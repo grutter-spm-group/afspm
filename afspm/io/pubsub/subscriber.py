@@ -45,12 +45,17 @@ class ABCSubscriber(ABC):
         - keys that are strings, equivalent to the topics we send.
         - values that are iterables. So, even if only storing 1 object, make
         sure it is in an iterable format.
+
+        NOTE: property so it is read-only!
         """
 
     @property
     @abstractmethod
     def shutdown_was_requested(self):
-        """Whether or not a kill signal has been received."""
+        """Whether or not a kill signal has been received.
+
+        NOTE: property so it is read-only!
+        """
 
 
 class Subscriber(ABCSubscriber):
