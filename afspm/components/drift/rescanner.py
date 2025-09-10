@@ -6,6 +6,7 @@ from google.protobuf.message import Message
 
 from ..scan import handler
 from ...io.pubsub.logic import pbc_logic
+from ...io.pubsub.logic.cache_logic import get_cache_item
 from ...io import common
 
 from ...io.protos.generated import control_pb2
@@ -78,12 +79,16 @@ class DriftRescanner(handler.ScanningComponent):
                 len(self.subscriber.cache[cs_key]) > 0):
             # If we have gone through all scan_params in cache and the
             # control state still has EXP_PROBLEM, try to remove it.
-            in_control = (self.subscriber.cache[cs_key][-1].client_in_control_id
-                          == self.name)
+            client_in_control_id = get_cache_item(
+                self.subscriber.cache, cs_key, -1).client_in_control_id
+            in_control = (client_in_control_id == self.name)
+
+            scope_state = get_cache_item(self.subscriber.cache,
+                                         ss_key, -1).scope_state
             finishing_scan = (self.scan_handler._desired_scope_state ==
                               scan_pb2.ScopeState.SS_SCANNING and
-                              self.subscriber.cache[ss_key][-1].scope_state ==
-                              scan_pb2.ScopeState.SS_FREE)
+                              scope_state == scan_pb2.ScopeState.SS_FREE)
+
             if in_control and finishing_scan:
                 logger.warning('Releasing control following rescan.')
                 rep = self.control_client.remove_experiment_problem(
@@ -94,7 +99,8 @@ class DriftRescanner(handler.ScanningComponent):
                 len(self.subscriber.cache[cs_key]) > 0):
             # If we have scan_params in cache and we have *not* logged
             # our EXP_PROBLEM, do so.
-            problems_set = self.subscriber.cache[cs_key][-1].problems_set
+            problems_set = get_cache_item(self.subscriber.cache,
+                                          cs_key, -1).problems_set
             if (not common.is_problem_in_problems_set(self.EXP_PROBLEM,
                                                       problems_set)):
                 logger.warning('Taking control to rescan.')
@@ -120,6 +126,8 @@ def rerun_scans(component: DriftRescanner
 
     key = component.scan_params_id
     if len(component.subscriber.cache[key]) > 0:
-        scan_params = component.subscriber.cache[key].pop()
+        # The cache contains (proto, ts), but we don't care about
+        # ts here.
+        scan_params, _ = component.subscriber.cache[key].pop()
         return scan_params
     return None

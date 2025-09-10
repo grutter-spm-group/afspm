@@ -231,8 +231,9 @@ def client(ctx, component_name, router_url, request_timeout_ms):
 def assert_sub_received_proto(sub: Subscriber, proto: Message):
     """Confirm a message is received by a subscriber."""
     assert sub.poll_and_store()
-    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][-1]
-            == proto)
+    cache_proto, ts = sub.cache[
+        cl.CacheLogic.get_envelope_for_proto(proto)][-1]
+    assert (cache_proto == proto)
 
 
 def stop_client(client: ControlClient):

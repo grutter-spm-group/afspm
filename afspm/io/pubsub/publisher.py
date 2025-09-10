@@ -1,17 +1,36 @@
 """Holds our Publisher logic."""
 
 from typing import Callable
+from datetime import datetime, timezone
 import logging
 
 import zmq
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from .. import common
 from . import defaults
 
 
 logger = logging.getLogger(__name__)
+
+
+def create_message_packet(env: str, proto: Message, ts: Timestamp):
+    """Create publishing message packet.
+
+    We convert a message packet into a list of bytes objects.
+    """
+    return [env.encode(),
+            proto.SerializeToString(),
+            ts.SerializeToString()]
+
+
+def create_ts():
+    """Create timestamp for this moment."""
+    ts = Timestamp()
+    ts.FromDatetime(datetime.now(timezone.utc))
+    return ts
 
 
 class Publisher:
@@ -74,8 +93,10 @@ class Publisher:
         envelope = self._get_envelope_for_proto(proto,
                                                 **self._get_envelope_kwargs)
         logger.debug(f"{self._uuid}: Sending message {envelope}")
-        self._publisher.send_multipart([envelope.encode(),
-                                       proto.SerializeToString()])
+
+        ts = create_ts()
+        self._publisher.send_multipart(
+                    create_message_packet(envelope, proto, ts))
 
     def send_kill_signal(self):
         """Send a kill signal to subscribers."""

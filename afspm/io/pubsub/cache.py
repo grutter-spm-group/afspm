@@ -7,9 +7,12 @@ import logging
 import zmq
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from .. import common
 from . import defaults
+from .publisher import create_message_packet
+from .logic.cache_logic import extract_ts
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +29,8 @@ class PubSubCache:
     determine how data is cached.
 
     Since this cache sits in between a publisher and subscribers, it will
-    receive [envelope, proto] messages from the publisher and will package
-    these into *potentially separate* [new_envelope, proto] messages to the
+    receive [envelope, proto, ts] messages from the publisher and will package
+    these into *potentially separate* [new_envelope, proto, ts] messages to the
     subscribers.
     This permits more complex logic than a 1-to-1 mapping between proto and
     envelope. For example, one may decide to have 2 envelopes defined for a
@@ -82,7 +85,7 @@ class PubSubCache:
                  defaults.EXTRACT_PROTO,
                  pub_get_envelope_for_proto: Callable[[Message, ...], str] =
                  defaults.PUBSUBCACHE_GET_ENVELOPE_FOR_PROTO,
-                 update_cache: Callable[[str, Message,
+                 update_cache: Callable[[str, Message, Timestamp,
                                          dict[str, Iterable], ...],
                                         dict[str, Iterable]] =
                  defaults.UPDATE_CACHE,
@@ -198,7 +201,8 @@ class PubSubCache:
                 frontend.
         """
         proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
-        return self.send_message(proto)
+        ts = extract_ts(msg)
+        return self.send_message(proto, ts)
 
     def _on_new_subscription(self, envelope: str):
         """Send associated cache (if envelope exists).
@@ -225,11 +229,11 @@ class PubSubCache:
         for env in envelopes_to_send:
             logger.info(f"{self._uuid}: Subscription: cache for {env} being "
                         "sent out.")
-            for proto in self.cache[env]:
-                self._backend.send_multipart([env.encode(),
-                                              proto.SerializeToString()])
+            for idx, (proto, ts) in enumerate(self.cache[env]):
+                self._backend.send_multipart(
+                    create_message_packet(env, proto, ts))
 
-    def send_message(self, proto: Message):
+    def send_message(self, proto: Message, ts: Timestamp):
         """Cache message and pass on to subscribers.
 
         Args:
@@ -237,11 +241,11 @@ class PubSubCache:
         """
         envelope = self._pub_get_envelope_for_proto(
             proto, **self._get_envelope_kwargs)
-        self._update_cache(proto, self.cache,
+        self._update_cache(proto, ts, self.cache,
                            **self._update_cache_kwargs)
         logger.debug(f"{self._uuid}: Sending message {envelope}")
-        self._backend.send_multipart([envelope.encode(),
-                                      proto.SerializeToString()])
+        self._backend.send_multipart(
+            create_message_packet(envelope, proto, ts))
 
     def send_kill_signal(self):
         """Send a kill signal to subscribers."""

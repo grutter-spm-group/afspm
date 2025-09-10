@@ -7,8 +7,8 @@ from collections import deque
 
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.pubsub.logic import pbc_logic as pbc
+from afspm.io.pubsub.publisher import create_message_packet, create_ts
 from afspm.io.protos.generated import scan_pb2
-
 
 logger = logging.getLogger(__name__)
 
@@ -73,32 +73,39 @@ def pbc_with_roi_logic(proto_5nm, proto_10nm, proto_5nm_hist, proto_10nm_hist):
     return pbc.PBCScanLogic(def_hist_list)
 
 
-def test_extract_proto(proto_5nm, pbc_logic, pbc_long_history_logic):
+@pytest.fixture
+def ts():
+    return create_ts()
+
+
+def test_extract_proto(proto_5nm, pbc_logic, pbc_long_history_logic, ts):
     """Validate we can extract a proto properly."""
 
     for logic in [pbc_logic, pbc_long_history_logic]:
         envelope = logic.get_envelope_for_proto(proto_5nm)
-        msg = [envelope.encode(), proto_5nm.SerializeToString()]
+
+        msg = create_message_packet(envelope, proto_5nm, ts)
         extracted_proto = logic.extract_proto(msg)
         assert proto_5nm == extracted_proto
 
 
-def test_update_cache_lvc(cache, proto_5nm, proto_10nm, pbc_logic):
+def test_update_cache_lvc(cache, proto_5nm, proto_10nm, pbc_logic, ts):
     """Validate we can use the cache properly."""
     logic = pbc_logic
     for proto in [proto_5nm, proto_10nm]:
         envelope = logic.get_envelope_for_proto(proto)
-        logic.update_cache(proto, cache)
-        assert proto in cache[envelope]
+        logic.update_cache(proto, ts, cache)
+        assert proto in [cache_proto for (cache_proto, ts) in cache[envelope]]
 
 
-def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
+def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic,
+                                     ts):
     max_len = 5
     logic = pbc_long_history_logic
 
     envelope = logic.get_envelope_for_proto(proto_5nm)
-    logic.update_cache(proto_5nm, cache)
-    assert proto_5nm in cache[envelope]
+    logic.update_cache(proto_5nm, ts, cache)
+    assert proto_5nm in [cache_proto for (cache_proto, ts) in cache[envelope]]
 
     # Test up to/before popping
     channels = ['a', 'b', 'c', 'd']
@@ -108,9 +115,9 @@ def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
         proto = copy.deepcopy(proto_5nm)
         proto.channel = channel
         expected_cache_channels.append(channel)
-        logic.update_cache(proto, cache)
+        logic.update_cache(proto, ts, cache)
 
-        cache_channels = [x.channel for x in cache[envelope]]
+        cache_channels = [x.channel for (x, ts) in cache[envelope]]
         for cn in expected_cache_channels:
             assert cn in cache_channels
 
@@ -121,16 +128,16 @@ def test_update_cache_longer_history(cache, proto_5nm, pbc_long_history_logic):
         proto = copy.deepcopy(proto_5nm)
         proto.channel = channel
         expected_cache_channels.append(channel)
-        logic.update_cache(proto, cache)
+        logic.update_cache(proto, ts, cache)
 
-        cache_channels = [x.channel for x in cache[envelope]]
+        cache_channels = [x.channel for (x, ts) in cache[envelope]]
         for cn in expected_cache_channels:
             assert cn in cache_channels
 
 
 def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
                             proto_5nm_hist, proto_10nm_hist,
-                            pbc_with_roi_logic):
+                            pbc_with_roi_logic, ts):
     """Validate we can use the cache properly."""
     protos = [proto_5nm, proto_10nm]
     hists = [proto_5nm_hist, proto_10nm_hist]
@@ -138,12 +145,12 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
     logic = pbc_with_roi_logic
     for proto in protos:
         envelope = logic.get_envelope_for_proto(proto)
-        logic.update_cache(proto, cache)
-        assert proto in cache[envelope]
+        logic.update_cache(proto, ts, cache)
+        assert proto in [cache_proto for (cache_proto, ts) in cache[envelope]]
 
     # Because we are using ROI logic, the original proto should still be there!
     envelope = logic.get_envelope_for_proto(proto_5nm)
-    assert proto_5nm in cache[envelope]
+    assert proto_5nm in [cache_proto for (cache_proto, ts) in cache[envelope]]
 
     # Now, validate that our history is correct for each.
     cache = {}
@@ -153,27 +160,27 @@ def test_pbc_with_roi_logic(cache, proto_5nm, proto_10nm,
             tmp = copy.deepcopy(proto)
             tmp.values.append(cnt)
 
-            logic.update_cache(tmp, cache)
+            logic.update_cache(tmp, ts, cache)
             expected_hist.append(tmp)
 
         envelope = logic.get_envelope_for_proto(proto)
-        for idx, cache_val in enumerate(cache[envelope]):
+        for idx, (cache_val, ts) in enumerate(cache[envelope]):
             assert cache_val == expected_hist[idx]
 
         tmp = copy.deepcopy(proto)
         tmp.values.append(200)  # Just differentiate from the end
 
-        logic.update_cache(tmp, cache)
+        logic.update_cache(tmp, ts, cache)
         # Append to end and remove first item (simulating deque)
         expected_hist = expected_hist[1:]
         expected_hist.append(tmp)
-        for idx, cache_val in enumerate(cache[envelope]):
+        for idx, (cache_val, ts) in enumerate(cache[envelope]):
             assert cache_val == expected_hist[idx]
 
 
 def test_pbc_with_roi_with_envelope_missing(cache, proto_5nm_general,
                                             proto_5nm_hist,
-                                            pbc_with_roi_logic):
+                                            pbc_with_roi_logic, ts):
     """Like above, but we are dealing with a proto which we did not specify.
 
     We expect it to get_closest_match to proto_5nm.
@@ -183,12 +190,12 @@ def test_pbc_with_roi_with_envelope_missing(cache, proto_5nm_general,
 
     logic = pbc_with_roi_logic
     envelope = logic.get_envelope_for_proto(proto)
-    logic.update_cache(proto, cache)
-    assert proto in cache[envelope]
+    logic.update_cache(proto, ts, cache)
+    assert proto in [cache_proto for (cache_proto, ts) in cache[envelope]]
 
     # Because we are using ROI logic, the original proto should still be there!
     envelope = logic.get_envelope_for_proto(proto)
-    assert proto in cache[envelope]
+    assert proto in [cache_proto for (cache_proto, ts) in cache[envelope]]
 
     # Now, validate that our history is correct for each.
     cache = {}
@@ -197,22 +204,22 @@ def test_pbc_with_roi_with_envelope_missing(cache, proto_5nm_general,
         tmp = copy.deepcopy(proto)
         tmp.values.append(cnt)
 
-        logic.update_cache(tmp, cache)
+        logic.update_cache(tmp, ts, cache)
         expected_hist.append(tmp)
 
     envelope = logic.get_envelope_for_proto(proto)
 
-    for idx, cache_val in enumerate(cache[envelope]):
+    for idx, (cache_val, ts) in enumerate(cache[envelope]):
         assert cache_val == expected_hist[idx]
 
     tmp = copy.deepcopy(proto)
     tmp.values.append(200)  # Just differentiate from the end
 
-    logic.update_cache(tmp, cache)
+    logic.update_cache(tmp, ts, cache)
     # Append to end and remove first item (simulating deque)
     expected_hist = expected_hist[1:]
     expected_hist.append(tmp)
-    for idx, cache_val in enumerate(cache[envelope]):
+    for idx, (cache_val, ts) in enumerate(cache[envelope]):
         assert cache_val == expected_hist[idx]
 
 

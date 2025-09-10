@@ -4,12 +4,14 @@ from typing import Mapping
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ...protos.generated import scan_pb2
 from ...protos.generated import control_pb2
 from ...protos.generated import feedback_pb2
 from ...protos.generated import analysis_pb2
 from ...protos.generated import spec_pb2
+
 
 # A default proto-history list for a Last-Value Cache (LVC)
 # Please update with new default messages created.
@@ -40,20 +42,26 @@ class CacheLogic(metaclass=ABCMeta):
                 message.
 
         Returns:
-            A protobuf structure extracted from the message.
+            A ProtoTimestamp extracted from the message.
         """
 
     @abstractmethod
-    def update_cache(self, proto: Message, cache: Mapping[str, Iterable]
+    def update_cache(self, proto: Message, ts: Timestamp,
+                     cache: Mapping[str, Iterable[tuple[Message, Timestamp]]]
                      ):
-        """Update the provided cache with the provided proto.
+        """Update the provided cache with the provided proto and timestamp.
+
+        We store items in the cache as (proto, ts) tuples. This allows us
+        to filter 'old' protos if we receive them due to new subscriptions.
 
         Args:
-            proto: protobuf structure linked to the envelope.
+            proto: proto of the message.
+            ts: Timestamp of when the message was sent.
             cache: mapping for storing the messages received. of the form:
-                envelope: list[proto] (for key:val). Note that the suggested
-                'list' type here is a dequeue, as it allows a size definition
-                (and will pop elements from the back if you exceed the size).
+                envelope: list[(proto,ts)] (for key:val). Note that the
+                suggested 'list' type here is a dequeue, as it allows a size
+                definition (and will pop elements from the back if you exceed
+                the size).
         """
 
     @staticmethod
@@ -76,7 +84,8 @@ class CacheLogic(metaclass=ABCMeta):
         return proto.__class__()
 
 
-def extract_proto(msg: list[bytes], cache_logic: CacheLogic) -> Message:
+def extract_proto(msg: list[bytes], cache_logic: CacheLogic
+                  ) -> Message:
     """Non-class method for extracting proto given a CacheLogic instance.
 
     See CacheLogic.extract_proto() for more info.
@@ -84,10 +93,58 @@ def extract_proto(msg: list[bytes], cache_logic: CacheLogic) -> Message:
     return cache_logic.extract_proto(msg)
 
 
-def update_cache(proto: Message, cache: dict[str, Iterable],
+def extract_ts(msg: list[bytes]) -> Timestamp:
+    """Extract timestamp of a published message."""
+    ts_contents = msg[2]
+    ts = Timestamp()
+    ts.ParseFromString(ts_contents)
+    return ts
+
+
+def update_cache(proto: Message, ts: Timestamp,
+                 cache: dict[str, Iterable[tuple[Message, Timestamp]]],
                  cache_logic: CacheLogic):
-    """Non-class method for updating the cache for a particular proto.
+    """Non-class method for updating the cache for a particular message.
 
     see CacheLogic.update_cache() for more info.
     """
-    cache_logic.update_cache(proto, cache)
+    cache_logic.update_cache(proto, ts, cache)
+
+
+def get_cache_item(cache: dict[str, Iterable[tuple[Message, Timestamp]]],
+                   key: str, idx: int) -> Message:
+    """Obtain Message from cache, given key and index.
+
+    Helper to obfuscate the access from the cache. Since we now get
+    (proto, ts) tuples, it gets a bit annoying to access. This tries
+    to make it a bit easier to read.
+
+    Args:
+        cache: the cache we are to access.
+        key: the cache key we are interested in.
+        idx: the index of interest for cache[key] (recall the val is an
+            iterable).
+
+    Returns:
+        the proto at that location in the cache.
+    """
+    proto, ts = cache[key][idx]
+    return proto
+
+
+def get_cache_items(cache: dict[str, Iterable[tuple[Message, Timestamp]]],
+                    key: str) -> Iterable[Message]:
+    """Obtain Messages from cache, given key.
+
+    Helper to obfuscate the access from the cache. Since we now get
+    (proto, ts) tuples, it gets a bit annoying to access. This tries
+    to make it a bit easier to read.
+
+    Args:
+        cache: the cache we are to access.
+        key: the cache key we are interested in.
+
+    Returns:
+        the list of protos for a given key the cache.
+    """
+    return [proto for (proto, ts) in cache[key]]

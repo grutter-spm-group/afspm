@@ -202,8 +202,9 @@ def afspm_component(sub_scope_state, admin_client, component_name, ctx):
 def assert_sub_received_proto(sub: Subscriber, proto: Message):
     """Confirm a message is received by a subscriber."""
     assert sub.poll_and_store()
-    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][-1]
-            == proto)
+    proto_cache, ts = sub.cache[
+        cl.CacheLogic.get_envelope_for_proto(proto)][-1]
+    assert (proto_cache == proto)
 
 
 def startup_flush_messages(afspm_component: AfspmComponentBase,

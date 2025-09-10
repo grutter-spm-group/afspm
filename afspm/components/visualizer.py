@@ -11,6 +11,8 @@ from google.protobuf.message import Message
 from . import component as afspmc
 from ..io.protos.generated import scan_pb2
 from ..io.pubsub.defaults import SCAN_ID
+from ..io.pubsub.logic.cache_logic import (get_cache_item,
+                                           get_cache_items)
 from ..utils import array_converters as ac
 
 logger = logging.getLogger(__name__)
@@ -210,8 +212,9 @@ class Visualizer(afspmc.AfspmComponent):
 
             if (self.cache_meaning_map[key].upper() ==
                     CacheMeaning.TEMPORAL.name):
-                scan_xarr = ac.convert_scan_pb2_to_xarray(
-                    self.subscriber.cache[key][-1])  # Last value in hist
+                scan_proto = get_cache_item(self.subscriber.cache,
+                                            key, -1)  # Last value in hist
+                scan_xarr = ac.convert_scan_pb2_to_xarray(scan_proto)
             elif (self.cache_meaning_map[key].upper() ==
                     CacheMeaning.REGIONS.name):
                 scan_xarr = self._create_regions_xarray(key)
@@ -262,7 +265,7 @@ class Visualizer(afspmc.AfspmComponent):
         scan_phys_size define the overall size of the image; the full image
         data resolution is calculated from this and the data_res/phys_size.
         """
-        cache_list = self.subscriber.cache[key]
+        cache_list = get_cache_items(self.subscriber.cache, key)
         scan_phys_origin = self.scan_phys_origin_map[key]
         scan_phys_size = self.scan_phys_size_map[key]
         # TODO: Consider angle!!

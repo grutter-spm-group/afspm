@@ -9,6 +9,7 @@ from samples.point_subscan import experiment
 from afspm.io import common
 from afspm.components import component
 from afspm.io.pubsub import subscriber
+from afspm.io.pubsub.publisher import create_ts
 
 from afspm.io.protos.generated import geometry_pb2
 from afspm.io.protos.generated import analysis_pb2
@@ -134,7 +135,7 @@ def expected_full_scan(exp_data):
 def sample_sub(sample_points, points_id):
     sub = subscriber.Subscriber("ipc://fake_url")
     sub.cache[points_id] = deque(maxlen=5)
-    sub.cache[points_id].append(sample_points)
+    sub.cache[points_id].append((sample_points, create_ts()))
     return sub
 
 

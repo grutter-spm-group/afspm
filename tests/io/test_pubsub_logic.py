@@ -168,8 +168,9 @@ def test_pub_send_msg(ctx, pub, sample_scan):
 def assert_sub_received_proto(sub: subscriber.Subscriber, proto: Message):
     """Confirm a message is received by a subscriber."""
     assert sub.poll_and_store()
-    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][-1]
-            == proto)
+    cache_proto, ts = sub.cache[cl.CacheLogic.get_envelope_for_proto(
+        proto)][-1]
+    assert cache_proto == proto
 
 
 def test_pubsub_simple(pub_url, cache_kwargs, ctx, pub, topics_both,
@@ -339,7 +340,9 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
     - subscribers receive only messages from the envelopes they
     subscribe.
     - upon a new subscriber, old cache messages (from each newly subscribed
-    envelope) are received by all current subscribers.
+    envelope) are *only* received by new current subscribers.
+      NOTE: this is something we implemented ourselves. We use timestamps
+      to filter out 'old' messages.
     - messages sent after a new subscriber are sent properly.
     """
     sub_scan = sub_scan_psc
@@ -355,7 +358,7 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
     assert not sub_scan.poll_and_store()
     assert_sub_received_proto(sub_control_state, control_state)
 
-    # Connect a 3rd subscriber and confirm we *do* re-receive the old
+    # Connect a 3rd subscriber and confirm we *do not* re-receive the old
     # messages (since we have a pubsubcache setup).
     sub_both = subscriber.Subscriber(
         psc_url, cl.extract_proto, topics_both,
@@ -363,9 +366,10 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
         extract_proto_kwargs=cache_kwargs,
         update_cache_kwargs=cache_kwargs,
         poll_timeout_ms=wait_ms)
+    assert not sub_scan.poll_and_store()
+    assert not sub_control_state.poll_and_store()
 
-    assert sub_scan.poll_and_store()
-    assert sub_control_state.poll_and_store()
+    # However, the new subscriber should receive our 'cached' messages.
     # Although we have subscribed to 2 topics, we should recieve both
     # messages in a single poll_and_store().
     assert sub_both.poll_and_store()

@@ -6,6 +6,7 @@ import copy
 from collections.abc import Iterable
 from collections import deque
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from .cache_logic import CacheLogic, DEFAULT_PROTO_WITH_HIST_SEQ
 from ...protos.generated import scan_pb2
@@ -41,13 +42,15 @@ class ProtoBasedCacheLogic(CacheLogic):
             # specific proto.
             envelope = self.get_envelope_for_proto(proto)
             self.envelope_to_history_map[envelope] = history
-            self.envelope_to_proto_map[envelope] = self.create_default_proto(proto)
+            self.envelope_to_proto_map[envelope] = self.create_default_proto(
+                proto)
 
     def extract_proto(self, msg: list[bytes]) -> Message:
         """Overload parent."""
-        envelope, contents = msg
+        envelope, contents, ts_contents = msg
         envelope = envelope.decode()
 
+        # Get proto type from envelope
         if envelope not in self.envelope_to_proto_map:
             envelope = get_closest_match(
                 envelope, list(self.envelope_to_proto_map.keys()))
@@ -60,11 +63,13 @@ class ProtoBasedCacheLogic(CacheLogic):
             logger.error(msg)
             raise KeyError(msg)
 
+        # Extract proto and timestamp from conents of each
         proto = copy.deepcopy(proto)
         proto.ParseFromString(contents)
         return proto
 
-    def update_cache(self, proto: Message, cache: dict[str, Iterable]):
+    def update_cache(self, proto: Message, ts: Timestamp,
+                     cache: dict[str, Iterable]):
         """Overload parent."""
         envelope = self.get_envelope_for_proto(proto)
         if envelope not in cache:
@@ -89,7 +94,7 @@ class ProtoBasedCacheLogic(CacheLogic):
                 logger.trace(f'for envelope: {envelope}, found {match_env}, '
                              f'adding cache of size {maxlen}.')
                 cache[envelope] = deque(maxlen=maxlen)
-        cache[envelope].append(proto)
+        cache[envelope].append((proto, ts))
 
 
 class PBCScanLogic(ProtoBasedCacheLogic):

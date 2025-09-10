@@ -1,6 +1,7 @@
 """Holds our Subscriber logic."""
 
 from typing import Callable
+from datetime import timezone
 from collections.abc import Iterable
 from abc import ABC, abstractmethod
 import logging
@@ -11,6 +12,7 @@ from google.protobuf.message import Message
 
 from .. import common
 from . import defaults
+from .logic.cache_logic import extract_ts
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,7 @@ class Subscriber(ABCSubscriber):
         _poll_timeout_ms: the poll timeout, in milliseconds. If None,
             we do not poll and do a blocking receive instead.
         _uuid: a uuid to differentiate subscribers in logs.
+        _latest_dt: datetime of latest message received.
     """
 
     def __init__(self, sub_url: str,
@@ -144,6 +147,8 @@ class Subscriber(ABCSubscriber):
 
         self._subscriber = ctx.socket(zmq.SUB)
         self._subscriber.connect(sub_url)
+
+        self._latest_dt = None
 
         # Subscribe to all our topics
         for topic in topics_to_sub:
@@ -208,15 +213,27 @@ class Subscriber(ABCSubscriber):
                 we return None.
         """
         envelope = msg[0].decode()
+
         if envelope == common.KILL_SIGNAL:
             logger.info(f"{self._uuid}: Shutdown was requested!")
             self._shutdown_was_requested = True
             return None
 
         proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
+        ts = extract_ts(msg)
+        dt = ts.ToDatetime(timezone.utc)
+        if self._latest_dt and dt <= self._latest_dt:
+            logger.debug(f"{self._uuid}: Received 'old' message, ignoring "
+                         f"(envelope: {envelope}).")
+            logger.trace(f" dt: {dt}")
+            logger.trace(f" self._latest_dt: {self._latest_dt}")
+            return None
+
         logger.debug(f"{self._uuid}: Message received {envelope}")
-        self._update_cache(proto, self._cache,
+        self._update_cache(proto, ts, self._cache,
                            **self._update_cache_kwargs)
+        self._latest_dt = dt
+
         return (envelope, proto)
 
     def set_uuid(self, uuid: str):

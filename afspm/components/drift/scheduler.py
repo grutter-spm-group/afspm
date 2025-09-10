@@ -13,6 +13,7 @@ import copy
 import datetime as dt
 import matplotlib.pyplot as plt
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.message_factory import GetMessageClass
 
 from . import drift, correction
@@ -283,7 +284,7 @@ class CSCorrectedCache(cache.PubSubCache):
         """Bind callback to scan having been received."""
         self._observers.append(callback)
 
-    def send_message(self, proto: Message):
+    def send_message(self, proto: Message, ts: Timestamp):
         """Override to correct CS data before sending out."""
         for callback in self._observers:
             callback(proto)
@@ -299,7 +300,7 @@ class CSCorrectedCache(cache.PubSubCache):
         proto = cs_correct_proto(proto, self._corr_info,
                                  self._update_weight, curr_dt)
 
-        super().send_message(proto)  # Add to cache after CS switch.
+        super().send_message(proto, ts)  # Add to cache after CS switch.
 
     @classmethod
     def from_parent(cls, parent):
@@ -550,10 +551,11 @@ class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
         return snapshot
 
     def _get_scans_from_cache(self) -> list[scan_pb2.Scan2d]:
-        # The cache is a key:val map of deques of items.
+        # The cache is a key:val map of deques of (proto, ts) items.
         # So we need to filter through each deque and concat the values
         # if they are scans.
-        scan_deques = [val for key, val in self.pubsubcache.cache.items()
+        scan_deques = [cache_logic.get_cache_items(self.pubsubcache.cache, key)
+                       for key in self.pubsubcache.cache.keys()
                        if self.SCAN_ID in key]
 
         # Go from list of lists to flattened single list (extending a new list)

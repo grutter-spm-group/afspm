@@ -134,7 +134,7 @@ def send_empty_scan(self):
     # We need length_units to have some unit, so we can do conversions
     # when updating the Scan2d/ScanParameters2d protos.
     scan.params.spatial.length_units = 'nm'
-    self.send_message(scan)
+    self.send_message(scan, ts)
     self.scan_was_received = True
 
 

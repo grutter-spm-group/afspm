@@ -8,6 +8,7 @@ from afspm.components.component import AfspmComponent
 
 from afspm.io import common
 from afspm.io.protos.generated import scan_pb2
+from afspm.io.pubsub.logic.cache_logic import get_cache_item
 
 
 logger = logging.getLogger(LOGGER_ROOT + '.samples.point_subscan.' + __name__)
@@ -66,7 +67,8 @@ def get_next_scan_params(component: AfspmComponent,
             return None
 
         # TODO: Should we be grabbing from 0 or -1???
-        pts = component.subscriber.cache[exp_data.points_id][-1].spatials
+        pts = get_cache_item(component.subscriber.cache,
+                             exp_data.points_id, -1).spatials
 
         highest_pt = None
         for pt in pts:
