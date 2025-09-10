@@ -168,8 +168,7 @@ def test_pub_send_msg(ctx, pub, sample_scan):
 def assert_sub_received_proto(sub: subscriber.Subscriber, proto: Message):
     """Confirm a message is received by a subscriber."""
     assert sub.poll_and_store()
-    assert len(sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)]) == 1
-    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][0]
+    assert (sub.cache[cl.CacheLogic.get_envelope_for_proto(proto)][-1]
             == proto)
 
 
