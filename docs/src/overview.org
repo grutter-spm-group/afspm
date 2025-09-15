@@ -12,7 +12,7 @@
 #+options: h:2 toc:1
 
 # Set institute
-#+beamer_header:\institute{Division of Materials Engineering, Faculty of Engineering,McGill University$^1$ \newline Department of Physics,McGill University$^2$ \newline National Research Council Canada, Digital Technologies Research Centre$^3$ \newline \bigskip\includegraphics[width=0.2\paperwidth]{./images/mcgill_sig_red.png}}
+#+beamer_header:\institute{Division of Materials Engineering, Faculty of Engineering, McGill University$^1$ \newline Department of Physics, McGill University$^2$ \newline National Research Council Canada, Digital Technologies Research Centre$^3$ \newline \bigskip\includegraphics[width=0.2\paperwidth]{./images/mcgill_sig_red.png}}
 
 # Add mcgill logo to title slide
 # #+beamer_header: \usebackgroundtemplate{\includegraphics[width=0.25\paperwidth]{./images/mcgill_sig_red.png}}
@@ -48,13 +48,15 @@
 #+beamer_header:\setbeamercolor{alerted text}{fg=structure!85!white}
 #+beamer_header:\setbeamerfont{alerted text}{series=\bfseries}
 
+
 # -- Theme structure -- #
 # Inner theme: default, circles, rectangles, rounded
 #+beamer_inner_theme: rectangles
-#+beamer_outer_theme: [subsection=false, footline=authortitle]miniframes
+#+beamer_outer_theme: [subsection=false, footline=empty]miniframes
 
 # Add frame numbers
-#+beamer_header:\setbeamertemplate{page number in head/foot}[framenumber]
+#+beamer_header:\setbeamertemplate{footline}[frame number]
+
 
 # Provides nicer equation fonts
 #+beamer_font_theme: professionalfonts
@@ -301,15 +303,15 @@ message Scan2d {
 :PROPERTIES:
 :BEAMER_col: 0.47
 :END:
-TODO: UPDATE!!!
 #+attr_latex: :options fontsize=\scriptsize, frame=lines, framesep=2mm
 #+begin_src protobuf :results code
 enum ControlRequest {
   REQ_UNDEFINED = 0;
-  REQ_START_SCAN = 1;     // [...]
-  REQ_REQUEST_CTRL = 4;   // [...]
-  REQ_ADD_EXP_PRBLM = 6;  // [...]
-  REQ_SET_CONTROL_MODE = 8;
+  REQ_ACTION = 1;
+  REQ_PARAM = 2;   // [...]
+  REQ_REQUEST_CTRL = 6;   // [...]
+  REQ_ADD_EXP_PRBLM = 8;  // [...]
+  REQ_SET_CONTROL_MODE = 10;
 }
 #+end_src
 #+begin_center
@@ -326,7 +328,7 @@ enum ControlResponse {
   REP_FAILURE = 1;             // [...]
   REP_NO_RESPONSE = 3;         // [...]
   REP_NOT_FREE = 7;            // [...]
-  REP_PARAM_NOT_SUPPORTED = 9; // [...]
+  REP_PARAM_NOT_SUPPORTED = 8; // [...]
 }
 #+end_src
 #+begin_center
