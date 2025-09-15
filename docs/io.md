@@ -43,7 +43,7 @@ All requests in the control-request path are of the form:
 
 | ```Request ID``` | ```Data Structure``` |
 
-Where ```Request ID``` is an integer associated with the ControlRequest enumeration in ```control.proto```, and ```Data Structure``` is a serialized protobuffer data structure. There is an explicit mapping from ```Request ID``` to the expected data structure, which can be found at ```afspm/io/control/commands.py``` (```REQ\_TO\_OBJ\_MAP```).
+Where ```Request ID``` is an integer associated with the ControlRequest enumeration in ```control.proto```, and ```Data Structure``` is a serialized protobuffer data structure. There is an explicit mapping from ```Request ID``` to the expected data structure, which can be found at ```afspm/io/control/commands.py``` (```REQ_TO_OBJ_MAP```).
 
 All responses in the control-request path are of one of the following two forms:
 
@@ -51,7 +51,7 @@ All responses in the control-request path are of one of the following two forms:
 
 (2) | ```Response ID``` | ```Data Structure``` |
 
-Where ```Response ID``` is an integer associated with the ControlRequest enumeration in ```control.proto```, and ```Data Structure``` is a serialized protobuffer data structure. Almost all responses are of form (1); the exceptional cases are listed in ```afspm/io/control/commands.py```  (```REQ\_TO\_RETURN\_OBJ\_MAP```).
+Where ```Response ID``` is an integer associated with the ControlRequest enumeration in ```control.proto```, and ```Data Structure``` is a serialized protobuffer data structure. Almost all responses are of form (1); the exceptional cases are listed in ```afspm/io/control/commands.py```  (```REQ_TO_RETURN_OBJ_MAP```).
 
 In the case of our microscope communication, data is passed between 3 I/O node types:
 - The MicroscopeTranslator has a ControlServer node, which receives requests from other components and responds to them.
