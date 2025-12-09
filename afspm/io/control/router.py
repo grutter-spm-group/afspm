@@ -42,12 +42,14 @@ class ControlRouter:
         _problems_set: holds the set of problems which have been notified by
             ControlClients. A ControlClient can only gain control if they
             request with an ExperimentProblem that is in _problems_set (or
-            EP_NONE if an automated component hat is expected to run normally).
+            EP_NONE if an automated component that is expected to run normally).
             If another client is already under control, the control request
             will be rejected.
         _control_mode: what ControlMode we are currently running under. When in
             CM_MANUAL, no automation will run.
         _client_in_control_id: a uuid for the client currently under control.
+        _client_in_control_problem: the EP_PROBLEM the client currently under
+            control solves.
         _poll_timeout_ms: delay to wait when polling for a request from the
            frontend.
         _request_timeout_ms: delay to wait for a reply from a request we send to
@@ -91,6 +93,7 @@ class ControlRouter:
 
         self._control_mode = control_pb2.ControlMode.CM_AUTOMATED
         self._client_in_control_id = None
+        self._client_in_control_problem = None
 
         self._poll_timeout_ms = poll_timeout_ms
         self._request_timeout_ms = request_timeout_ms
@@ -148,9 +151,10 @@ class ControlRouter:
         solves_problem = problem in self._problems_set
 
         if (not in_manual_mode and (no_problems_and_generic_request or
-                solves_problem)):
+                                    solves_problem)):
             logger.info(f"{self._uuid}: %s gaining control", client)
             self._client_in_control_id = client
+            self._client_in_control_problem = problem
             return control_pb2.ControlResponse.REP_SUCCESS
 
         problems_set_str = {common.get_enum_str(control_pb2.ExperimentProblem,
@@ -189,6 +193,7 @@ class ControlRouter:
         if self._client_in_control_id and self._client_in_control_id == client:
             logger.info(f"{self._uuid}: Releasing control from {client}")
             self._client_in_control_id = None
+            self._client_in_control_problem = None
             return control_pb2.ControlResponse.REP_SUCCESS
 
         logger.debug(f"{self._uuid}: {client} tried to release control, but "
@@ -207,22 +212,37 @@ class ControlRouter:
         Returns:
             ControlMode.SUCCESS if we were able to add it.
         """
+        if exp_problem == control_pb2.ExperimentProblem.EP_NONE:
+            logger.trace('Trying to add/remove generic problem. Skipping.')
+            return control_pb2.ControlResponse.REP_SUCCESS
+
         old_problems_set = copy.deepcopy(self._problems_set)
         if add_problem:
             logger.warning(f"{self._uuid}: Adding problem %s",
                            common.get_enum_str(control_pb2.ExperimentProblem,
                                                exp_problem))
             self._problems_set.add(exp_problem)
+
+            if len(old_problems_set) == 0:
+                logger.warning(f'{self._uuid}: From None to a problem, remove '
+                               'client in control.')
+                self._client_in_control_id = None
+                self._client_in_control_problem = None
+
         else:
             logger.warning(f"{self._uuid}: Removing problem %s",
                            common.get_enum_str(control_pb2.ExperimentProblem,
                                                exp_problem))
             self._problems_set.remove(exp_problem)
 
-        if self._problems_set != old_problems_set:
-            logger.warning(f"{self._uuid}: Problem set changed, removing "
-                           "client in control.")
-            self._client_in_control_id = None
+            if exp_problem == self._client_in_control_problem:
+                # Remove client in control, since the problem it resolves
+                # has supposedly been resolved.
+                logger.warning(f'{self._uuid}: The problem client '
+                               f'{self._client_in_control_id} solves has been '
+                               'removed. Releasing control from that client.')
+                self._client_in_control_id = None
+                self._client_in_control_problem = None
 
         # Return success always for now...
         return control_pb2.ControlResponse.REP_SUCCESS

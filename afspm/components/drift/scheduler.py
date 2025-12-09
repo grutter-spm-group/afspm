@@ -245,6 +245,7 @@ class DriftCompensatedRouter(router.ControlRouter):
         child._problems_set = parent._problems_set
         child._control_mode = parent._control_mode
         child._client_in_control_id = parent._client_in_control_id
+        child._client_in_control_problem = parent._client_in_control_problem
         child._poll_timeout_ms = parent._poll_timeout_ms
         child._request_timeout_ms = parent._request_timeout_ms
         child.shutdown_was_requested = parent.shutdown_was_requested

@@ -311,6 +311,38 @@ class TestRouterServerClient:
         comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
                                  b''])
 
+    def test_control_after_problem_removed(self, ctx, server_url, router_url,
+                                           comm_url, comm_pub, timeout_ms,
+                                           thread_srv, thread_rtr, problem,
+                                           rtr_client,
+                                           rtr_client_server_methods):
+        """A client that supports a problem can connect when the problem is
+        logged, and loses control once the problem is removed."""
+
+        rep = rtr_client.add_experiment_problem(problem)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        rep = rtr_client.request_control(problem)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        # When in control, all requests work
+        for method, proto in rtr_client_server_methods:
+            rep = method(proto) if proto else method()
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_SUCCESS)
+
+        rep = rtr_client.remove_experiment_problem(problem)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        # Cannot perform methods, because we are no longer in control!
+        for method, proto in rtr_client_server_methods:
+            rep = method(proto) if proto else method()
+            assert_rep(proto, rep,
+                       control_pb2.ControlResponse.REP_NOT_IN_CONTROL)
+
+        comm_pub.send_multipart([CommEnvelope.KILL.value.encode(),
+                                 b''])
+
     def test_control_after_manual(self, ctx, server_url, router_url,
                                   comm_url, comm_pub, timeout_ms,
                                   thread_srv, thread_rtr, problem, no_problem,
