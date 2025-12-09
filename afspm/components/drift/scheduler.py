@@ -194,7 +194,7 @@ def cs_correct_proto(proto_in: Message,
     return proto
 
 
-class CSCorrectedRouter(router.ControlRouter):
+class DriftCompensatedRouter(router.ControlRouter):
     """Corrects CS data before it is sent out via the router."""
 
     def __init__(self, **kwargs):
@@ -237,7 +237,7 @@ class CSCorrectedRouter(router.ControlRouter):
     @classmethod
     def from_parent(cls, parent):
         """Actual construction method, given a parent instance."""
-        child = CSCorrectedRouter()
+        child = DriftCompensatedRouter()
         child._ctx = parent._ctx
         child._backend_url = parent._backend_url
         child._backend = parent._backend
@@ -269,7 +269,7 @@ class CSCorrectedRouter(router.ControlRouter):
         self._update_weight = update_weight
 
 
-class CSCorrectedCache(cache.PubSubCache):
+class DriftCompensatedCache(cache.PubSubCache):
     """Corrects CS data before it is sent out to subscribers."""
 
     SCAN_ID = cache_logic.CacheLogic.get_envelope_for_proto(scan_pb2.Scan2d())
@@ -305,7 +305,7 @@ class CSCorrectedCache(cache.PubSubCache):
     @classmethod
     def from_parent(cls, parent):
         """Actual construction method, given a parent instance."""
-        child = CSCorrectedCache()
+        child = DriftCompensatedCache()
         child.cache = parent.cache
         child._sub_extract_proto = parent._sub_extract_proto
         child._extract_proto_kwargs = parent._extract_proto_kwargs
@@ -506,9 +506,9 @@ class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
                            'is probably too low!')
 
         # Create our wrapper router and cache
-        kwargs[scheduler.ROUTER_KEY] = CSCorrectedRouter.from_parent(
+        kwargs[scheduler.ROUTER_KEY] = DriftCompensatedRouter.from_parent(
             kwargs[scheduler.ROUTER_KEY])
-        kwargs[scheduler.CACHE_KEY] = CSCorrectedCache.from_parent(
+        kwargs[scheduler.CACHE_KEY] = DriftCompensatedCache.from_parent(
             kwargs[scheduler.CACHE_KEY])
 
         super().__init__(**kwargs)
