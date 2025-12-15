@@ -294,12 +294,20 @@ class ParameterHandler(metaclass=ABCMeta):
             generic_param:ParameterMethods. For a given generic_param, its
             ParameterMethods will only be added if it has both a setter and a
             getter defined.
+        param_info_init: method to call to create a ParameterInfo from
+            the val in the key:val pair of a config file.
+        param_methods_init: method to call to create a ParameterMethods
+            from the val in the key:val pair of a config file.
     """
 
-    def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME):
+    def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME,
+                 param_info_init: Callable = create_parameter_info,
+                 param_methods_init: Callable = create_parameter_methods):
         """Init class, loading params config for these purposes."""
         self.param_infos = {}
         self.param_methods = {}
+        self.param_info_init = param_info_init
+        self.param_methods_init = param_methods_init
         self._load_config_build_params(params_config_path)
 
     @abstractmethod
@@ -359,7 +367,7 @@ class ParameterHandler(metaclass=ABCMeta):
         for key, val in params_config.items():
             if isinstance(val, dict):
                 # Ceck if we have our own set/get methods
-                param_methods = create_parameter_methods(val)
+                param_methods = self.param_methods_init(val)
 
                 if param_methods.setter or param_methods.getter:
                     no_setter_or_getter = (
@@ -376,7 +384,7 @@ class ParameterHandler(metaclass=ABCMeta):
                     self.param_methods[key] = param_methods
 
                 # Load all the param info we can get.
-                param_info = create_parameter_info(val)
+                param_info = self.param_info_init(val)
                 self.param_infos[key] = param_info
 
                 # Check that we have what is needed to set/get:
@@ -506,6 +514,11 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for (param, val, unit) in zip(generic_params, vals, curr_units):
             self.set_param(param, val, unit)
+
+    def get_unit_list(self, generic_params: list[MicroscopeParameter]
+                      ) -> list[Any]:
+        """Get units for a list of provided parameters."""
+        return [self.get_unit(param) for param in generic_params]
 
 
 def _correct_val_for_sending(val: str, param_info: ParameterInfo,
