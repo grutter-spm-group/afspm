@@ -1,0 +1,27 @@
+# This file holds the SXM actions.
+
+[start-scan]
+method = 'afspm.components.microscope.translators.omicronsxm.actions.request_action'
+method_name = 'ScanPara'
+params = ['Scan', 1]
+type = 'PASS_KWARGS'
+pass_self = true
+
+[stop-scan]
+method = 'afspm.components.microscope.translators.omicronsxm.actions.request_action'
+method_name = 'ScanPara'
+params = ['Scan', 0]
+type = 'PASS_KWARGS'
+pass_self = true
+
+[start-spec]
+method = 'afspm.components.microscope.translators.omicronsxm.actions.request_action'
+method_name = 'SpectStart;'
+type = 'PASS_KWARGS'
+pass_self = true
+
+[stop-spec]
+method = 'afspm.components.microscope.translators.omicronsxm.actions.request_action'
+method_name = 'SpectStop;'  # TODO: VALIDATE?
+type = 'PASS_KWARGS'
+pass_self = true
