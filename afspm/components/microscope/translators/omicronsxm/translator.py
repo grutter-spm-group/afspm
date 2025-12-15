@@ -1,50 +1,36 @@
-"""Handles device communication with the Omicron SXM controller."""
-"""TODO:
-        naming: OmicronSXM
-        title for doscstring
-        nice strings for msg
-        add space between # and comment
-        implement changing scan speed
-        how much info to give when raising MicroscopeError?
-        be consistent between 'Omicron' and 'Anfatec'
-        remove plus signs in string concatenation
+"""Handles device communication with the Omicron SXM controller.
 
-    TODO later: refactor methods in params.py to cach and print exceptions,
-    then return true or false for success.
-
-    NOTE: maybe a bit of a design mistake: I originally had the setters return
-    a bool indicating success/failure, but changed them to return None. So now
-    instead of doing if set(): return pb.controlresponse.success, I have to 
-    catch and print exceptions to detect failure. Might need to change it back
-    to returning bools
-
-    NOTE: We constantly reset the DDE object here, because of a found bug in
-    SXMRemote. If/when fixed, consider cleaning this up!
+The directory containing SXMRemote must be added to pythonpath of venv
+TODO do this ourselves with the poetry setup files?
+say this in readme
 """
 
 import logging
-
-from afspm.components.microscope.translator import (
-    MicroscopeTranslator, MicroscopeError, get_file_modification_datetime)
-from afspm.utils.array_converters import convert_sidpy_to_scan_pb2
-
-from afspm.components.microscope.translators.omicron.params import (
-    OmicronParameter, OmicronParameterUnit, set_param, get_param,
-    set_pb2_scan_params,    set_pb2_feedback_params, get_all_scan_params,
-    get_all_feedback_params, PARAM_METHOD_MAP)
-from afspm.components.microscope.translators.omicron.scan import (get_latest_scan_metadata_path)
+import os
+from glob import glob
 
 from SciFiReaders.readers.microscopy.spm.afm import pifm
 
-from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import control_pb2
-from afspm.io.protos.generated import feedback_pb2
+from ...params import (ParameterHandler,
+                       DEFAULT_PARAMS_FILENAME)
+from ...actions import (ActionHandler,
+                        DEFAULT_ACTIONS_FILENAME)
+from ... import config_translator as ct
+
+from .....utils import array_converters as conv
+
+from .....io.protos.generated import scan_pb2
+from .....io.protos.generated import spec_pb2
+from .....io.protos.generated import control_pb2
+
+from . import params
+from . import actions
+
 
 logger = logging.getLogger(__name__)
 
-# The directory containing SXMRemote must be added to pythonpath of venv
-# TODO do this ourselves with the poetry setup files?
-# say this in readme
+
+# Import SXMRemote (main SXM interface), and throw error on failure.
 try:
     import SXMRemote
 except ModuleNotFoundError as e:
@@ -52,87 +38,77 @@ except ModuleNotFoundError as e:
                  '\n\t Export PYHTONPATH = < PathToSXMRemote >:$PYTHONPATH"')
     raise e
 
-class OmicronSXMTranslator(MicroscopeTranslator):
-    """Handles device communication with the Omicron SXM controller
+
+logger = logging.getLogger(__name__)
+
+
+class SXMTranslator(ct.ConfigTranslator):
+    """Handles device communication with the Scienta Omicron SXM controller.
+
+    The SXMTranslator communicates with the Asylum Research software via the
+    XopClient, which sends/receives JSON messages over a zmq interface as
+    defined by the Allen Institute's ZeroMQ-XOP project:
+    https://github.com/AllenInstitute/ZeroMQ-XOP
 
     Note: we encountered difficulties working with the methods provided by
     Anfatec to read the latest scan, so we request the directory where scans
     are saved via the constructor to find the latest one ourselves.
+
+    Attributes:
+        _old_scans: the last scans, to send out if it has not changed.
+        _old_scan_path: the prior scan filepath. We use this to avoid loading
+            the same scans multiple times.
+        _old_spec: the last spec, to send out if it has not changed.
+        _old_spec_path: the prior spec filepath. We use this to avoid loading
+            the same spectroscopies multiple times.
+        _client: DDE Client used to interact with SXM.
+        _save_dir: directory where we expect to find our scans/specs. I suppose
+            it cannot be queried from SXM :( ?
     """
-    def __init__(self, save_directory: str = None, **kwargs):
-        """Initialize internal logic.""" 
 
-        self.last_scan_fname = ""   #which of these two do we want to compare?
-        self.old_scans = []         #
+    def __init__(self, param_handler: ParameterHandler = None,
+                 action_handler: ActionHandler = None,
+                 client: SXMRemote.DDEClient = None,
+                 save_dir: str = None,
+                 **kwargs):
+        """Init our translator."""
+        self._old_scan_path = None
+        self._old_scans = []
+        self._old_spec_path = None
+        self._old_spec = None
+        self._save_dir = save_dir
 
-        #omicron-specific field
-        self.save_directory = save_directory
-
-        self.DDE_client = SXMRemote.DDEClient("SXM","Remote")
-
+        # Default initialization of handler
+        kwargs = self._init_handlers(client, param_handler, action_handler,
+                                     **kwargs)
+        # Tell parent class that SXM *does not* detect moving
+        kwargs[ct.DETECTS_MOVING_KEY] = False
         super().__init__(**kwargs)
+        self._init_spec_settings()
 
-        self.param_method_map = PARAM_METHOD_MAP   #TODO implement get_set_scan_speed()
-    
-    #TODO put this in own file to avoid circular bad when implementing get set
-    def reset_DDE(self): 
-        """Closes current DDE connexion (if any) and establishes a new one.
-            
-        Called before reading / setting scan parameters to avoid the "set+get
-        error": setting and getting parameters (the same or different) sometimes
-        causes an error in Anfatec's code.
-        Note: if the current implementation does not work, try using the
-        disconnect method of the DDE client (SXMRemote line 134).
-        """
-        try:
-            #if self.DDE_client: self.DDE_client.__del__()   #is this required? or can we un-assign self.DDE_client and let the garbage collector clean it up?
-            self.DDE_client = SXMRemote.DDEClient("SXM","Remote")   #NOTE: could be problem if DDE must be closed before making new one
-        except Exception as e:
-            msg = f"Error resetting DDE connection: {e}"
-            logger.error(msg)
-            raise Exception(msg)
+    def _init_handlers(self, client: SXMRemote.DDEClient,
+                       param_handler: ParameterHandler,
+                       action_handler: ActionHandler,
+                       **kwargs) -> dict:
+        """Init handlers and update kwargs."""
+        if not client:
+            client = SXMRemote.DDEClient("SXM", "Remote")
+        if not param_handler:
+            param_handler = _init_param_handler(client)
+            kwargs[ct.PARAM_HANDLER_KEY] = param_handler
+        if not action_handler:
+            action_handler = _init_action_handler(client)
+            kwargs[ct.ACTION_HANDLER_KEY] = action_handler
+        return kwargs
 
-    def on_start_scan(self) -> control_pb2.ControlResponse:
-        """Override on starting scan."""
-        self.reset_DDE()
-        try: 
-            set_param(self.DDE_client, "Scan", 1.0)
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_FAILURE
+    def _init_spec_settings(self):
+        """Set up spec defaults: autosave and do not repeat."""
+        self.param_handler.set_param(params.SXMParam.SPEC_AUTOSAVE, 1)
+        self.param_handler.set_param(params.SXMParam.SPEC_REPEAT, 0)
 
-    def on_stop_scan(self) -> control_pb2.ControlResponse:
-        """Handle a request to stop a scan."""
-        self.reset_DDE()
-        try:
-            set_param(self.DDE_client, "Scan", 0.0)
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_FAILURE
-
-    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
-                           ) -> control_pb2.ControlResponse:
-        """Handle a request to change the scan parameters."""
-        self.reset_DDE()
-        try:
-            set_pb2_scan_params(self.DDE_client, scan_params)
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_FAILURE
-
-    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
-                            ) -> control_pb2.ControlResponse:
-        """Handle a request to change the Z-Controller Feedback parameters."""
-        self.reset_DDE()
-        try:
-            set_pb2_feedback_params(self.DDE_client, zctrl_params):
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_PARAM_ERROR
+    def switch_feedback_mode(self, mode: params.FeedbackMode):
+        """Switch to using appropriate feedback mode."""
+        self.param_handler._switch_feedback_mode(mode)
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Poll the controller for the current scope state.
@@ -140,75 +116,116 @@ class OmicronSXMTranslator(MicroscopeTranslator):
         NOTE: We cannot detect whether the motor is running via SXMRemote.
         Throws a MicroscopeError on failure.
         """
-        self.reset_DDE()
-        scanning = get_param(self.DDE_client, "Scan")
-        if scanning: 
+        state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
+
+        if state == 1:
             return scan_pb2.ScopeState.SS_SCANNING
+        # TODO: How to check for SS_SPEC??
         else:
             return scan_pb2.ScopeState.SS_FREE
 
-    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        """Poll the controller for the current scan parameters."""
-        self.reset_DDE()
+    def _get_latest_file(self) -> str | None:
+        """Return the location of the metadata for the latest scan.
 
-        vals = get_all_scan_params(self.DDE_client)
-        scan_params = scan_pb2.ScanParameters2d()
-        scan_params.spatial.roi.top_left.x = vals[0]
-        scan_params.spatial.roi.top_left.y = vals[1]
-        scan_params.spatial.roi.size.x = vals[2]
-        scan_params.spatial.roi.size.y = vals[2]
-        scan_params.spatial.length_units = OmicronParameterUnit.X
-    
-        # Note: we must provide image resolution as an int, so we convert here 
-        scan_params.data.shape.x = int(vals[3])
-        scan_params.data.shape.y = int(vals[3])
-
-        return scan_params
-
-    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
-        """Poll the controller for the current Z-Control parameters."""
-        self.reset_DDE()
-
-        vals = get_all_feedback_params()    #TODO make also return whether zctrl is on
-        feedback_params = feedback_pb2.ZCtrlParameters()
-        feedback_params.feedbackOn = bool(vals[0])
-        feedback_params.proportionalGain = vals[1]
-        feedback_params.integralGain = vals[2]
-
-        return feedback_params
-
-    def poll_scans(self) -> list[scan_pb2.Scan2d]:
-        """Obtain latest performed scans."""
-        latest_path = get_latest_scan_metadata_path(self.save_directory)
-
-        # Avoid reloading scans if same filename. Return old scans.
-        if latest_path == self.old_scan_fname:
-            return self.old_scans
-
-        dt_modified = get_file_modification_datetime(latest)  #this is a datetime
-
-        # TODO: Validate. From code, it would seem we need the path to the .int,
-        # *not* the .txt metadata file...
+        Raises:
+            ValueError if the file structure is incorrect (i.e. there are
+                no/several metadata files in a sub-directory).
+        """
         try:
-            logger.debug(f'Getting datasets from {latest_path}.')
-            reader = pifm.PiFMTranslator(latest_path)
-            res = reader.read()     #returns a list of sidpy datasets
-        except Exception as exc:
-            logger.error(f"Failure loading scan at {latest_path}: {exc}")
-            return self.old_scans
+            latest_dir = max(glob(os.path.join(self._save_dir, '*/')),
+                             key=os.path.getmtime)
+        except ValueError:
+            msg = ("No sub-directory (scans) found in main directory when "
+                   "polling for latest scans/specs.")
+            logger.warning(msg)
+            return None
 
-        # Convert and prepare scans, update old_scans.
-        scans = []
-        for dataset in res:
-            scan = convert_sidpy_to_scan_pb2(dataset)
+        try:
+            txts = glob(os.path.join(latest_dir, "*.txt"))
+            if len(txts) != 1:  # there should only be one .txt per dir.
+                # TODO: check that this is actually the case
+                msg = (f"Found {len(txts)} txt files in scan directory " +
+                       f"{latest_dir} when there should only be one.")
+                logger.error(msg)
+                raise ValueError(msg)
+        except ValueError:
+            msg = ("No metadata text file found in the latest dir in the scan "
+                   "directory")
+            logger.warning(msg)
+            raise ValueError(msg)
+        return txts[0]  # Returning first metadata file in latest scan subdir.
 
-            # Set ROI angle, timestamp, filename
-            # TODO: Set ROI Angle!
-            scan.timestamp.FromDateTime(dt_modified)
-            scan.filename = latest_path
-            scans.append(scan)
-        
-        self.old_scans = scans
-        self.last_scan_fname = latest_path  #path to metadata is OK?
+    def poll_scans(self) -> [scan_pb2.Scan2d]:
+        """Override polling of scans."""
+        scan_path = self._get_latest_file()  # TODO: Should this be done elsewhere?
 
-        return  self.old_scans
+        if (scan_path and not self._old_scan_path or
+                scan_path != self._old_scan_path):
+            scans = load_scans_from_file(scan_path)
+            scans = [ct.correct_scan(scan, self._latest_scan_params)
+                     for scan in scans]
+            if scans:
+                self._old_scan_path = scan_path
+                self._old_scans = scans
+        return self._old_scans
+
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        """Override spec polling."""
+        spec_path = self._get_latest_file()  # TODO: Should this be done elsewhere?
+
+        # TODO: What are specs and what are scans? How do we differentiate
+        # from the folders?
+
+        if (spec_path and not self._old_spec_path or
+                spec_path != self._old_spec_path):
+            spec = load_spec_from_file(spec_path)
+            spec = ct.correct_spec(spec, self._latest_probe_pos)
+            if spec:
+                self._old_spec_path = spec_path
+                self._old_spec = spec
+        return self._old_spec
+
+
+# TODO: Consider pulling client up to translator level if it needs resetting?
+def _init_action_handler(client: SXMRemote.DDEClient
+                         ) -> actions.AsylumActionHandler:
+    """Initialize Asylum action handler pointing to defulat config."""
+    actions_config_path = os.path.join(os.path.dirname(__file__),
+                                       DEFAULT_ACTIONS_FILENAME)
+    return actions.AsylumActionHandler(actions_config_path, client)
+
+
+def _init_param_handler(client: SXMRemote.DDEClient
+                        ) -> params.AsylumParameterHandler:
+    """Initialize Asylum action handler pointing to defulat config."""
+    params_config_path = os.path.join(os.path.dirname(__file__),
+                                      DEFAULT_PARAMS_FILENAME)
+    return params.AsylumParameterHandler(params_config_path, client)
+
+
+def load_scans_from_file(scan_path: str
+                         ) -> list[scan_pb2.Scan2d] | None:
+    """Load SXM scan, filling in info possible from file only.
+
+    Args:
+        scan_path: path to the scan.
+
+    Returns:
+        loaded scans in scan_pb2 format (one scan per channel). None if
+        dataset is empty or failure loading scan.
+    """
+    raise RuntimeError.NotImplementerError('write me, dummy!')
+
+
+def load_spec_from_file(fname: str,
+                        ) -> spec_pb2.Spec1d | None:
+    """Load Spec1d from provided filename (None on failure).
+
+    Args:
+        fname: path to spec file.
+
+    Returns:
+        Spec1d if loaded properly, None if spec file was empty or exception
+        thrown when reading.
+    """
+    raise RuntimeError.NotImplementerError('write me, dummy!')

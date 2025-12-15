@@ -1,0 +1,162 @@
+# This file holds the SXM parameters. Feel free to modify the
+# parameter range if you want to constrain it further.
+
+# ----- Physical Scan Parameters ----- #
+[scan-top-left-x]  # Changeable attributes in [center-x] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_x'
+
+[scan-top-left-y]  # Changeable attributes in [center-y] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_y'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_y'
+
+[scan-angle]
+uuid = 'Angle'
+unit = 'degrees'
+type = 1.0
+range = [-360.0, 360.0]  # Will return in range [0, 360]
+caller = 'SCAN'
+
+[scan-size-x]   # [size-x-ratio] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_size_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_size_x'
+range = [0, 90]  # TODO: Update
+type = 1.0
+
+[scan-size-y]
+uuid = 'Range'
+unit = 'nm'
+type = 1.0
+range = [0, 90]  # TODO: Update!
+caller = 'SCAN'
+
+# ----- Digital Scan Parameters ----- #
+[scan-resolution-x]  # [pixel-x-ratio] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_res_x'
+type = 1
+range = [32, 1536]  # TODO: Update!
+
+[scan-resolution-y]  # Unitless, no range enforced.
+uuid = 'Pixel'
+type = 1
+range = [32, 1536]  # TODO: update!
+caller = 'SCAN'
+
+# ----- Feedback Parameters ----- #
+[zctrl-setpoint]
+uuid = 'Reference'  # TODO: Confirm!!!
+# Note: units are uA, but we consider it unitless, because in
+# ZCtrlParameters it is unitless.
+type = 1.0
+range = [0, 10]   # TODO: Update!
+caller = 'FEEDBACK'
+
+[zctrl-pgain]  # Unitless, no range enforced.
+uuid = 'Kp'
+type = 1.0
+range = [0, 4096]   # TODO: Update!
+caller = 'FEEDBACK'
+
+[zctrl-igain]  # Unitless, no range enforced.
+uuid = 'Ki'
+type = 1.0
+range = [0, 4096]   # TODO: Update!
+caller = 'FEEDBACK'
+
+# ----- Sample Slope Correction ----- #
+[sample-slope-x]
+uuid = 'SlopeX'
+type = 1.0
+range = [0, 4096]   # TODO: Update!
+caller = 'SCAN'
+
+[sample-slope-y]
+uuid = 'SlopeY'
+type = 1.0
+range = [0, 4096]   # TODO: Update!
+caller = 'SCAN'
+
+# ----- Probe / Scan Parameters ----- #
+[scan-speed]  # Uses [speed-lines-s] below.
+getter = 'afspm.components.microscope.translators.asylum.params.get_scan_speed'
+setter = 'afspm.components.microscope.translators.asylum.params.set_scan_speed'
+unit = 'nm/s'
+type = 1.0
+range = [0, 5e-4]  #  TODO: Update!
+
+# ----- Probe Parameters ----- #
+[probe-pos-x]
+getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_x'
+setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_x'
+unit = 'nm'
+type = 1.0
+range = [0, 9e-5]  # [0 nm, 90 um]  # TODO: Update me!
+# Really: within the size of your scan (this is in scan CS).
+
+[probe-pos-y]
+getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_y'
+setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_y'
+unit = 'nm'
+type = 1.0
+range = [0, 9e-5]  # [0 nm, 90 um]
+# Really: within the size of your scan (this is in scan CS).
+
+# ----- Other ----- #
+[tip-bias-voltage]
+uuid = 'Bias'
+unit = 'mV'
+type = 1.0
+range = [0, 1000.0]  # TODO: Update!
+caller = 'FEEDBACK'
+
+
+# ----- SXM-Specific Parameters ----- #
+# The following parameters are SXM-specific, used for some internal logic.
+# We use this rather than hard-coded values in params.py, because WHY?
+
+[center-x]
+uuid = 'X'
+unit = 'nm'
+type = 1.0
+range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
+caller = 'SCAN'
+
+[center-y]
+uuid = 'Y'
+unit = 'nm'
+type = 1.0
+range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
+caller = 'SCAN'
+
+[size-x-ratio]
+uuid = 'AspectRatio'
+# No units
+type = 1.0
+caller = 'SCAN'
+
+[pixel-x-ratio]
+uuid = 'PixelRatio'
+# No units
+type = 1.0
+caller = 'SCAN'
+
+[speed-lines-s]  # Range check is in scan-speed
+uuid = 'Speed'
+type = 1
+caller = 'SCAN'
+
+[scan-state]
+uuid = 'Scan'
+type = 1
+caller = 'SCAN'
+
+[spec-autosave]
+uuid = 'AUTOSAVE'
+type = 1
+caller = 'SPECTRA'
+
+[spec-repeat]
+uuid = 'Repeat'
+type = 1
+caller = 'SPECTRA'
