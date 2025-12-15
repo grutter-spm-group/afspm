@@ -10,8 +10,6 @@ from afspm.components.microscope import params
 from afspm.components.microscope.translators.asylum.client import (
     XopClient, XopMessageError)
 
-from afspm.io.protos.generated import scan_pb2
-
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +62,7 @@ class AsylumParameterHandler(params.ParameterHandler):
     GET_STRING = 'GS'
     SET_STRING = 'PS'
 
-    def __init__(self, params_config_path: str, client: XopClient):
+    def __init__(self, client: XopClient, **kwargs):
         """Init our Asylum handler, feeding the Xop Client."""
         if client is None:
             msg = "No xop client provided, cannot continue!"
@@ -74,7 +72,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         self.client = client
         self.latest_get_set_method = None
         self.generic_uuid_type_map = {}
-        super().__init__(params_config_path)
+        super().__init__(**kwargs)
         self._populate_generic_uuid_type_map()
 
     def _populate_generic_uuid_type_map(self):
@@ -118,20 +116,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         return val
 
     def get_param_spm(self, spm_uuid: str) -> Any:
-        """Get the current value for the microscope parameter.
-
-        This method should only concern itself with requesting an
-        scope-specific param and returning the value.
-
-        Args:
-            spm_uuid: name of the param in scope-specific terminology.
-
-        Returns:
-            Current value.
-
-        Raises:
-            ParameterError if getting the parameter fails.
-        """
+        """Override for SPM-specific getter."""
         method_str = self.latest_get_set_method
         return self._call_method(method_str, (spm_uuid,))
 
@@ -144,20 +129,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         self.latest_get_set_method = None
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
-        """Set the current value for the microscope parameter.
-
-        This method should only concern itself with setting an scope-specific
-        param and returning whether it succeeds or not. Conversion to
-        scope-expected units should have already been done, and the param
-        string should be the one expected by the specific microscope.
-
-        Args:
-            spm_uuid: name of the param in scope-specific terminology.
-            spm_val: val to set the param to, in scope-specific units.
-
-        Raises:
-            - ParameterError if the parameter could not be set.
-        """
+        """Override for SPM-specific setter."""
         method_str = self.latest_get_set_method
         self._call_method(method_str, (spm_uuid, spm_val))
 

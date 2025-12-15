@@ -52,8 +52,10 @@ class AsylumTranslator(ct.ConfigTranslator):
     https://github.com/AllenInstitute/ZeroMQ-XOP
 
     Attributes:
+        _old_scans: the last scans, to send out if it has not changed.
         _old_scan_path: the prior scan filepath. We use this to avoid loading
             the same scans multiple times.
+        _old_spec: the last spec, to send out if it has not changed.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
         _old_saving_mode: the prior SavingMode state.
