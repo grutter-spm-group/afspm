@@ -30,11 +30,6 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
-# Attributes from the read scan file (differs from params.toml, which
-# contains UUIDs for getting/setting parameters).
-SCAN_ATTRIB_ANGLE = 'alpha'
-# Hardcoded, even though it is also in params.toml. For loading scan.
-SCAN_ANGLE_UNIT = 'degrees'
 SPEC_EXT_SEARCH = '*.vpdata'
 
 
@@ -212,11 +207,7 @@ class GxsmTranslator(ct.ConfigTranslator):
         return fnames
 
     def _load_scan(self, fname: str) -> scan_pb2.Scan2d | None:
-        """Try to load a scan from a given filename (None on error).
-
-        We also correct the scan here, to ensure the scan params and timestamp
-        are set properly.
-        """
+        """Try to load a scan from a given filename (None on error)."""
         scan = load_scan_from_file(
             fname, self.read_channels_config_path,
             self.read_use_physical_units,
@@ -273,7 +264,7 @@ def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
                                   names=names, units=units,
                                   values=data.ravel().tolist())
 
-    spec = spec_pb2.Spec1d(data=spec_data)
+    spec = spec_pb2.Spec1d(data=spec_data, position=probe_pos)
     return spec
 
 
@@ -329,6 +320,10 @@ def load_scan_from_file(fname: str,
                         ) -> scan_pb2.Scan2d | None:
     """Load gxsm scan, filling in info possible from file only.
 
+    NOTE: We follow the suggestions of config_translator and use correct_scan()
+    in the calling method (avoids any coordinate system differences).
+    We still need to set the filename, however.
+
     Args:
         fname: path to the scan.
         read_channels_config_path: path to config file for configuring loading
@@ -358,13 +353,6 @@ def load_scan_from_file(fname: str,
         # one data variable).
         scan = conv.convert_xarray_to_scan_pb2(
             ds[list(ds.data_vars)[0]])
-
-        # Set ROI angle, timestamp, filename
-        scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
-        scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
-
-        ts = get_file_modification_datetime(fname)
-        scan.timestamp.FromDatetime(ts)
         scan.filename = fname
 
         return scan
@@ -376,6 +364,9 @@ def load_scan_from_file(fname: str,
 
 def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
+
+    NOTE: We follow the suggestions of config_translator and use correct_spec()
+    in the calling method (avoids any coordinate system differences).
 
     Args:
         fname: path to spec file.
