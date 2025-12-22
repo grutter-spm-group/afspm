@@ -17,6 +17,7 @@ import xarray as xr
 import numpy as np
 import imageio.v3 as iio
 from ..io.protos.generated import scan_pb2
+from ..io.protos.generated import spec_pb2
 from ..io.protos.generated import geometry_pb2
 
 
@@ -209,3 +210,34 @@ def create_xarray_from_img_path(img_path: str,
         da.name = channel_id
 
     return da
+
+
+def convert_sidpy_to_spec_pb2(datasets: list[sidpy.Dataset],
+                              ) -> spec_pb2.Spec1d:
+    """Convert a list of sidpy Datasets to a single Spec1d.
+
+    NOTE: The probe position is metadata specific, so the parent
+    method should update this data accordingly.
+
+    Args:
+        datasets: list of sidpy Datasets containing spec data.
+
+    Returns:
+        Spec1d containing data from datasets.
+    """
+    names = [ds.quantity for ds in datasets]
+    units = [ds.units for ds in datasets]
+    num_variables = len(datasets)
+    data_per_variable = datasets[0].shape[0]
+
+    # Extract data (first as 2D list)
+    values = [ds.compute() for ds in datasets]
+    # Now, unravel to 1D version (using numpy's ravel)
+    values = np.array(values).ravel().tolist()
+
+    spec_data = spec_pb2.SpecData(num_variables=num_variables,
+                                  data_per_variable=data_per_variable,
+                                  names=names, units=units,
+                                  values=values)
+    spec = spec_pb2.Spec1d(data=spec_data)
+    return spec
