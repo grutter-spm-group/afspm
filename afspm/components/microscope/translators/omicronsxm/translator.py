@@ -28,13 +28,6 @@ from . import reader_sxm
 logger = logging.getLogger(__name__)
 
 
-# Attributes from the read scan file (differs from params,
-# which contains UUIDs for getting/setting parameters).
-SCAN_ATTRIB_ANGLE = 'Angle'
-# Hardcoded, even though it is also in params.toml. For loading scan.
-SCAN_ANGLE_UNIT = 'degrees'
-
-
 class SXMTranslator(ct.ConfigTranslator):
     """Handles device communication with the Scienta Omicron SXM controller.
 
@@ -218,6 +211,10 @@ def load_scans_from_file(md_path: str
                          ) -> list[scan_pb2.Scan2d] | None:
     """Load SXM scan, filling in info possible from file only.
 
+    NOTE: We follow the suggestions of config_translator and use correct_scan()
+    in the calling method (avoids any coordinate system differences).
+    We still need to set the filename, however.
+
     Args:
         md_path: path to the scan metadata.
 
@@ -238,15 +235,6 @@ def load_scans_from_file(md_path: str
             file_path = os.path.join(os.path.dirname(md_path),
                                      ds.metadata[reader_sxm.MD_SCAN_FILENAME])
             scan = conv.convert_sidpy_to_scan_pb2(ds)
-
-            # Set ROI angle, timestamp, filename
-            scan.params.spatial.roi.angle = ds.metadata[
-                SCAN_ATTRIB_ANGLE]
-            scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
-
-            ts = get_file_modification_datetime(file_path)
-            scan.timestamp.FromDatetime(ts)
-
             scan.filename = file_path
             scans.append(scan)
         return scans
@@ -256,6 +244,9 @@ def load_scans_from_file(md_path: str
 def load_spec_from_file(fname: str,
                         ) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
+
+    NOTE: We follow the suggestions of config_translator and use correct_spec()
+    in the calling method (avoids any coordinate system differences).
 
     Args:
         fname: path to spec file.
@@ -270,14 +261,6 @@ def load_spec_from_file(fname: str,
 
         spec = conv.convert_sidpy_to_spec_pb2(datasets)
         spec.filename = fname
-
-        # Correct probe position
-        probe_x = datasets[0].original_metadata[reader_sxm.MD_PROBE_POS_X]
-        probe_y = datasets[0].original_metadata[reader_sxm.MD_PROBE_POS_Y]
-        units = reader_sxm.MD_POS_UNITS
-        point = geometry_pb2.Point2d(x=float(probe_x), y=float(probe_y))
-        spec.position = spec_pb2.ProbePosition(point, units=units)
-
         return spec
     except Exception:
         logger.error(f'Could not read spec fname {fname}.'
