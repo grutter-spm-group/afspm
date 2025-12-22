@@ -317,27 +317,6 @@ def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
     return params.AsylumParameterHandler(params_config_path, client)
 
 
-def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
-                              ) -> spec_pb2.Spec1d:
-    """Convert a dict of sidpy datasets to a single Spec1d."""
-    names = [ds.dim_0.name for ds in ds_dict.values()]
-    units = [ds.dim_0.units for ds in ds_dict.values()]
-    num_variables = len(ds_dict)
-    data_per_variable = list(ds_dict.values())[0].shape[0]
-
-    # Extract data (first as 2D list)
-    values = [ds.compute() for ds in ds_dict.values()]
-    # Now, unravel to 1D version (using numpy's ravel)
-    values = np.array(values).ravel().tolist()
-
-    spec_data = spec_pb2.SpecData(num_variables=num_variables,
-                                  data_per_variable=data_per_variable,
-                                  names=names, units=units,
-                                  values=values)
-    spec = spec_pb2.Spec1d(data=spec_data)
-    return spec
-
-
 def load_scans_from_file(scan_path: str
                          ) -> list[scan_pb2.Scan2d] | None:
     """Load Asylum scan, filling in info possible from file only.
@@ -353,6 +332,7 @@ def load_scans_from_file(scan_path: str
                  " is a channel).")
     try:
         reader = sr.IgorIBWReader(scan_path)
+        # NOTE: Why does Igor reader return dict instead of list?
         datasets = list(reader.read(verbose=False).values())
     except Exception as exc:
         logger.error(f"Failure loading scan at {scan_path}: {exc}")
@@ -411,9 +391,10 @@ def load_spec_from_file(fname: str,
     """
     try:
         reader = sr.IgorIBWReader(fname)
-        ds_dict = reader.read(verbose=False)
+        # NOTE: Why does Igor reader return dict instead of list?
+        datasets = list(reader.read(verbose=False).values())
 
-        spec = convert_sidpy_to_spec_pb2(ds_dict)
+        spec = conv.convert_sidpy_to_spec_pb2(datasets)
         spec.filename = fname
 
         return spec
