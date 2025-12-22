@@ -1,19 +1,15 @@
 """Handles device communication with aslyum research controllers."""
 
 import os
-import copy
 import logging
 import glob
 import SciFiReaders as sr
-import sidpy
-import numpy as np
 
 from ...params import (ParameterHandler, ParameterNotSupportedError,
                        ParameterError, MicroscopeParameter,
                        DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler, MicroscopeAction, ActionError,
                         DEFAULT_ACTIONS_FILENAME)
-from ...translator import get_file_modification_datetime
 from ... import config_translator as ct
 
 from .....utils import array_converters as conv
@@ -34,13 +30,6 @@ logger = logging.getLogger(__name__)
 # least for probe position).
 FLOAT_TOLERANCE = 1e-05
 FLOAT_TOLERANCE_KEY = 'float_tolerance'
-
-
-# Attributes from the read scan file (differs from params.AsylumParameter,
-# which contains UUIDs for getting/setting parameters).
-SCAN_ATTRIB_ANGLE = 'ScanAngle'
-# Hardcoded, even though it is also in params.toml. For loading scan.
-SCAN_ANGLE_UNIT = 'degrees'
 
 
 class AsylumTranslator(ct.ConfigTranslator):
@@ -321,6 +310,10 @@ def load_scans_from_file(scan_path: str
                          ) -> list[scan_pb2.Scan2d] | None:
     """Load Asylum scan, filling in info possible from file only.
 
+    NOTE: We follow the suggestions of config_translator and use correct_scan()
+    in the calling method (avoids any coordinate system differences).
+    We still need to set the filename, however.
+
     Args:
         scan_path: path to the scan.
 
@@ -340,7 +333,6 @@ def load_scans_from_file(scan_path: str
 
     if datasets:
         scans = []
-        ts = get_file_modification_datetime(scan_path)
         for ds in datasets:
             # BUG WORKAROUND: scifireaders does not properly load the
             # scan data! The data is read originally in the same manner
@@ -353,25 +345,9 @@ def load_scans_from_file(scan_path: str
             # operations.
             swap_ds = ds.swapaxes(0, 1)
             scan = conv.convert_sidpy_to_scan_pb2(swap_ds)
-            # Note: we use the original ds for stuff below, as we
-            # cannot guarantee all is properly copied.
 
-            # BUG WORKAROUND: scifireaders does not properly read the
-            # length units of scans (it puts the data_units). Because
-            # of this, we get a conversion error when dealing, e.g.
-            # with the phase channel (it tries to convert 'm' to
-            # 'deg').
-            # Until this is fixed, we are just hard-coding the
-            # length_units as 'm', which is what IBW files appear
-            # to be anyway.
-            scan.params.spatial.length_units = 'm'
-
-            # Set ROI angle, timestamp, file
-            scan.params.spatial.roi.angle = ds.original_metadata[
-                SCAN_ATTRIB_ANGLE]
-            scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
-
-            scan.timestamp.FromDatetime(ts)
+            # Setting filename. All else is done by correct_scan()
+            # (recommended to ensure coordinate system consistency).
             scan.filename = scan_path
             scans.append(scan)
         return scans
@@ -381,6 +357,10 @@ def load_scans_from_file(scan_path: str
 def load_spec_from_file(fname: str,
                         ) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
+
+    NOTE: We follow the suggestions of config_translator and use correct_spec()
+    in the calling method (avoids any coordinate system differences). In this
+    case, probe position is not available in the saved data so we need it.
 
     Args:
         fname: path to spec file.
