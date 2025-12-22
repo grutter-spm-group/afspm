@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from afspm.components.microscope import params
 
-from SXMRemote import DDEClient
+from sxm import DDEClient
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,7 @@ class CallerType(str, enum.Enum):
     SCAN = 'SCAN'
     FEEDBACK = 'FEEDBACK'
     SPECTRA = 'SPECTRA'
+    CHANNEL = 'CHANNEL'
 
 
 class FeedbackMode(enum.Enum):
@@ -29,35 +30,42 @@ class FeedbackMode(enum.Enum):
     AFM = enum.auto()
 
 
-def get_getter_callable(client: DDEClient, caller: CallerType) -> Callable:
-    """Get the getter callable for a given CallerType."""
+def get_getter_substr(caller: CallerType) -> str:
+    """Get the setter substring for a given CallerType."""
     match caller:
         case CallerType.SCAN:
-            return client.GetScanPara
+            return 'GetScanPara'
         case CallerType.FEEDBACK:
-            return client.GetFeedbackPara
+            return 'GetFeedPara'  # TODO: Validate!
         case CallerType.SPECTRA:
-            return client.GetSpectPara
+            return 'GetSpectPara'
+        case CallerType.CHANNEL:
+            return 'GetChannel'
         case _:
-            return None
+            raise ValueError(f'{caller} is an unsupported CallerType.')
 
 
 def get_setter_substr(caller: CallerType) -> str:
     """Get the setter substring for a given CallerType."""
     match caller:
         case CallerType.SCAN:
-            return 'GetScanPara'
+            return 'ScanPara'
         case CallerType.FEEDBACK:
-            return 'GetFeedbackPara'  # TODO: Validate!
+            return 'FeedPara'
         case CallerType.SPECTRA:
-            return 'GetSpectPara'
+            return 'SpectPara'
+        case CallerType.CHANNEL:
+            return 'SetChannel'
         case _:
-            return None
+            raise ValueError(f'{caller} is an unsupported CallerType.')
 
 
 @dataclass
 class SXMParameterInfo(params.ParameterInfo):
-    """Adds param caller TODO Finish."""
+    """Adds param caller to ParameterInfo.
+
+    We need this in the case of SXM to know what method we are calling.
+    """
 
     caller: CallerType  # Indicates 'grouping' this param is in.
 
@@ -112,17 +120,21 @@ class SXMParameterHandler(params.ParameterHandler):
 
     def get_param_spm(self, spm_uuid: str) -> Any:
         """Override for SPM-specific getter."""
-        method = get_getter_callable(self.client, self.param_caller)
-        return self._call_get(method, spm_uuid)
+        # Special case for CHANNEL get calls.
+        if self.param_caller == CallerType.CHANNEL:
+            spm_uuid = '-' + spm_uuid
 
-    def _call_get(self, method: Callable, attr: str) -> Any:
+        method_substr = get_getter_substr(self.client, self.param_caller)
+        return self._call_get(method_substr, spm_uuid)
+
+    def _call_get(self, method: str, attr: str) -> Any:
         """Error handling around get call."""
         try:
-            val = method(f"\'{attr}\'")
+            call_str = "a:=" + method + "(" + attr + ");\r\n writeln(a);"
+            val = self.client.execute_and_return(call_str)
             if val is not None:
                 return val
             else:
-                # TODO make nice string here
                 msg = (f"Getting {attr} returned None. This happens when "
                        "the request sent to the SXM controller is not "
                        "recognized. Verify that the parameter requested is "
@@ -152,7 +164,7 @@ class SXMParameterHandler(params.ParameterHandler):
     def _call_set(self, substr: str, attr: str, val: str):
         """Error handling around set call."""
         try:
-            self.client.SendWait(substr + f"('{attr}',{val});")
+            self.client.execute(substr + f"('{attr}',{val});")
         except Exception as e:
             msg = f"Error setting scan parameter {attr} to {val}: {e}"
             logger.error(msg)
@@ -199,6 +211,14 @@ class SXMParam(params.MicroscopeParameter):
     SCAN_STATE = 'scan-state'
     SPEC_AUTOSAVE = 'spec-autosave'
     SPEC_REPEAT = 'spec-repeat'
+
+    # --- The below are for dealing with probe position --- #
+    # Position for running spec.
+    SPEC_POS_X = 'spec-pos-x'
+    SPEC_POS_Y = 'spec-pos-y'
+    # Actual position of probe.
+    TIP_POS_X = 'tip-pos-x'
+    TIP_POS_Y = 'tip-pos-y'
 
 
 # ---- Special Conversions ----- #
@@ -382,21 +402,14 @@ def set_scan_speed(handler: params.ParameterHandler,
     handler.set_param(SXMParam.SPEED_LINES_S)
 
 
-# ----- Probe Position Methods ----- #
-PROBE_POS_X_GET_ID = -2
-PROBE_POS_Y_GET_ID = -3
-PROBE_POS_X_SET_ID = 1
-PROBE_POS_Y_SET_ID = 2
-
-
 def get_probe_pos_x(handler: params.ParameterHandler) -> Any:
     """Get Probe Position (X-).
 
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
     """
-    return handler._call_get(handler.client.GetChannel,
-                             PROBE_POS_X_GET_ID)
+    return handler.get_param(SXMParam.TIP_POS_X)
+    # TODO: do I need to do any CS conversion? It's in abs pos.
 
 
 def get_probe_pos_y(handler: params.ParameterHandler) -> Any:
@@ -405,8 +418,8 @@ def get_probe_pos_y(handler: params.ParameterHandler) -> Any:
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
     """
-    return handler._call_get(handler.client.GetChannel,
-                             PROBE_POS_Y_GET_ID)
+    return handler.get_param(SXMParam.TIP_POS_Y)
+    # TODO: do I need to do any CS conversion? It's in abs pos.
 
 
 def set_probe_pos_x(handler: params.ParameterHandler,
@@ -415,13 +428,16 @@ def set_probe_pos_x(handler: params.ParameterHandler,
 
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
+
+    For setting, we must set both (a) the spec position, and (b)
+    the probe position.
     """
     gid = params.MicroscopeParameter.PROBE_POS_X
     val = handler._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
-    handler._call_set(get_setter_substr(CallerType.SPECTRA),
-                      PROBE_POS_X_SET_ID, val)
+    handler.set_param(SXMParam.TIP_POS_X, val, unit)
+    handler.set_param(SXMParam.SPEC_POS_X, val, unit)
 
 
 def set_probe_pos_y(handler: params.ParameterHandler,
@@ -435,5 +451,5 @@ def set_probe_pos_y(handler: params.ParameterHandler,
     val = handler._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
-    handler._call_set(get_setter_substr(CallerType.SPECTRA),
-                      PROBE_POS_Y_SET_ID, val)
+    handler.set_param(SXMParam.TIP_POS_Y, val, unit)
+    handler.set_param(SXMParam.SPEC_POS_Y, val, unit)

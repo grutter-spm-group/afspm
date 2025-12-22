@@ -1,45 +1,38 @@
-"""Handles device communication with the Omicron SXM controller.
-
-The directory containing SXMRemote must be added to pythonpath of venv
-TODO do this ourselves with the poetry setup files?
-say this in readme
-"""
+"""Handles device communication with the Omicron SXM controller."""
 
 import logging
 import os
 from glob import glob
 
-from SciFiReaders.readers.microscopy.spm.afm import pifm
-
 from ...params import (ParameterHandler,
                        DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler,
-                        DEFAULT_ACTIONS_FILENAME)
+                        DEFAULT_ACTIONS_FILENAME,
+                        MicroscopeAction)
+from ...translator import get_file_modification_datetime
 from ... import config_translator as ct
 
 from .....utils import array_converters as conv
 
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import spec_pb2
+from .....io.protos.generated import geometry_pb2
 from .....io.protos.generated import control_pb2
 
 from . import params
 from . import actions
+from . import sxm
+from . import reader_sxm
 
 
 logger = logging.getLogger(__name__)
 
 
-# Import SXMRemote (main SXM interface), and throw error on failure.
-try:
-    import SXMRemote
-except ModuleNotFoundError as e:
-    logger.error("SXMRemote not found, make sure to add it to your PythonPath:"
-                 '\n\t Export PYHTONPATH = < PathToSXMRemote >:$PYTHONPATH"')
-    raise e
-
-
-logger = logging.getLogger(__name__)
+# Attributes from the read scan file (differs from params,
+# which contains UUIDs for getting/setting parameters).
+SCAN_ATTRIB_ANGLE = 'Angle'
+# Hardcoded, even though it is also in params.toml. For loading scan.
+SCAN_ANGLE_UNIT = 'degrees'
 
 
 class SXMTranslator(ct.ConfigTranslator):
@@ -50,9 +43,11 @@ class SXMTranslator(ct.ConfigTranslator):
     defined by the Allen Institute's ZeroMQ-XOP project:
     https://github.com/AllenInstitute/ZeroMQ-XOP
 
-    Note: we encountered difficulties working with the methods provided by
-    Anfatec to read the latest scan, so we request the directory where scans
-    are saved via the constructor to find the latest one ourselves.
+    Notes:
+    - In SXM, the spec position and probe position do not need to align
+    *until* a spec is run. To be consistent with our expectations, we set
+    both of these whenever the probe position is set. On a get, we grab
+    from the actual probe position.
 
     Attributes:
         _old_scans: the last scans, to send out if it has not changed.
@@ -61,22 +56,24 @@ class SXMTranslator(ct.ConfigTranslator):
         _old_spec: the last spec, to send out if it has not changed.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
-        _client: DDE Client used to interact with SXM.
-        _save_dir: directory where we expect to find our scans/specs. I suppose
-            it cannot be queried from SXM :( ?
+        _scope_state: holds the current client.
+        _client: SXM client.
     """
+
+    INI_SECTION_SAVE = 'Save'
+    INI_ITEM_PATH = 'Path'
 
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
-                 client: SXMRemote.DDEClient = None,
-                 save_dir: str = None,
+                 client: sxm.DDEClient = None,
                  **kwargs):
         """Init our translator."""
         self._old_scan_path = None
         self._old_scans = []
         self._old_spec_path = None
         self._old_spec = None
-        self._save_dir = save_dir
+        self._scope_state = scan_pb2.ScopeState.SS_FREE
+        self._client = client
 
         # Default initialization of handler
         kwargs = self._init_handlers(client, param_handler, action_handler,
@@ -86,13 +83,15 @@ class SXMTranslator(ct.ConfigTranslator):
         super().__init__(**kwargs)
         self._init_spec_settings()
 
-    def _init_handlers(self, client: SXMRemote.DDEClient,
+    def _init_handlers(self, client: sxm.DDEClient,
                        param_handler: ParameterHandler,
                        action_handler: ActionHandler,
                        **kwargs) -> dict:
         """Init handlers and update kwargs."""
         if not client:
-            client = SXMRemote.DDEClient("SXM", "Remote")
+            client = sxm.DDEClient("SXM", "Remote")
+        self._register_scan_spec_end_callbacks(client)
+
         if not param_handler:
             param_handler = _init_param_handler(client)
             kwargs[ct.PARAM_HANDLER_KEY] = param_handler
@@ -100,6 +99,19 @@ class SXMTranslator(ct.ConfigTranslator):
             action_handler = _init_action_handler(client)
             kwargs[ct.ACTION_HANDLER_KEY] = action_handler
         return kwargs
+
+    def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
+        """Ensure we detect when scans/specs end, to update scope state."""
+        client.register_spect_save_callback(self.on_scan_spec_end)
+        client.register_scan_end_callback(self.on_scan_spec_end)
+
+    def _on_scan_spec_end(self):
+        """Return scope state to free when scan/spec ends.
+
+        The main scope state logic is handled in on_action_request()
+        and on_scan_spec_end().
+        """
+        self._scope_state = scan_pb2.ScopeState.SS_FREE
 
     def _init_spec_settings(self):
         """Set up spec defaults: autosave and do not repeat."""
@@ -116,49 +128,35 @@ class SXMTranslator(ct.ConfigTranslator):
         NOTE: We cannot detect whether the motor is running via SXMRemote.
         Throws a MicroscopeError on failure.
         """
-        state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
+        return self._scope_state
 
-        if state == 1:
-            return scan_pb2.ScopeState.SS_SCANNING
-        # TODO: How to check for SS_SPEC??
-        else:
-            return scan_pb2.ScopeState.SS_FREE
+    def _get_latest_file(self, spec: bool) -> str | None:
+        """Return the filepath for the latest scan/spec.
 
-    def _get_latest_file(self) -> str | None:
-        """Return the location of the metadata for the latest scan.
+        Args:
+            spec: if true, we grab the latest spec. If false, the latest
+                scan.
 
         Raises:
             ValueError if the file structure is incorrect (i.e. there are
                 no/several metadata files in a sub-directory).
         """
+        latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
+                                                self.INI_ITEM_PATH)
+        ext = reader_sxm.SPEC_DATA_EXT if spec else reader_sxm.SCAN_METADATA_EXT
+        ext = "*" + ext
         try:
-            latest_dir = max(glob(os.path.join(self._save_dir, '*/')),
-                             key=os.path.getmtime)
+            files = sorted(glob(os.path.join(latest_dir,
+                                             os.path.join(os.sep, ext))),
+                           key=os.path.getmtime)  # Sorted by access time
         except ValueError:
-            msg = ("No sub-directory (scans) found in main directory when "
-                   "polling for latest scans/specs.")
-            logger.warning(msg)
+            # No files currently showing
             return None
-
-        try:
-            txts = glob(os.path.join(latest_dir, "*.txt"))
-            if len(txts) != 1:  # there should only be one .txt per dir.
-                # TODO: check that this is actually the case
-                msg = (f"Found {len(txts)} txt files in scan directory " +
-                       f"{latest_dir} when there should only be one.")
-                logger.error(msg)
-                raise ValueError(msg)
-        except ValueError:
-            msg = ("No metadata text file found in the latest dir in the scan "
-                   "directory")
-            logger.warning(msg)
-            raise ValueError(msg)
-        return txts[0]  # Returning first metadata file in latest scan subdir.
+        return files[0]  # Returning newest matching file in scan dir.
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override polling of scans."""
-        scan_path = self._get_latest_file()  # TODO: Should this be done elsewhere?
-
+        scan_path = self._get_latest_file(spec=False)  # Actually md path
         if (scan_path and not self._old_scan_path or
                 scan_path != self._old_scan_path):
             scans = load_scans_from_file(scan_path)
@@ -171,11 +169,7 @@ class SXMTranslator(ct.ConfigTranslator):
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling."""
-        spec_path = self._get_latest_file()  # TODO: Should this be done elsewhere?
-
-        # TODO: What are specs and what are scans? How do we differentiate
-        # from the folders?
-
+        spec_path = self._get_latest_file(spec=True)
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
             spec = load_spec_from_file(spec_path)
@@ -185,9 +179,26 @@ class SXMTranslator(ct.ConfigTranslator):
                 self._old_spec = spec
         return self._old_spec
 
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Override to change state for scan/specs.
+
+        Since we can mainly detect when scans/specs *end*, we
+        use successful action requests to handle the 'start' of
+        a scan/spec.
+        """
+        rep = super().on_action_request(action)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            if action.action == MicroscopeAction.START_SCAN:
+                self._scope_state = scan_pb2.ScopeState.SS_SCANNING
+            elif action.action == MicroscopeAction.STOP_SCAN:
+                self._scope_state = scan_pb2.ScopeState.SS_FREE
+            elif action.action == MicroscopeAction.START_SPEC:
+                self._scope_state = scan_pb2.ScopeState.SS_SPEC
+
 
 # TODO: Consider pulling client up to translator level if it needs resetting?
-def _init_action_handler(client: SXMRemote.DDEClient
+def _init_action_handler(client: sxm.DDEClient
                          ) -> actions.AsylumActionHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
@@ -195,7 +206,7 @@ def _init_action_handler(client: SXMRemote.DDEClient
     return actions.AsylumActionHandler(actions_config_path, client)
 
 
-def _init_param_handler(client: SXMRemote.DDEClient
+def _init_param_handler(client: sxm.DDEClient
                         ) -> params.AsylumParameterHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
@@ -203,18 +214,43 @@ def _init_param_handler(client: SXMRemote.DDEClient
     return params.AsylumParameterHandler(params_config_path, client)
 
 
-def load_scans_from_file(scan_path: str
+def load_scans_from_file(md_path: str
                          ) -> list[scan_pb2.Scan2d] | None:
     """Load SXM scan, filling in info possible from file only.
 
     Args:
-        scan_path: path to the scan.
+        md_path: path to the scan metadata.
 
     Returns:
         loaded scans in scan_pb2 format (one scan per channel). None if
         dataset is empty or failure loading scan.
     """
-    raise RuntimeError.NotImplementerError('write me, dummy!')
+    try:
+        reader = reader_sxm.SXMScanReader(md_path)
+        datasets = reader.read(verbose=False)
+    except Exception as exc:
+        logger.error(f"Failure loading scan at {md_path}: {exc}")
+        return None
+
+    if datasets:
+        scans = []
+        for ds in datasets:
+            file_path = os.path.join(os.path.dirname(md_path),
+                                     ds.metadata[reader_sxm.MD_SCAN_FILENAME])
+            scan = conv.convert_sidpy_to_scan_pb2(ds)
+
+            # Set ROI angle, timestamp, filename
+            scan.params.spatial.roi.angle = ds.metadata[
+                SCAN_ATTRIB_ANGLE]
+            scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
+
+            ts = get_file_modification_datetime(file_path)
+            scan.timestamp.FromDatetime(ts)
+
+            scan.filename = file_path
+            scans.append(scan)
+        return scans
+    return None
 
 
 def load_spec_from_file(fname: str,
@@ -228,4 +264,22 @@ def load_spec_from_file(fname: str,
         Spec1d if loaded properly, None if spec file was empty or exception
         thrown when reading.
     """
-    raise RuntimeError.NotImplementerError('write me, dummy!')
+    try:
+        reader = reader_sxm.SXMSpecReader(fname)
+        datasets = reader.read(verbose=False)
+
+        spec = conv.convert_sidpy_to_spec_pb2(datasets)
+        spec.filename = fname
+
+        # Correct probe position
+        probe_x = datasets[0].original_metadata[reader_sxm.MD_PROBE_POS_X]
+        probe_y = datasets[0].original_metadata[reader_sxm.MD_PROBE_POS_Y]
+        units = reader_sxm.MD_POS_UNITS
+        point = geometry_pb2.Point2d(x=float(probe_x), y=float(probe_y))
+        spec.position = spec_pb2.ProbePosition(point, units=units)
+
+        return spec
+    except Exception:
+        logger.error(f'Could not read spec fname {fname}.'
+                     'Got error.', exc_info=True)
+        return None

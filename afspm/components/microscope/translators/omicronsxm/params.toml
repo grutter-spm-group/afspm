@@ -1,5 +1,5 @@
 # This file holds the SXM parameters. Feel free to modify the
-# parameter range if you want to constrain it further.
+# parameter ranges if you want to constrain any further.
 
 # ----- Physical Scan Parameters ----- #
 [scan-top-left-x]  # Changeable attributes in [center-x] below
@@ -45,7 +45,7 @@ caller = 'SCAN'
 
 # ----- Feedback Parameters ----- #
 [zctrl-setpoint]
-uuid = 'Reference'  # TODO: Confirm!!!
+uuid = 'Ref'
 # Note: units are uA, but we consider it unitless, because in
 # ZCtrlParameters it is unitless.
 type = 1.0
@@ -86,21 +86,21 @@ type = 1.0
 range = [0, 5e-4]  #  TODO: Update!
 
 # ----- Probe Parameters ----- #
-[probe-pos-x]
+[probe-pos-x]  # See spec-pos-x *and* tip-pos-x
 getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_x'
 setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_x'
 unit = 'nm'
 type = 1.0
 range = [0, 9e-5]  # [0 nm, 90 um]  # TODO: Update me!
-# Really: within the size of your scan (this is in scan CS).
+# This is in absolute coordinate system
 
-[probe-pos-y]
+[probe-pos-y]  # See spec-pos-y *and* tip-pos-y
 getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_y'
 setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_y'
 unit = 'nm'
 type = 1.0
 range = [0, 9e-5]  # [0 nm, 90 um]
-# Really: within the size of your scan (this is in scan CS).
+# This is in absolute coordinate system
 
 # ----- Other ----- #
 [tip-bias-voltage]
@@ -160,3 +160,23 @@ caller = 'SPECTRA'
 uuid = 'Repeat'
 type = 1
 caller = 'SPECTRA'
+
+[spec-pos-x]  # This is the position where a spec *will* be taken
+uuid = '1'
+type = 1.0
+caller = 'SPECTRA'
+
+[spec-pos-y]  # This is the position where a spec *will* be taken
+uuid = '2'
+type = 1.0
+caller = 'SPECTRA'
+
+[tip-pos-x]  # This is the actual position of the probe
+uuid = '2'
+type = 1.0
+caller = 'CHANNEL'
+
+[tip-pos-y]  # This is the actual position of the probe
+uuid = '3'
+type = 1.0
+caller = 'CHANNEL'

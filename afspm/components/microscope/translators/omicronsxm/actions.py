@@ -3,7 +3,7 @@
 import logging
 from afspm.components.microscope import actions
 
-from SXMRemote import DDEClient
+from sxm import DDEClient
 
 
 logger = logging.getLogger(__name__)
