@@ -20,8 +20,7 @@ from afspm.io.protos.generated import geometry_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
-from gxsmread.spec import (KEY_PROBE_POS_X, KEY_PROBE_POS_Y,
-                           KEY_PROBE_POS_UNITS, KEY_UNITS)
+from gxsmread.spec import KEY_UNITS
 
 from . import params
 from . import actions
@@ -247,13 +246,9 @@ class GxsmTranslator(ct.ConfigTranslator):
 def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
     """Convert pandas DataFrame to spec_pb2.Spec1d.
 
-    NOTE: This does *not* contain the proper ProbePosition! The user must
-    modify the ProbePosition to its appropriate value after calling this.
+    NOTE: Even though this does appear to have probe pos info, we are
+    not populating it and instead using correct_spec().
     """
-    point_2d = geometry_pb2.Point2d(x=float(df.attrs[KEY_PROBE_POS_X]),
-                                    y=float(df.attrs[KEY_PROBE_POS_Y]))
-    probe_pos = spec_pb2.ProbePosition(point=point_2d,
-                                       units=df.attrs[KEY_PROBE_POS_UNITS])
     units_dict = df.attrs[KEY_UNITS]
     names = list(units_dict.keys())
     units = list(units_dict.values())
@@ -264,7 +259,7 @@ def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
                                   names=names, units=units,
                                   values=data.ravel().tolist())
 
-    spec = spec_pb2.Spec1d(data=spec_data, position=probe_pos)
+    spec = spec_pb2.Spec1d(data=spec_data)
     return spec
 
 
