@@ -3,7 +3,7 @@
 import logging
 import pytest
 import tomli
-from typing import Any
+from typing import Any, Callable
 
 from afspm.components.microscope.translator import MicroscopeError
 from afspm.components.microscope.config_translator import ConfigTranslator
@@ -123,11 +123,16 @@ def load_config(config_str: str) -> dict:
 
 class MyParameterHandler(params.ParameterHandler):
 
-    def __init__(self, params_config: dict, vals_dict: dict):
+    def __init__(self, params_config: dict, vals_dict: dict,
+                 param_info_init: Callable = params.create_parameter_info,
+                 param_methods_init: Callable = params.create_parameter_methods):
         """Different from parent in that we feed str rather than file path."""
         self.vals = vals_dict
         self.param_infos = {}
         self.param_methods = {}
+        self.param_info_init = param_info_init
+        self.param_methods_init = param_methods_init
+
         self._build_param_infos_methods(params_config)
 
     def get_param_spm(self, spm_uuid: str) -> Any:
