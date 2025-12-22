@@ -78,11 +78,11 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             the probe position or scan params top-left position change.
 
         _latest_scan_params: ScanParameters2d from when last scan was
-            done. Needed in order to create Scan2d from saved file, as the
-            metadata (oddly) does not appear to store the XY origin.
+            done. Needed in order to create Scan2d from saved file, as not
+            all file formats appear to store the XY origin.
         _latest_probe_pos: ProbePosition of XY position when last spec was
-            done. Needed in order to create Spec1d from saved file, as the
-            metadata (oddly) does not appear to store the XY position.
+            done. Needed in order to create Spec1d from saved file, as not
+            all file formats appear to store the XY position.
     """
 
     def __init__(self, name: str, publisher: pub.Publisher,
@@ -400,7 +400,7 @@ def correct_scan(scan: scan_pb2,
 
     Note that the main attribute we need to correct here is the top-left
     position of the spatial region of interest, as this is what does not
-    appear to be stored by any microscope scan format. We assume the other
+    appear to be stored by many microscope scan formats. We assume the other
     parameters (physical size, digital resolution) are stored properly.
     However, to ensure we do not run into units issues, we copy the full
     *spatial* portion of the scan.
