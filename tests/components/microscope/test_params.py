@@ -5,7 +5,7 @@ import sys
 import math
 import logging
 import pytest
-from typing import Any
+from typing import Any, Callable
 import tomli
 
 from afspm.components.microscope import params
@@ -53,10 +53,15 @@ def load_config(config_str: str) -> dict:
 class MyParameterHandler(params.ParameterHandler):
     vals = {'TL_X': 2.0, 'TL_Y': 1.0}
 
-    def __init__(self, params_config: dict):
+    def __init__(self, params_config: dict,
+                 param_info_init: Callable = params.create_parameter_info,
+                 param_methods_init: Callable = params.create_parameter_methods):
         """Different from parent in that we feed str rather than file path."""
         self.param_infos = {}
         self.param_methods = {}
+        self.param_info_init = param_info_init
+        self.param_methods_init = param_methods_init
+
         self._build_param_infos_methods(params_config)
 
     def get_param_spm(self, spm_uuid: str) -> Any:
