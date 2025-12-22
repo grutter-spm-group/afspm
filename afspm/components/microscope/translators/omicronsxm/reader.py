@@ -13,7 +13,8 @@ match the data as it is saved on our system.
 import os
 import glob
 from dataclasses import dataclass
-from typing import Any, MappingProxyType  # Immutable dict
+from typing import Any
+from types import MappingProxyType  # Immutable dict
 import numpy as np
 from sidpy import sid
 
@@ -137,7 +138,8 @@ def read_spec(spec_path: str) -> [sid.Dataset]:
     names, data = _extract_spec_data(lines)
     units = [SPEC_NAME_TO_UNIT_MAP[name] for name in names]
 
-    data_cols = np.split(data, axis=1)  # Split data along columns
+    # Split data along columns
+    data_cols = np.moveaxis(data, 1, 0)
 
     # Using the first data column as our dim.
     # NOTE: For Asylum, it uses 'dz' or 'Raw' and throws an
@@ -151,7 +153,6 @@ def read_spec(spec_path: str) -> [sid.Dataset]:
 #                        name='Index')
 
     datasets = []
-#    for name, unit, data in zip(names[1:], units[1:], data_cols[1:]):
     for name, unit, data in zip(names, units, data_cols):
         dset = sid.Dataset.from_array(data, name=name)
         dset.data_type = 'spectrum'
@@ -220,19 +221,20 @@ def _read_scan_infos(metadata_path: str) -> dict[str, ScanInfo]:
                 # (We should not be getting any for specs, this is weird
                 # outdated behaviour).
                 if os.path.splitext(file_desc[0])[1] == SCAN_DATA_EXT:
-                    img_desc[file_desc[0]] = ScanInfo(file_desc)
-                    # TODO: *file_desc?
+                    info = ScanInfo(*file_desc)
+                    info.scale = float(info.scale)
+                    info.offset = float(info.offset)
+                    img_desc[file_desc[0]] = info
     return img_desc
 
 
 def _get_scan_paths(metadata_path: str) -> [str]:
     """Given a scan metadata path, output associated scan file paths."""
     metadata_dir = os.path.dirname(metadata_path)
-    prefix = os.path.basename(metadata_path).splitext[0]  # Remove extension
+    # Get filename prefix without extension
+    prefix = os.path.splitext(os.path.basename(metadata_path))[0]
     paths = glob.glob(metadata_dir + os.sep + prefix + "*"
                       + SCAN_DATA_EXT)
-# This is for getting latest dir...
-#                   key=os.path.getmtime)  # Sorted by access time
     return paths
 
 
@@ -251,17 +253,20 @@ def _read_scan_data(metadata_path: str,
         scan_infos: associated ScanInfos.
     """
     scan_paths = _get_scan_paths(metadata_path)
+    scan_base_names = [os.path.basename(scan_path) for scan_path in scan_paths]
     scan_infos_dict = _read_scan_infos(metadata_path)
 
     # If they don't match, something wonky is up!
-    assert scan_paths == list(scan_infos_dict.keys())
+    print(scan_paths)
+    print(scan_infos_dict.keys())
+    assert scan_base_names == list(scan_infos_dict.keys())
 
     # Get resolution
     res_x = int(metadata[RES_X])
     res_y = int(metadata[RES_Y])
 
     scans = []
-    for filename, scan_info in scan_infos_dict:
+    for filename, scan_info in scan_infos_dict.items():
         file_path = os.path.join(os.path.dirname(metadata_path), filename)
         scan = np.fromfile(file_path,
                            dtype='i4').astype(float)  # Convert to float
@@ -272,7 +277,7 @@ def _read_scan_data(metadata_path: str,
     return scans, list(scan_infos_dict.values())
 
 
-def _
+def _make_dimensions(metadata: dict[str, Any]
                      ) -> (sid.Dimension, sid.Dimension):
     x_range = float(metadata[RANGE_X])
     y_range = float(metadata[RANGE_Y])
@@ -327,7 +332,8 @@ def _extract_raw_spec_metadata(lines: list[str]) -> dict[str, str]:
     Returns:
         str:str key:val dict containing MD_KEY:MD_STR.
     """
-    md_lines = [line[1:] for line in lines if line[0] == MD_PREFIX]
+    # Strip newlines from every line
+    md_lines = [line[1:].rstrip() for line in lines if line[0] == MD_PREFIX]
     raw_md = {}
     for line in md_lines:
         kv = line.split(MD_KEY_VAL_DELINEATOR)
@@ -353,8 +359,8 @@ def _parse_useful_spec_metadata(raw_md: dict[str, str]) -> dict[str, str]:
     """
     xy_vals = raw_md[KEY_PROBE_POS_XY]
     x_val, y_val = xy_vals.split('/')
-    raw_md[MD_PROBE_POS_X] = x_val
-    raw_md[MD_PROBE_POS_Y] = y_val
+    raw_md[MD_PROBE_POS_X] = float(x_val)
+    raw_md[MD_PROBE_POS_Y] = float(y_val)
     return raw_md
 
 
@@ -381,13 +387,14 @@ def _extract_spec_data(lines: list[str]) -> (list[str], list[str], np.ndarray):
         - np.ndarray of all data.
     """
     lines = lines[1:]  # Skip first line, which should be always empty
-    lines = [line for line in lines if line[0] != MD_PREFIX]
+    # rstrip() to remove newlines at end of lines
+    lines = [line.rstrip() for line in lines if line[0] != MD_PREFIX]
 
     # Get channel names
     names = lines[0].split(SPEC_DATA_SEP)
 
     # Get data
-    data = [[val for val in line.split(SPEC_DATA_SEP)] for line in lines]
-    data = np.array(data)
+    data = [[val for val in line.split(SPEC_DATA_SEP)] for line in lines[1:]]
+    data = np.array(data, dtype=float)
 
     return names, data

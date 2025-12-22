@@ -224,7 +224,7 @@ def load_scans_from_file(md_path: str
     """
     try:
         reader = reader_sxm.SXMScanReader(md_path)
-        datasets = reader.read(verbose=False)
+        datasets = reader.read()
     except Exception as exc:
         logger.error(f"Failure loading scan at {md_path}: {exc}")
         return None
@@ -257,7 +257,7 @@ def load_spec_from_file(fname: str,
     """
     try:
         reader = reader_sxm.SXMSpecReader(fname)
-        datasets = reader.read(verbose=False)
+        datasets = reader.read()
 
         spec = conv.convert_sidpy_to_spec_pb2(datasets)
         spec.filename = fname
