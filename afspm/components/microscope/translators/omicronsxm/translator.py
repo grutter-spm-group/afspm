@@ -31,10 +31,10 @@ logger = logging.getLogger(__name__)
 class SXMTranslator(ct.ConfigTranslator):
     """Handles device communication with the Scienta Omicron SXM controller.
 
-    The SXMTranslator communicates with the Asylum Research software via the
-    XopClient, which sends/receives JSON messages over a zmq interface as
-    defined by the Allen Institute's ZeroMQ-XOP project:
-    https://github.com/AllenInstitute/ZeroMQ-XOP
+    Omicron Research SXM allows communication with the controller software
+    via DDE, a Windows inter-process communication interface.
+    They also provide (on top of this) a Python interface.
+    The local module sxm is our modified version of this interface.
 
     Notes:
     - In SXM, the spec position and probe position do not need to align
