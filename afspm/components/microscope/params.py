@@ -285,6 +285,10 @@ class ParameterHandler(metaclass=ABCMeta):
     in this case are in a module my_file.py. The 'scan-top-left-x' parameter use
     uses get/set_param_spm() in this case.
 
+    NOTE: if you are using a getter/setter, you can still use the
+    internal logic to correct type, units, range (_correct_val_for_sending()).
+    We suggest doing so wherever possible.
+
     Attributes:
         param_infos: a dict of key:val pairs consisting of
             generic_param:ParameterInfo. For a given generic_param, its
