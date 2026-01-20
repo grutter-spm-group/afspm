@@ -293,17 +293,17 @@ class AsylumTranslator(ct.ConfigTranslator):
 
 
 def _init_action_handler(client: XopClient) -> actions.AsylumActionHandler:
-    """Initialize Asylum action handler pointing to defulat config."""
+    """Initialize Asylum action handler pointing to default config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
-    return actions.AsylumActionHandler(actions_config_path, client)
+    return actions.AsylumActionHandler(client, actions_config_path)
 
 
 def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
-    """Initialize Asylum action handler pointing to defulat config."""
+    """Initialize Asylum action handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
-    return params.AsylumParameterHandler(params_config_path, client)
+    return params.AsylumParameterHandler(client, params_config_path)
 
 
 def load_scans_from_file(scan_path: str

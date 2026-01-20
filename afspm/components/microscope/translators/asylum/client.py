@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_XOP_URL = 'tcp://127.0.0.1:5555'
 
 # Asylum takes a while to respond at times.
-DEFAULT_TIMEOUT_S = 5
+DEFAULT_TIMEOUT_S = 5.0
 
 
 class XopMessageError(Exception):
@@ -43,7 +43,7 @@ class XopClient:
     """
 
     def __init__(self, url: str = DEFAULT_XOP_URL,
-                 timeout_s: int = DEFAULT_TIMEOUT_S,
+                 timeout_s: float = DEFAULT_TIMEOUT_S,
                  ctx: zmq.Context = None):
         """Init constructor."""
         if not ctx:
