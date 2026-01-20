@@ -9,14 +9,12 @@ from ...params import (ParameterHandler,
 from ...actions import (ActionHandler,
                         DEFAULT_ACTIONS_FILENAME,
                         MicroscopeAction)
-from ...translator import get_file_modification_datetime
 from ... import config_translator as ct
 
 from .....utils import array_converters as conv
 
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import spec_pb2
-from .....io.protos.generated import geometry_pb2
 from .....io.protos.generated import control_pb2
 
 from . import params
@@ -191,12 +189,13 @@ class SXMTranslator(ct.ConfigTranslator):
 
 
 # TODO: Consider pulling client up to translator level if it needs resetting?
+# TODO: Update! This still says Asylum!!!
 def _init_action_handler(client: sxm.DDEClient
                          ) -> actions.AsylumActionHandler:
     """Initialize Asylum action handler pointing to defulat config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
-    return actions.AsylumActionHandler(actions_config_path, client)
+    return actions.SXMActionHandler(client, actions_config_path)
 
 
 def _init_param_handler(client: sxm.DDEClient
@@ -204,7 +203,7 @@ def _init_param_handler(client: sxm.DDEClient
     """Initialize Asylum action handler pointing to defulat config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
-    return params.AsylumParameterHandler(params_config_path, client)
+    return params.SXMParameterHandler(client, params_config_path)
 
 
 def load_scans_from_file(md_path: str

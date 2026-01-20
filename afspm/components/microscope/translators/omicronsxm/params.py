@@ -4,7 +4,7 @@ import logging
 
 import enum
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 from afspm.components.microscope import params
 
@@ -62,7 +62,7 @@ def get_setter_substr(caller: CallerType) -> str:
 
 @dataclass
 class SXMParameterInfo(params.ParameterInfo):
-    """Adds param caller to ParameterInfo.
+    """Adds caller attribute to ParameterInfo.
 
     We need this in the case of SXM to know what method we are calling.
     """
@@ -89,12 +89,16 @@ class SXMParameterHandler(params.ParameterHandler):
         mode: FeedbackMode we are to be running in.
     """
 
-    def __init__(self, client: DDEClient, mode: FeedbackMode, **kwargs):
+    DEFAULT_MODE = FeedbackMode.AFM
+
+    def __init__(self, client: DDEClient, mode: FeedbackMode = DEFAULT_MODE,
+                 **kwargs):
         """Override create_parameter_info for our special one.
 
         Args:
             client: DDE client used to communicate with SXM.
-            mode: FeedbackMode we are to be running in.
+            mode: FeedbackMode we are to be running in. Defaults to
+                DEFAULT_MODE.
         """
         self.client = client
         self.param_caller = None
