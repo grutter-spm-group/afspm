@@ -33,12 +33,12 @@ type = 1.0
 range = [-360.0, 360.0]
 
 # ----- Digital Scan Parameters ----- #
-[scan-resolution-x]  # Unitless, no range enforced.
+[scan-resolution-x]  # Unitless
 uuid = 'PointsX'
 type = 1
 range = [0, 32000]
 
-[scan-resolution-y]  # Unitless, no range enforced.
+[scan-resolution-y]  # Unitless
 uuid = 'PointsY'
 type = 1
 range = [0, 32000]
@@ -50,12 +50,12 @@ uuid = 'dsp-fbs-mx0-current-set'
 type = 1.0
 range = [-100, 100]
 
-[zctrl-pgain]  # Unitless, no range enforced.
+[zctrl-pgain]  # Unitless
 uuid = 'dsp-fbs-cp'
 type = 1.0
 range = [0, 200]
 
-[zctrl-igain]  # Unitless, no range enforced.
+[zctrl-igain]  # Unitless
 uuid = 'dsp-fbs-ci'
 type = 1.0
 range = [0, 200]

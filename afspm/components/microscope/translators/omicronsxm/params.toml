@@ -5,10 +5,12 @@
 [scan-top-left-x]  # Changeable attributes in [center-x] below
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_x'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_x'
+# TODO: type and range?  CONFIRM how center-x is expected to work.
 
 [scan-top-left-y]  # Changeable attributes in [center-y] below
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_y'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_y'
+# TODO: type and range?
 
 [scan-angle]
 uuid = 'Angle'
@@ -37,7 +39,7 @@ getter = 'afspm.components.microscope.translators.omicronsxm.params.get_res_x'
 type = 1
 range = [32, 1536]  # TODO: Update!
 
-[scan-resolution-y]  # Unitless, no range enforced.
+[scan-resolution-y]  # Unitless
 uuid = 'Pixel'
 type = 1
 range = [32, 1536]  # TODO: update!
@@ -52,13 +54,13 @@ type = 1.0
 range = [0, 10]   # TODO: Update!
 caller = 'FEEDBACK'
 
-[zctrl-pgain]  # Unitless, no range enforced.
+[zctrl-pgain]  # Unitless
 uuid = 'Kp'
 type = 1.0
 range = [0, 4096]   # TODO: Update!
 caller = 'FEEDBACK'
 
-[zctrl-igain]  # Unitless, no range enforced.
+[zctrl-igain]  # Unitless
 uuid = 'Ki'
 type = 1.0
 range = [0, 4096]   # TODO: Update!
