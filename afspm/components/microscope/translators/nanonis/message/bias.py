@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 
 class BiasStruct(base.NanonisMessage):
-    """Voltage Bias."""
+    """Voltage Bias. Unit is in V."""
 
     value: float  # 4 bytes, float32
 

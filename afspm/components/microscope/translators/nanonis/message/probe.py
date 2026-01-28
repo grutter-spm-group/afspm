@@ -15,7 +15,8 @@ class XYPosStruct(base.NanonisMessage):
 
     x: float  # 8 bytes, float64
     y: float  # 8 bytes, float64
-    wait_end_of_move: bool  # 4 bytes, unsigned int32
+    # NOTE: We default to wait until the tip stops what it is doing.
+    wait_end_of_move: bool = 1  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""

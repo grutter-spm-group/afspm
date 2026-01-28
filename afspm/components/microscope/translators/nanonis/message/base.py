@@ -178,7 +178,8 @@ def from_bytes(buffer: bytes, rep: NanonisResponse,
         NanonisResponse of same type as rep, unpacked from buffer.
 
     Raises:
-        TODO: Some form of error, if we get an error?
+        NanonisMessageError if we requested a response and the response
+            indicates an error.
     """
     rep_header = ResponseHeader()
     offset = struct.calcsize(rep_header.get_format())
