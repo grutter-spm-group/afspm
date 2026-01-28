@@ -93,7 +93,7 @@ class ZSpectrastopRep(base.EmptyResponse):
 
 
 # ----- Spectra Status ----- #
-class SpectraStatusGet(base.NanonisMessage):
+class SpectraStatusStruct(base.NanonisMessage):
     """Spectroscopy status."""
 
     status: int  # 4 bytes, unsigned int32
@@ -111,7 +111,7 @@ class BiasSpectraStatusGet(base.NanonisMessage):
         return 'BiasSpectr.StatusGet'
 
 
-class ZSpectraStatusGet(SpectraStatusGet):
+class ZSpectraStatusGet(base.NanonisMessage):
     """Z spectroscopy status."""
 
     def get_command_name(self) -> str:
@@ -119,11 +119,18 @@ class ZSpectraStatusGet(SpectraStatusGet):
         return 'ZSpectr.StatusGet'
 
 
+# TODO: Remember the name of what these are :(
+# Anyway, matching the 'structure' of getter/setter commands for sake of
+# consistency.
+BiasSpectraStatusStruct = SpectraStatusStruct
+ZSpectraStatusStruct = SpectraStatusStruct
+
+
 class BiasSpectraStatusGetReq(BiasSpectraStatusGet, base.EmptyRequest):
     """Bias spectroscopy status request."""
 
 
-class BiasSpectraStatusGetRep(BiasSpectraStatusGet, SpectraStatusGet):
+class BiasSpectraStatusGetRep(BiasSpectraStatusGet, BiasSpectraStatusStruct):
     """Bias spectroscopy status request."""
 
 
@@ -131,5 +138,5 @@ class ZSpectraStatusGetReq(ZSpectraStatusGet, base.EmptyRequest):
     """Z spectroscopy status request."""
 
 
-class ZSpectraStatusGetRep(ZSpectraStatusGet, SpectraStatusGet):
+class ZSpectraStatusGetRep(ZSpectraStatusGet, ZSpectraStatusStruct):
     """Z spectroscopy status request."""
