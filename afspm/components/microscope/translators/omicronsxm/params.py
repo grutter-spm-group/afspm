@@ -83,9 +83,7 @@ class SXMParameterHandler(params.ParameterHandler):
 
     Attributes:
         client: DDE client used to communicate with SXM.
-        param_caller: holds the CallerType of the latest parameter we
-            wish to access. It is set in get_param()/set_param(), and
-            used by get_param_spm()/set_param_spm().
+        uuid_to_caller_map: holds the CallerType for a given specific uuid.
         mode: FeedbackMode we are to be running in.
     """
 
@@ -101,7 +99,7 @@ class SXMParameterHandler(params.ParameterHandler):
                 DEFAULT_MODE.
         """
         self.client = client
-        self.param_caller = None
+        self.uuid_to_caller_map = {}
         kwargs['param_info_init'] = create_param_info
         self.__init__(**kwargs)
 
@@ -115,20 +113,19 @@ class SXMParameterHandler(params.ParameterHandler):
         self.mode = mode
         self._switch_feedback_mode(mode)
 
-    def get_param(self, generic_param: params.MicroscopeParameter) -> Any:
-        """Override to store get-set substr."""
-        self.param_caller = self._get_param_info(generic_param).caller
-        val = super().get_param(generic_param)
-        self.param_caller = None
-        return val
+    def _load_config_build_params(self, params_config_path: str):
+        """Override to populate self.uuid_to_caller_map."""
+        for key, val in self.param_infos.items():
+            self.uuid_to_caller_map[val.uuid] = val.caller
 
     def get_param_spm(self, spm_uuid: str) -> Any:
         """Override for SPM-specific getter."""
+        caller = self.uuid_to_caller_map[spm_uuid]
         # Special case for CHANNEL get calls.
-        if self.param_caller == CallerType.CHANNEL:
+        if caller == CallerType.CHANNEL:
             spm_uuid = '-' + spm_uuid
 
-        method_substr = get_getter_substr(self.client, self.param_caller)
+        method_substr = get_getter_substr(self.client, caller)
         return self._call_get(method_substr, spm_uuid)
 
     def _call_get(self, method: str, attr: str) -> Any:
@@ -153,16 +150,10 @@ class SXMParameterHandler(params.ParameterHandler):
             logger.error(msg)
             raise Exception(msg)
 
-    def set_param(self, generic_param: params.MicroscopeParameter, val: Any,
-                  curr_unit: str = None):
-        """Override to store get-set method."""
-        self.param_caller = self._get_param_info(generic_param).caller
-        super().set_param(generic_param, val, curr_unit)
-        self.param_caller = None
-
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
         """Override for SPM-specific setter."""
-        substr = get_setter_substr(self.param_caller)
+        caller = self.uuid_to_caller_map[spm_uuid]
+        substr = get_setter_substr(caller)
         self._call_set(substr, spm_uuid, spm_val)
 
     def _call_set(self, substr: str, attr: str, val: str):
@@ -198,7 +189,7 @@ class SXMParam(params.MicroscopeParameter):
     We use the 'name' of these parameters as their generic uuid when
     querying them from the params config. So, for example, for CENTER_X,
     we expect:
-        [CENTER_X]
+        [center_x]
         uuid = 'something'
         [...]
     In the config file.
