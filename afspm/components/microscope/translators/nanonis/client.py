@@ -46,16 +46,32 @@ class NanonisClient:
 
     def send_request(self, buffer: bytes,
                      expect_response: bool) -> bytes | None:
-        """Send a request to NanonisClient, receive optional response."""
+        """Send a request to NanonisClient, receive optional response.
+
+        Args:
+            buffer: request in a bytes array.
+            expect_response: whether or not we expect a response.
+
+        Returns:
+            response, as a bytes array, or None if expect_response is False.
+
+        Raises:
+            - TimeoutError if we did not receive an acknowledgement of our
+            request or a response (if expected) within self._timeout_s.
+            - NanonisMessageError if we received a response but it indicates
+            an error.
+        """
         try:
             self._socket.sendall(buffer)
         except TimeoutError as e:
             logger.error('Timeout error sending request.')
             raise e
 
+        response = None
         if expect_response:
             try:
-                self._socket.recv(self._bufsize)
+                response = self._socket.recv(self._bufsize)
             except TimeoutError as e:
                 logger.error('Timeout error receiving response from request.')
                 raise e
+        return response
