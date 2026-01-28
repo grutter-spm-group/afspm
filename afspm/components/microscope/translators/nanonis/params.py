@@ -2,17 +2,27 @@
 
 import logging
 import enum
-from dataclasses import dataclass
-from typing import Any, Callable
+from dataclasses import dataclass, as_tuple
+from typing import Any
 
 from ... import params
-#from .message.spectroscopy import   # Import using parser instead?
+from .....utils.parser import _evaluate_value_str
 from .client import NanonisClient
+from .message import base
 
 
 logger = logging.getLogger(__name__)
 
 
+# Some common strings for our Nanonis controller message handling.
+STRUCT = 'Struct'
+GET_REQ = 'GetReq'
+GET_REP = 'GetRep'
+SET_REQ = 'SetReq'
+SET_REP = 'SetRep'
+
+
+# TODO: Move into message.spectroscopy.py? That way both this and actions can use?
 class SpectroscopyMode(enum.Enum):
     """The spectroscopy mode used, Bias or Z."""
 
@@ -72,14 +82,43 @@ def create_param_info(param_dict: dict) -> NanonisParameterInfo:
     return NanonisParameterInfo(*vals)
 
 
+@dataclass
+class NanonisReqRepStruct:
+    """Holds the various NanonisMessages associated with a data structure.
+
+    For a given data structure Nanonis has bundled you can request it and
+    receive a reply. This structure holds that.
+    """
+
+    req: base.NanonisRequest
+    rep: base.NanonisResponse
+    struct: base.NanonisMessage
+
+    #set_req: base.NanonisRequest
+    #set_rep: base.NanonisResponse
+
+
 class NanonisParameterHandler(params.ParameterHandler):
     """Implements Nanonis-specific logic for parameter handling.
 
     Attributes:
         _client: TCP client usd to communicate with Nanonis.
         _mode: SpectroscopyMode we are to be running in.
+        _uuid_to_reqrepstruct_get_map: holds a NanonisReqRepStruct instance
+            tied to a get call for a given specific uuid.
+        _uuid_to_reqrepstruct_set_map: holds a NanonisReqRepStruct instance
+            tied to a set call for a given specific uuid.
+        _uuid_to_struct_index_map: holds the NanonisMessage's attribute index
+            for a given parameter. (Remember, many parameters are stored in
+            composite structures, so they will be one of many and thus have
+            an index.)
     """
 
+    # TODO: In fact, this is ONLY needed in actions. No parameters are linked
+    # to spectroscopy right now (probe positioning is independent of your
+    # spectroscopy mode.)!
+    # So you need to move this into actions.py
+    # And the current mode should probably be in the translator?
     DEFAULT_MODE = SpectroscopyMode.Bias
 
     def __init__(self, client: NanonisClient,
@@ -93,6 +132,9 @@ class NanonisParameterHandler(params.ParameterHandler):
                 DEFAULT_MODE.
         """
         self._client = client
+        self._uuid_to_reqrepstruct_get_map = {}
+        self._uuid_to_reqrepstruct_set_map = {}
+        self._uuid_to_struct_index_map = {}
 
         kwargs['param_info_init'] = create_param_info
         self.__init__(**kwargs)
@@ -100,6 +142,252 @@ class NanonisParameterHandler(params.ParameterHandler):
         self._mode = mode
         self._switch_spectroscopy_mode(mode)
 
+    def _load_config_build_params(self, params_config_path: str):
+        """Override, to populate Message mapping for all ParameterInfos.
+
+        For Nanonis ParameterInfos in our TOML, we feed the module + message
+        prefix for instantiation. Rather than evaluating every time, we
+        populate self._prefix_to_messages.
+        """
+        super()._load_config_build_params(params_config_path)
+
+        # Populate specific_uuid-to-reqrepstruct mappings
+        for key, val in self.param_infos.items():
+#            class_name = val.split('.')[-1]
+            struct = _evaluate_value_str(val.uuid + STRUCT)
+
+            # Store get information
+            req = _evaluate_value_str(val.uuid + GET_REQ)
+            rep = _evaluate_value_str(val.uuid + GET_REP)
+            reqrepstruct = NanonisReqRepStruct(req, rep, struct)
+            self._uuid_to_reqrepstruct_get_map[val.uuid] = reqrepstruct
+
+            # Store set information
+            req = _evaluate_value_str(val.uuid + SET_REQ)
+            rep = _evaluate_value_str(val.uuid + SET_REP)
+            reqrepstruct = NanonisReqRepStruct(req, rep, struct)
+            self._uuid_to_reqrepstruct_set_map[val.uuid] = reqrepstruct
+
+            # Store index information
+            self._uuid_to_struct_index_map[val.uuid] = val.index
+
+        self._load_status_logic()
+
+    def _load_status_logic(self):
+        """Load status Req/Rep logic, which is not in the TOMLs.
+
+        These particular message types are get-only.
+        """
+        self.param_infos.update(_create_status_param_info_entries())
+        self._uuid_to_reqrepstruct_get_map.update(
+            _create_status_reqrepstruct_map_entries())
+        self._uuid_to_struct_index_map.update(
+            _create_status_struct_index_entries())
+
+    def get_param_spm(self, spm_uuid: str) -> Any:
+        """Implement.
+
+        In this implementation, spm_uuid is in fact a str containing
+        the module + class prefix for importing necessary Python objects
+        in order to send the request. Look for VARIABLE in the class
+        pydoc above.
+
+        Note, however, that we *also* need the index of the struct we are
+        getting
+        """
+        get_req = self._uuid_to_reqrepstruct_get_map[spm_uuid].req
+        requested_response = get_req.request_response()
+
+        req_buffer = base.to_bytes(get_req)
+        rep_buffer = self.client.send_request(req_buffer,
+                                              requested_response)
+
+        if requested_response:
+            val_idx = self._uuid_to_struct_index_map[spm_uuid]
+            get_rep = self._uuid_to_reqrepstruct_get_map[spm_uuid].rep
+            # Populate rep
+            get_rep = base.from_bytes(rep_buffer, get_rep,
+                                      requested_response)
+            val = as_tuple(get_rep)[val_idx]
+            return val
+        return None
+
+    def set_param_spm(self, spm_uuid: str, spm_val: Any):
+        """Implement.
+
+        Because
+
+        Are we sure there is not a 'not-set' option for values
+        we do not want to set in these structs?
+
+        If not, we probably have to do a get for all of them. We can
+        add a hack of using -1 to indicate that an index is 0 and the
+        struct has only 1 value...
+
+        It looks like you *do* need to do a get and then change the params
+        you want.
+
+        TODO: Check for STATUS_UUIDs? And throw error if we try to set one!
+        """
+
+        # TODO: Do you need a special check for gain? You may need to ensure
+        # the P and I are properly linked.
+        # In fact, it may be smarter to deal with t or 1/t, because otherwise
+        # P and I are very clearly linked? Consider changing I-gain
+        # in params TOML accordingly...
+
+
+
     def _switch_spectroscopy_mode(mode):
         """Switch to using the appropriate spectroscopy mode."""
         # TODO: Change the appropriate uuids in the TOML!
+
+
+# ---- Special Conversions ----- #
+# Special conversions due to differences between Nanonis and our generic model.
+
+
+class NanonisParam(params.MicroscopeParameter):
+    """Nanonis-specific parameters, used as 'generic' names in config.
+
+    We use the 'name' of these parameters as their generic uuid when
+    querying them from the params config. So, for example, for CENTER_X,
+    we expect:
+        [center_x]
+        uuid = 'something'
+        [...]
+    In the config file.
+    """
+
+    CENTER_X = 'center-x'
+    CENTER_Y = 'center-y'
+
+    # Status params (getters only)
+    SCAN_STATUS = 'scan-status'
+    BIAS_SPEC_STATUS = 'bias-spec-status'
+    Z_SPEC_STATUS = 'z-spec-status'
+
+
+# ----- Top-Left Position Methods ----- #
+def center_to_top_left(pos: float, size: float):
+    """Go from center -> TL."""
+    return pos + 0.5*size
+
+
+def top_left_to_center(pos: float, size: float):
+    """Go from center -> TL."""
+    return pos - 0.5*size
+
+
+def set_scan_x(handler: params.ParameterHandler,
+               val: Any, unit: str):
+    """Set top-left x-position of scan.
+
+    Nanonis stores the center position, so we need to subtract half of
+    (width/height) to what we receive.
+    """
+    # Get scan_size_x
+    size = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
+    pos = top_left_to_center(val, size)
+    handler.set_param(NanonisParam.CENTER_X, pos, unit)
+
+
+def set_scan_y(handler: params.ParameterHandler,
+               val: Any, unit: str):
+    """Set top-left y-position of scan.
+
+    Nanonis stores the center position, so we need to subtract half of
+    (width/height) to what we receive.
+    """
+    size = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_Y)
+    pos = top_left_to_center(val, size)
+    handler.set_param(NanonisParam.CENTER_Y, pos, unit)
+
+
+def set_scan_speed(handler: params.ParameterHandler,
+                   val: Any, unit: str):
+    """Set scan speed.
+
+    This is a special method, since Nanonis allows you to set the forward
+    and backward scan speeds independently. Because our framework only
+    supports a generic 'scan-speed', we set the forward one and maintain
+    the pre-existing ratio between forward and backward.
+    """
+    generic_uuid = params.MicroscopeParameter.SCAN_SPEED
+    param_info = handler._get_param_info(generic_uuid)
+
+    if param_info.uuid is None:
+        msg = f'Parameter {generic_uuid} does not have SPM uuid.'
+        logger.error(msg)
+        raise params.ParameterNotSupportedError(msg)
+
+    # TODO: Set this attr *AND* the ratio between forward and backward.
+    # Also, make sure you set const to 0 for this struct.
+
+
+# ----- Hard-coded status logic ----- #
+# The parameters here don't fit into the standard set/get paradigm,
+# but only have a get (they are statuses).
+# Since we only use these to check the current ScopeState, we are just
+# hard-coding the logic here.
+
+# Special parameters for get only (ScanAction is needed for actions.py)
+SCAN_STATUS_UUID = 'afspm.components.microscope.translators.nanonis.message.scan.ScanStatus'
+BIAS_SPEC_STATUS_UUID = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.BiasSpectraStatus'
+Z_SPEC_STATUS_UUID = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.ZSpectraStatus'
+
+STATUS_UUIDS = [SCAN_STATUS_UUID, BIAS_SPEC_STATUS_UUID, Z_SPEC_STATUS_UUID]
+STATUS_GENERIC_IDS = [NanonisParam.SCAN_STATUS, NanonisParam.BIAS_SPEC_STATUS,
+                      NanonisParam.Z_SPEC_STATUS]
+
+
+def _create_status_param_info_entries() -> dict:
+    """Create status param info entries, outputting a dict of these.
+
+    We do this rather than polute the params TOML with them. It is also
+    worth doing explicitly, as these ones do not have setters!
+
+    Returns:
+        param_info_map-like dict, which can be joined with the one in
+            NanonisParameterHandler.
+    """
+    param_info_map = {}
+    for generic_id, uuid in zip(STATUS_GENERIC_IDS, STATUS_UUIDS):
+        info = params.ParameterInfo(uuid, type=1)  # int for all statuses
+        param_info_map[generic_id] = info
+    return param_info_map
+
+
+def _create_status_reqrepstruct_map_entries() -> dict:
+    """Create status NanonisReqRepStruct entries, outputting a dict of these.
+
+    We do this rather than polute the params TOML with them. It is also
+    worth doing explicitly, as these ones do not have setters!
+
+    Returns:
+        uuid_to_reqrepstruct_get_map-like dict, which can be joined with the
+            one in NanonisParameterHandler.
+    """
+    reqrepstruct_map = {}
+    for uuid in STATUS_UUIDS:
+        struct = _evaluate_value_str(uuid + STRUCT)
+
+        # Store get information
+        req = _evaluate_value_str(uuid + GET_REQ)
+        rep = _evaluate_value_str(uuid + GET_REP)
+        reqrepstruct = NanonisReqRepStruct(req, rep, struct)
+        reqrepstruct_map[uuid] = reqrepstruct
+    return reqrepstruct_map
+
+
+def _create_status_struct_index_entries() -> dict:
+    """Create index entries for our status parameters.
+
+    Returns:
+        uuid_to_struct_index_map-like dict, which can be joined with the one
+            in NanonisParameterHandler.
+    """
+    index_map = {}
+    for uuid in STATUS_UUIDS:
+        index_map[uuid] = 0
+    return index_map
