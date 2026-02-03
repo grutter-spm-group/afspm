@@ -2,7 +2,7 @@
 
 import logging
 import enum
-from dataclasses import dataclass, as_tuple
+from dataclasses import dataclass, replace, astuple, fields
 from typing import Any
 
 from ... import params
@@ -102,7 +102,7 @@ class NanonisParameterHandler(params.ParameterHandler):
     """Implements Nanonis-specific logic for parameter handling.
 
     Attributes:
-        _client: TCP client usd to communicate with Nanonis.
+        _client: TCP client used to communicate with Nanonis.
         _mode: SpectroscopyMode we are to be running in.
         _uuid_to_reqrepstruct_get_map: holds a NanonisReqRepStruct instance
             tied to a get call for a given specific uuid.
@@ -184,6 +184,22 @@ class NanonisParameterHandler(params.ParameterHandler):
         self._uuid_to_struct_index_map.update(
             _create_status_struct_index_entries())
 
+    def _get_param_spm_struct(self, spm_uuid: str
+                              ) -> base.NanonisResponse | None:
+        """Like get_param_spm(), but we return the NanonisResponse."""
+        get_req = self._uuid_to_reqrepstruct_get_map[spm_uuid].req
+        requested_response = get_req.request_response()
+
+        req_buffer = base.to_bytes(get_req)
+        rep_buffer = self.client.send_request(req_buffer, requested_response)
+
+        if requested_response:
+            get_rep = self._uuid_to_reqrepstruct_get_map[spm_uuid].rep
+            get_rep = base.from_bytes(rep_buffer, get_rep,
+                                      requested_response)
+            return get_rep
+        return None
+
     def get_param_spm(self, spm_uuid: str) -> Any:
         """Implement.
 
@@ -195,48 +211,95 @@ class NanonisParameterHandler(params.ParameterHandler):
         Note, however, that we *also* need the index of the struct we are
         getting
         """
-        get_req = self._uuid_to_reqrepstruct_get_map[spm_uuid].req
-        requested_response = get_req.request_response()
-
-        req_buffer = base.to_bytes(get_req)
-        rep_buffer = self.client.send_request(req_buffer,
-                                              requested_response)
-
-        if requested_response:
+        get_rep = self._get_param_spm_struct(spm_uuid)
+        if get_rep:
             val_idx = self._uuid_to_struct_index_map[spm_uuid]
-            get_rep = self._uuid_to_reqrepstruct_get_map[spm_uuid].rep
-            # Populate rep
-            get_rep = base.from_bytes(rep_buffer, get_rep,
-                                      requested_response)
-            val = as_tuple(get_rep)[val_idx]
+            val = astuple(get_rep)[val_idx]
             return val
         return None
+
+    def _obtain_set_struct(self, spm_uuid: str) -> base.NanonisMessage:
+        """Obtain structure we will be using to set.
+
+        Many of the parameters we wish to set are part of a composite structure
+        which causes us to need to 'get' the current state of the structure
+        first. This is notably  not the case for *all* parameters. This method
+        will return the base structure, either (a) via getting the composite
+        struct or (b) grabbing from our reqrepstruct map.
+        """
+        try:
+            reqrepstruct = self._uuid_to_reqrepstruct_set_map[spm_uuid]
+        except KeyError:
+            msg = f'Could not find NanonisMessages for {spm_uuid}.'
+            logger.error(msg)
+            raise params.ParameterConfigurationError(msg)
+
+        if len(astuple(reqrepstruct.req)) > 1:
+            get_rep = self._get_param_spm_struct(spm_uuid)
+        else:
+            get_rep = reqrepstruct.req
+        return get_rep
+
+    def _prepare_set_struct(self, spm_uuid: str, spm_val: Any
+                            ) -> base.NanonisMessage:
+        """Populate a structure for setting.
+
+        Here, we obtain the base structure associated with our set call and
+        modify the appropriate attribute (linked to our parameter of interest).
+        The returned structure is ready to be sent out to our setter method.
+        """
+        try:
+            val_idx = self._uuid_to_struct_index_map[spm_uuid]
+        except KeyError:
+            msg = f'Could not find struct index for {spm_uuid}.'
+            logger.error(msg)
+            raise params.ParameterConfigurationError(msg)
+
+        get_rep = self._obtain_set_struct(spm_uuid)
+
+        tuple_data = astuple(get_rep)
+        tuple_data[val_idx] = spm_val
+
+        # Fill set request with struct data (should match our get reply
+        # structure).
+        set_req = self._uuid_to_reqrepstruct_set_map.req
+        set_req = replace(set_req, dict(zip(fields(set_req), tuple_data)))
+        return set_req
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
         """Implement.
 
-        Because
+        Because many of the parameters we set are settable via composite
+        structures, we largely have to call a 'get' method before setting,
+        obtaining the current values. This is done in _obtain_set_struct().
 
-        Are we sure there is not a 'not-set' option for values
-        we do not want to set in these structs?
-
-        If not, we probably have to do a get for all of them. We can
-        add a hack of using -1 to indicate that an index is 0 and the
-        struct has only 1 value...
-
-        It looks like you *do* need to do a get and then change the params
-        you want.
-
-        TODO: Check for STATUS_UUIDs? And throw error if we try to set one!
-        """
+        For composite sets from within afspm (e.g., ScanParameters2d), I
+        suggest manually using these internal methods. Otherwise, the
+        approach taken here will call N gets and sets for the N attributes of
+        the afspm-composite struct.
 
         # TODO: Do you need a special check for gain? You may need to ensure
         # the P and I are properly linked.
         # In fact, it may be smarter to deal with t or 1/t, because otherwise
         # P and I are very clearly linked? Consider changing I-gain
         # in params TOML accordingly...
+        """
+        set_req = self._prepare_set_struct(spm_uuid, spm_val)
+        req_buffer = base.to_bytes(set_req)
 
+        requested_response = set_req.request_response()
+        rep_buffer = self.client.send_request(req_buffer, requested_response)
+        if requested_response:
+            # Receive response (in case we catch an error), but do  not
+            # parse it (because there should be no struct sent back).
+            try:
+                set_rep = self._uuid_to_reqrepstruct_set_map[spm_uuid].rep
+            except KeyError:
+                msg = f'Could not NanonisResponse for {spm_uuid}.'
+                logger.error(msg)
+                raise params.ParameterConfigurationError(msg)
 
+            base.from_bytes(rep_buffer, set_rep, requested_response)
 
     def _switch_spectroscopy_mode(mode):
         """Switch to using the appropriate spectroscopy mode."""
