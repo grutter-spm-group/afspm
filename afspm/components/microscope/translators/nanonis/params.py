@@ -14,14 +14,6 @@ from .message import base
 logger = logging.getLogger(__name__)
 
 
-# Some common strings for our Nanonis controller message handling.
-STRUCT = 'Struct'
-GET_REQ = 'GetReq'
-GET_REP = 'GetRep'
-SET_REQ = 'SetReq'
-SET_REP = 'SetRep'
-
-
 # TODO: Move into message.spectroscopy.py? That way both this and actions can use?
 class SpectroscopyMode(enum.Enum):
     """The spectroscopy mode used, Bias or Z."""
@@ -82,18 +74,6 @@ def create_param_info(param_dict: dict) -> NanonisParameterInfo:
     return NanonisParameterInfo(*vals)
 
 
-@dataclass
-class NanonisReqRep:
-    """Holds the various request-reply associatd with a Nanonis call.
-
-    For a given data structure Nanonis has bundled you can request it and
-    receive a reply. This structure holds that.
-    """
-
-    req: base.NanonisRequest
-    rep: base.NanonisResponse
-
-
 class NanonisParameterHandler(params.ParameterHandler):
     """Implements Nanonis-specific logic for parameter handling.
 
@@ -150,18 +130,18 @@ class NanonisParameterHandler(params.ParameterHandler):
         # Populate specific_uuid-to-reqrep mappings
         for key, val in self.param_infos.items():
 #            class_name = val.split('.')[-1]
-            struct = _evaluate_value_str(val.uuid + STRUCT)
+            struct = _evaluate_value_str(val.uuid + base.STRUCT)
 
             # Store get information
-            req = _evaluate_value_str(val.uuid + GET_REQ)
-            rep = _evaluate_value_str(val.uuid + GET_REP)
-            reqrep = NanonisReqRep(req, rep, struct)
+            req = _evaluate_value_str(val.uuid + base.GET_REQ)
+            rep = _evaluate_value_str(val.uuid + base.GET_REP)
+            reqrep = base.NanonisReqRep(req, rep, struct)
             self._uuid_to_reqrep_get_map[val.uuid] = reqrep
 
             # Store set information
-            req = _evaluate_value_str(val.uuid + SET_REQ)
-            rep = _evaluate_value_str(val.uuid + SET_REP)
-            reqrep = NanonisReqRep(req, rep, struct)
+            req = _evaluate_value_str(val.uuid + base.SET_REQ)
+            rep = _evaluate_value_str(val.uuid + base.SET_REP)
+            reqrep = base.NanonisReqRep(req, rep, struct)
             self._uuid_to_reqrep_set_map[val.uuid] = reqrep
 
             # Store index information
@@ -429,12 +409,12 @@ def _create_status_reqrep_map_entries() -> dict:
     """
     reqrep_map = {}
     for uuid in STATUS_UUIDS:
-        struct = _evaluate_value_str(uuid + STRUCT)
+        struct = _evaluate_value_str(uuid + base.STRUCT)
 
         # Store get information
-        req = _evaluate_value_str(uuid + GET_REQ)
-        rep = _evaluate_value_str(uuid + GET_REP)
-        reqrep = NanonisReqRep(req, rep, struct)
+        req = _evaluate_value_str(uuid + base.GET_REQ)
+        rep = _evaluate_value_str(uuid + base.GET_REP)
+        reqrep = base.NanonisReqRep(req, rep, struct)
         reqrep_map[uuid] = reqrep
     return reqrep_map
 

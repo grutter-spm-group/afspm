@@ -31,6 +31,15 @@ from abc import ABC, abstractmethod
 logger = logging.getLogger(__name__)
 
 
+# ----- Common Strings ----- #
+# Some common strings for our Nanonis controller message handling.
+STRUCT = 'Struct'
+GET_REQ = 'GetReq'
+GET_REP = 'GetRep'
+SET_REQ = 'SetReq'
+SET_REP = 'SetRep'
+
+
 # ----- Base Classes ----- #
 @dataclass
 class NanonisMessage(ABC):
@@ -222,3 +231,15 @@ def to_bytes(req: NanonisRequest) -> bytes:
                                       *dataclass.astuple(this_req))
         buffer = buffer + local_buff
     return buffer
+
+
+@dataclass
+class NanonisReqRep:
+    """Holds the various request-reply associatd with a Nanonis call.
+
+    For a given data structure Nanonis has bundled you can request it and
+    receive a reply. This structure holds that.
+    """
+
+    req: NanonisRequest
+    rep: NanonisResponse
