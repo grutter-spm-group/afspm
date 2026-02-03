@@ -24,7 +24,7 @@ import logging
 
 import struct
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, fields
 from abc import ABC, abstractmethod
 
 
@@ -187,7 +187,8 @@ def from_bytes(buffer: bytes, rep: NanonisResponse,
     # Unpack response
     format = rep.get_format(buffer, offset)  # Get format for unpacking
     tuple_data = struct.unpack_from(format, offset, buffer)
-    inst = replace(rep, *tuple_data)
+    # Update struct with proper values
+    inst = replace(rep, dict(zip(fields(rep), tuple_data)))
 
     # Unpack error message (if expected)
     if requested_response:
