@@ -83,8 +83,8 @@ def create_param_info(param_dict: dict) -> NanonisParameterInfo:
 
 
 @dataclass
-class NanonisReqRepStruct:
-    """Holds the various NanonisMessages associated with a data structure.
+class NanonisReqRep:
+    """Holds the various request-reply associatd with a Nanonis call.
 
     For a given data structure Nanonis has bundled you can request it and
     receive a reply. This structure holds that.
@@ -92,10 +92,6 @@ class NanonisReqRepStruct:
 
     req: base.NanonisRequest
     rep: base.NanonisResponse
-    struct: base.NanonisMessage
-
-    #set_req: base.NanonisRequest
-    #set_rep: base.NanonisResponse
 
 
 class NanonisParameterHandler(params.ParameterHandler):
@@ -104,9 +100,9 @@ class NanonisParameterHandler(params.ParameterHandler):
     Attributes:
         _client: TCP client used to communicate with Nanonis.
         _mode: SpectroscopyMode we are to be running in.
-        _uuid_to_reqrepstruct_get_map: holds a NanonisReqRepStruct instance
+        _uuid_to_reqrep_get_map: holds a NanonisReqRep instance
             tied to a get call for a given specific uuid.
-        _uuid_to_reqrepstruct_set_map: holds a NanonisReqRepStruct instance
+        _uuid_to_reqrep_set_map: holds a NanonisReqRep instance
             tied to a set call for a given specific uuid.
         _uuid_to_struct_index_map: holds the NanonisMessage's attribute index
             for a given parameter. (Remember, many parameters are stored in
@@ -132,8 +128,8 @@ class NanonisParameterHandler(params.ParameterHandler):
                 DEFAULT_MODE.
         """
         self._client = client
-        self._uuid_to_reqrepstruct_get_map = {}
-        self._uuid_to_reqrepstruct_set_map = {}
+        self._uuid_to_reqrep_get_map = {}
+        self._uuid_to_reqrep_set_map = {}
         self._uuid_to_struct_index_map = {}
 
         kwargs['param_info_init'] = create_param_info
@@ -151,7 +147,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         """
         super()._load_config_build_params(params_config_path)
 
-        # Populate specific_uuid-to-reqrepstruct mappings
+        # Populate specific_uuid-to-reqrep mappings
         for key, val in self.param_infos.items():
 #            class_name = val.split('.')[-1]
             struct = _evaluate_value_str(val.uuid + STRUCT)
@@ -159,14 +155,14 @@ class NanonisParameterHandler(params.ParameterHandler):
             # Store get information
             req = _evaluate_value_str(val.uuid + GET_REQ)
             rep = _evaluate_value_str(val.uuid + GET_REP)
-            reqrepstruct = NanonisReqRepStruct(req, rep, struct)
-            self._uuid_to_reqrepstruct_get_map[val.uuid] = reqrepstruct
+            reqrep = NanonisReqRep(req, rep, struct)
+            self._uuid_to_reqrep_get_map[val.uuid] = reqrep
 
             # Store set information
             req = _evaluate_value_str(val.uuid + SET_REQ)
             rep = _evaluate_value_str(val.uuid + SET_REP)
-            reqrepstruct = NanonisReqRepStruct(req, rep, struct)
-            self._uuid_to_reqrepstruct_set_map[val.uuid] = reqrepstruct
+            reqrep = NanonisReqRep(req, rep, struct)
+            self._uuid_to_reqrep_set_map[val.uuid] = reqrep
 
             # Store index information
             self._uuid_to_struct_index_map[val.uuid] = val.index
@@ -179,22 +175,22 @@ class NanonisParameterHandler(params.ParameterHandler):
         These particular message types are get-only.
         """
         self.param_infos.update(_create_status_param_info_entries())
-        self._uuid_to_reqrepstruct_get_map.update(
-            _create_status_reqrepstruct_map_entries())
+        self._uuid_to_reqrep_get_map.update(
+            _create_status_reqrep_map_entries())
         self._uuid_to_struct_index_map.update(
             _create_status_struct_index_entries())
 
     def _get_param_spm_struct(self, spm_uuid: str
                               ) -> base.NanonisResponse | None:
         """Like get_param_spm(), but we return the NanonisResponse."""
-        get_req = self._uuid_to_reqrepstruct_get_map[spm_uuid].req
+        get_req = self._uuid_to_reqrep_get_map[spm_uuid].req
         requested_response = get_req.request_response()
 
         req_buffer = base.to_bytes(get_req)
         rep_buffer = self.client.send_request(req_buffer, requested_response)
 
         if requested_response:
-            get_rep = self._uuid_to_reqrepstruct_get_map[spm_uuid].rep
+            get_rep = self._uuid_to_reqrep_get_map[spm_uuid].rep
             get_rep = base.from_bytes(rep_buffer, get_rep,
                                       requested_response)
             return get_rep
@@ -225,19 +221,19 @@ class NanonisParameterHandler(params.ParameterHandler):
         which causes us to need to 'get' the current state of the structure
         first. This is notably  not the case for *all* parameters. This method
         will return the base structure, either (a) via getting the composite
-        struct or (b) grabbing from our reqrepstruct map.
+        struct or (b) grabbing from our reqrep map.
         """
         try:
-            reqrepstruct = self._uuid_to_reqrepstruct_set_map[spm_uuid]
+            reqrep = self._uuid_to_reqrep_set_map[spm_uuid]
         except KeyError:
             msg = f'Could not find NanonisMessages for {spm_uuid}.'
             logger.error(msg)
             raise params.ParameterConfigurationError(msg)
 
-        if len(astuple(reqrepstruct.req)) > 1:
+        if len(astuple(reqrep.req)) > 1:
             get_rep = self._get_param_spm_struct(spm_uuid)
         else:
-            get_rep = reqrepstruct.req
+            get_rep = reqrep.req
         return get_rep
 
     def _prepare_set_struct(self, spm_uuid: str, spm_val: Any
@@ -262,7 +258,7 @@ class NanonisParameterHandler(params.ParameterHandler):
 
         # Fill set request with struct data (should match our get reply
         # structure).
-        set_req = self._uuid_to_reqrepstruct_set_map.req
+        set_req = self._uuid_to_reqrep_set_map.req
         set_req = replace(set_req, dict(zip(fields(set_req), tuple_data)))
         return set_req
 
@@ -293,7 +289,7 @@ class NanonisParameterHandler(params.ParameterHandler):
             # Receive response (in case we catch an error), but do  not
             # parse it (because there should be no struct sent back).
             try:
-                set_rep = self._uuid_to_reqrepstruct_set_map[spm_uuid].rep
+                set_rep = self._uuid_to_reqrep_set_map[spm_uuid].rep
             except KeyError:
                 msg = f'Could not NanonisResponse for {spm_uuid}.'
                 logger.error(msg)
@@ -421,26 +417,26 @@ def _create_status_param_info_entries() -> dict:
     return param_info_map
 
 
-def _create_status_reqrepstruct_map_entries() -> dict:
-    """Create status NanonisReqRepStruct entries, outputting a dict of these.
+def _create_status_reqrep_map_entries() -> dict:
+    """Create status NanonisReqRep entries, outputting a dict of these.
 
     We do this rather than polute the params TOML with them. It is also
     worth doing explicitly, as these ones do not have setters!
 
     Returns:
-        uuid_to_reqrepstruct_get_map-like dict, which can be joined with the
+        uuid_to_reqrep_get_map-like dict, which can be joined with the
             one in NanonisParameterHandler.
     """
-    reqrepstruct_map = {}
+    reqrep_map = {}
     for uuid in STATUS_UUIDS:
         struct = _evaluate_value_str(uuid + STRUCT)
 
         # Store get information
         req = _evaluate_value_str(uuid + GET_REQ)
         rep = _evaluate_value_str(uuid + GET_REP)
-        reqrepstruct = NanonisReqRepStruct(req, rep, struct)
-        reqrepstruct_map[uuid] = reqrepstruct
-    return reqrepstruct_map
+        reqrep = NanonisReqRep(req, rep, struct)
+        reqrep_map[uuid] = reqrep
+    return reqrep_map
 
 
 def _create_status_struct_index_entries() -> dict:
