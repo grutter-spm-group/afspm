@@ -13,7 +13,7 @@ MOVE_PROBE_UUID = 'move-spec'
 
 
 class AsylumActionHandler(actions.ActionHandler):
-    """Implements asylum-specific aciton handling.
+    """Implements asylum-specific action handling.
 
     Attributes:
         client: XopClient, used to communicate with the Asylum controller
