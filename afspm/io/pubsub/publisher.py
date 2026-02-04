@@ -1,7 +1,8 @@
 """Holds our Publisher logic."""
 
 from typing import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import time
 import logging
 
 import zmq
@@ -14,6 +15,17 @@ from . import defaults
 
 
 logger = logging.getLogger(__name__)
+
+# --- Reliable cross-platform timestamps ---
+# It appears that on Windows, datetime.now() has a lower accuracy than on
+# Linux. The net effect is that you can receive multiple messages that were
+# sent around the same time, and they will all have the same timestamp. This
+# breaks our usage of timestamps to throw out old ones.
+# The fix is to use perf_counter() in addition to a per-Python interpreter
+# datetime (START_DATETIME below). This seems to allow our logic to work
+# in a cross-platform manner.
+START_DATETIME = datetime.now(timezone.utc)
+START_PERF = time.perf_counter()
 
 
 def create_message_packet(env: str, proto: Message, ts: Timestamp):
@@ -29,7 +41,8 @@ def create_message_packet(env: str, proto: Message, ts: Timestamp):
 def create_ts():
     """Create timestamp for this moment."""
     ts = Timestamp()
-    ts.FromDatetime(datetime.now(timezone.utc))
+    ts.FromDatetime(START_DATETIME + timedelta(time.perf_counter() -
+                                               START_PERF))
     return ts
 
 
