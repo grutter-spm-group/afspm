@@ -95,7 +95,8 @@ def set_up_logging(log_file: str = None, log_to_stdout: bool = True,
         root.handlers.clear()
 
     if isinstance(log_level, str):
-        log_level = LOG_LEVEL_STR_TO_INT[log_level.upper()]
+        log_level = (int(log_level) if log_level.isdigit() else
+                     LOG_LEVEL_STR_TO_INT[log_level.upper()])
 
     root.setLevel(log_level)
     formatter = logging.Formatter(
