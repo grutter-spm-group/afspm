@@ -125,6 +125,7 @@ class AfspmComponentBase:
             self.subscriber.set_uuid(self.name)
         if self.heartbeater:
             self.heartbeater.set_uuid(self.name)
+        logger.trace(f"End init component {name}")
 
     def run(self):
         """Loop."""
@@ -140,10 +141,12 @@ class AfspmComponentBase:
             logger.error("Component crash: ", exc_info=True)
 
     def _per_loop_step(self):
+        logger.trace('Start _per_loop_step.')
         self.heartbeater.handle_beat()
         self._handle_subscriber()
         if self.stay_alive:
             self.run_per_loop()
+        logger.trace('End _per_loop_step.')
 
     def _handle_subscriber(self):
         """Poll subscriber and check for a shutdown request.
