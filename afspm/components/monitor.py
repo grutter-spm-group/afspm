@@ -64,9 +64,9 @@ class AfspmComponentsMonitor:
         component_params_dict: a dict of the component constructor params, with
             the component.name being used as a key. The format of this dict
             is the same as the input provided to the constructor.
-        component_processes_dict: a dict of the currently running processes,
+        component_processes: a dict of the currently running processes,
             with the component.name being used as a key.
-        listeners_dict: a dict of the currently running HeartbeatListeners,
+        listeners: a dict of the currently running HeartbeatListeners,
             with the component.name being used as a key.
     """
 
