@@ -1,7 +1,8 @@
 """Test drift estimation logic.
 
-NOTE: I have seen these tests fail intermittently on Windows, tied to tcl
-I have not yet figured out why. Further investigation is required.
+NOTE: Intermittent tcl errors on Windows are likely due to an 'improper'
+install (which appears to be common with virtual environments). The 'solution'
+is to manually copy your Python's tcl folder into your virtual environment.
 """
 
 import logging
