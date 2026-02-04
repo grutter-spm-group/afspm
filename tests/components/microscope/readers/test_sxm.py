@@ -9,6 +9,10 @@ import numpy as np
 
 from afspm.components.microscope.translators.omicronsxm import reader
 
+# Skip these tests if we don't have sidpy installed (and therefore
+# are not set up to run SXM).
+sidpy = pytest.importorskip("sidpy")
+
 
 logger = logging.getLogger(__name__)
 
