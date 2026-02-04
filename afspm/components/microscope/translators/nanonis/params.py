@@ -14,14 +14,6 @@ from .message import base
 logger = logging.getLogger(__name__)
 
 
-# TODO: Move into message.spectroscopy.py? That way both this and actions can use?
-class SpectroscopyMode(enum.Enum):
-    """The spectroscopy mode used, Bias or Z."""
-
-    BIAS = enum.auto()
-    Z = enum.auto()
-
-
 @dataclass
 class NanonisParameterInfo(params.ParameterInfo):
     """Expanding ParameterInfo to be used for Nanonis params.
@@ -79,7 +71,6 @@ class NanonisParameterHandler(params.ParameterHandler):
 
     Attributes:
         _client: TCP client used to communicate with Nanonis.
-        _mode: SpectroscopyMode we are to be running in.
         _uuid_to_reqrep_get_map: holds a NanonisReqRep instance
             tied to a get call for a given specific uuid.
         _uuid_to_reqrep_set_map: holds a NanonisReqRep instance
@@ -90,22 +81,12 @@ class NanonisParameterHandler(params.ParameterHandler):
             an index.)
     """
 
-    # TODO: In fact, this is ONLY needed in actions. No parameters are linked
-    # to spectroscopy right now (probe positioning is independent of your
-    # spectroscopy mode.)!
-    # So you need to move this into actions.py
-    # And the current mode should probably be in the translator?
-    DEFAULT_MODE = SpectroscopyMode.Bias
-
     def __init__(self, client: NanonisClient,
-                 mode: SpectroscopyMode = DEFAULT_MODE,
                  **kwargs):
         """Override create_parameter_info for our special one.
 
         Args:
             client: TCP client used to communicate with Nanonis.
-            mode: SpectroscopyMode we are to be running in. Defaults to
-                DEFAULT_MODE.
         """
         self._client = client
         self._uuid_to_reqrep_get_map = {}
@@ -114,9 +95,6 @@ class NanonisParameterHandler(params.ParameterHandler):
 
         kwargs['param_info_init'] = create_param_info
         self.__init__(**kwargs)
-
-        self._mode = mode
-        self._switch_spectroscopy_mode(mode)
 
     def _load_config_build_params(self, params_config_path: str):
         """Override, to populate Message mapping for all ParameterInfos.
@@ -160,18 +138,49 @@ class NanonisParameterHandler(params.ParameterHandler):
         self._uuid_to_struct_index_map.update(
             _create_status_struct_index_entries())
 
+    # --- Helpers to try/catch KeyErrors --- #
+    def _get_req_rep_get(self, spm_uuid: str) -> base.NanonisReqRep:
+        """Getter of GET ReqRep with KeyError handling."""
+        try:
+            req_rep = self._uuid_to_reqrep_get_map[spm_uuid]
+        except KeyError:
+            msg = f'Could not find GET NanonisReqRep for {spm_uuid}.'
+            logger.error(msg)
+            raise params.ParameterConfigurationError(msg)
+        return req_rep
+
+    def _get_req_rep_set(self, spm_uuid: str) -> base.NanonisReqRep:
+        """Getter of SET ReqRep with KeyError handling."""
+        try:
+            req_rep = self._uuid_to_reqrep_set_map[spm_uuid]
+        except KeyError:
+            msg = f'Could not find SET NanonisReqRep for {spm_uuid}.'
+            logger.error(msg)
+            raise params.ParameterConfigurationError(msg)
+        return req_rep
+
+    def _get_struct_idx(self, spm_uuid: str) -> int:
+        """Getter of NanonisMessage attribute index with KeyError handling."""
+        try:
+            idx = self._uuid_to_struct_index_map[spm_uuid]
+        except KeyError:
+            msg = f'Could not find Nanonis struct index for {spm_uuid}.'
+            logger.error(msg)
+            raise params.ParameterConfigurationError(msg)
+        return idx
+    # --- End KeyError catching helpers --- #
+
     def _get_param_spm_struct(self, spm_uuid: str
                               ) -> base.NanonisResponse | None:
         """Like get_param_spm(), but we return the NanonisResponse."""
-        get_req = self._uuid_to_reqrep_get_map[spm_uuid].req
-        requested_response = get_req.request_response()
+        req_rep = self._get_req_rep_get(spm_uuid)
 
-        req_buffer = base.to_bytes(get_req)
-        rep_buffer = self.client.send_request(req_buffer, requested_response)
+        requested_response = req_rep.req.request_response()
+        req_buffer = base.to_bytes(req_rep.req)
+        rep_buffer = self._client.send_request(req_buffer, requested_response)
 
         if requested_response:
-            get_rep = self._uuid_to_reqrep_get_map[spm_uuid].rep
-            get_rep = base.from_bytes(rep_buffer, get_rep,
+            get_rep = base.from_bytes(rep_buffer, req_rep.rep,
                                       requested_response)
             return get_rep
         return None
@@ -203,18 +212,11 @@ class NanonisParameterHandler(params.ParameterHandler):
         will return the base structure, either (a) via getting the composite
         struct or (b) grabbing from our reqrep map.
         """
-        try:
-            reqrep = self._uuid_to_reqrep_set_map[spm_uuid]
-        except KeyError:
-            msg = f'Could not find NanonisMessages for {spm_uuid}.'
-            logger.error(msg)
-            raise params.ParameterConfigurationError(msg)
+        req_rep = self._get_req_rep_set(spm_uuid)
 
-        if len(astuple(reqrep.req)) > 1:
-            get_rep = self._get_param_spm_struct(spm_uuid)
-        else:
-            get_rep = reqrep.req
-        return get_rep
+        if len(astuple(req_rep.req)) > 1:
+            return self._get_param_spm_struct(spm_uuid)
+        return req_rep.req
 
     def _prepare_set_struct(self, spm_uuid: str, spm_val: Any
                             ) -> base.NanonisMessage:
@@ -224,17 +226,11 @@ class NanonisParameterHandler(params.ParameterHandler):
         modify the appropriate attribute (linked to our parameter of interest).
         The returned structure is ready to be sent out to our setter method.
         """
-        try:
-            val_idx = self._uuid_to_struct_index_map[spm_uuid]
-        except KeyError:
-            msg = f'Could not find struct index for {spm_uuid}.'
-            logger.error(msg)
-            raise params.ParameterConfigurationError(msg)
-
+        idx = self._get_struct_idx(spm_uuid)
         get_rep = self._obtain_set_struct(spm_uuid)
 
         tuple_data = astuple(get_rep)
-        tuple_data[val_idx] = spm_val
+        tuple_data[idx] = spm_val
 
         # Fill set request with struct data (should match our get reply
         # structure).
@@ -264,22 +260,12 @@ class NanonisParameterHandler(params.ParameterHandler):
         req_buffer = base.to_bytes(set_req)
 
         requested_response = set_req.request_response()
-        rep_buffer = self.client.send_request(req_buffer, requested_response)
+        rep_buffer = self._client.send_request(req_buffer, requested_response)
         if requested_response:
             # Receive response (in case we catch an error), but do  not
             # parse it (because there should be no struct sent back).
-            try:
-                set_rep = self._uuid_to_reqrep_set_map[spm_uuid].rep
-            except KeyError:
-                msg = f'Could not NanonisResponse for {spm_uuid}.'
-                logger.error(msg)
-                raise params.ParameterConfigurationError(msg)
-
+            set_rep = self._get_req_rep_set(spm_uuid).rep
             base.from_bytes(rep_buffer, set_rep, requested_response)
-
-    def _switch_spectroscopy_mode(mode):
-        """Switch to using the appropriate spectroscopy mode."""
-        # TODO: Change the appropriate uuids in the TOML!
 
 
 # ---- Special Conversions ----- #

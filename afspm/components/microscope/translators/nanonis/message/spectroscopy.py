@@ -1,5 +1,6 @@
 """Spectroscopy message structures."""
 import logging
+import enum
 from . import base
 
 
@@ -140,3 +141,10 @@ class ZSpectraStatusGetReq(ZSpectraStatusGet, base.EmptyRequest):
 
 class ZSpectraStatusGetRep(ZSpectraStatusGet, ZSpectraStatusStruct):
     """Z spectroscopy status request."""
+
+
+class SpectroscopyMode(enum.Enum):
+    """The spectroscopy mode used, Bias or Z."""
+
+    BIAS = enum.auto()
+    Z = enum.auto()
