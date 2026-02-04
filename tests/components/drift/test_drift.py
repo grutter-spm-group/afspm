@@ -1,4 +1,8 @@
-"""Test drift estimation logic."""
+"""Test drift estimation logic.
+
+NOTE: I have seen these tests fail intermittently on Windows, tied to tcl
+I have not yet figured out why. Further investigation is required.
+"""
 
 import logging
 import pytest
