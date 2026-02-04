@@ -212,7 +212,7 @@ def create_xarray_from_img_path(img_path: str,
     return da
 
 
-def convert_sidpy_to_spec_pb2(datasets: list[sidpy.Dataset],
+def convert_sidpy_to_spec_pb2(datasets: list[Dataset],
                               ) -> spec_pb2.Spec1d:
     """Convert a list of sidpy Datasets to a single Spec1d.
 
