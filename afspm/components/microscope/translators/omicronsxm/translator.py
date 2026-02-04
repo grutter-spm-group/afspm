@@ -20,7 +20,7 @@ from .....io.protos.generated import control_pb2
 from . import params
 from . import actions
 from . import sxm
-from . import reader_sxm
+from . import reader
 
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class SXMTranslator(ct.ConfigTranslator):
         """
         latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
                                                 self.INI_ITEM_PATH)
-        ext = reader_sxm.SPEC_DATA_EXT if spec else reader_sxm.SCAN_METADATA_EXT
+        ext = reader.SPEC_DATA_EXT if spec else reader.SCAN_METADATA_EXT
         ext = "*" + ext
         try:
             files = sorted(glob(os.path.join(latest_dir,
@@ -222,8 +222,8 @@ def load_scans_from_file(md_path: str
         dataset is empty or failure loading scan.
     """
     try:
-        reader = reader_sxm.SXMScanReader(md_path)
-        datasets = reader.read()
+        sxm_reader = reader.SXMScanReader(md_path)
+        datasets = sxm_reader.read()
     except Exception as exc:
         logger.error(f"Failure loading scan at {md_path}: {exc}")
         return None
@@ -232,7 +232,7 @@ def load_scans_from_file(md_path: str
         scans = []
         for ds in datasets:
             file_path = os.path.join(os.path.dirname(md_path),
-                                     ds.metadata[reader_sxm.MD_SCAN_FILENAME])
+                                     ds.metadata[reader.MD_SCAN_FILENAME])
             scan = conv.convert_sidpy_to_scan_pb2(ds)
             scan.filename = file_path
             scans.append(scan)
@@ -255,8 +255,8 @@ def load_spec_from_file(fname: str,
         thrown when reading.
     """
     try:
-        reader = reader_sxm.SXMSpecReader(fname)
-        datasets = reader.read()
+        sxm_reader = reader.SXMSpecReader(fname)
+        datasets = sxm_reader.read()
 
         spec = conv.convert_sidpy_to_spec_pb2(datasets)
         spec.filename = fname

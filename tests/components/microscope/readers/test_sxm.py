@@ -7,7 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
-from afspm.components.microscope.translators.omicronsxm import reader as reader_sxm
+from afspm.components.microscope.translators.omicronsxm import reader
 
 
 logger = logging.getLogger(__name__)
@@ -44,8 +44,8 @@ def names():
 
 def test_read_spec(spec_path, spec_raw_data_first, spec_raw_data_last,
                    names, xy_pos):
-    reader = reader_sxm.SXMSpecReader(spec_path)
-    datasets = reader.read()
+    sxm_reader = reader.SXMSpecReader(spec_path)
+    datasets = sxm_reader.read()
 
     for idx, ds in enumerate(datasets):
         # Assert first and last values make sense
@@ -53,9 +53,9 @@ def test_read_spec(spec_path, spec_raw_data_first, spec_raw_data_last,
         assert spec_raw_data_last[idx] == datasets[idx].compute()[-1]
 
         # Assert X-Pos and Y-Pos are right
-        assert (datasets[idx].original_metadata[reader_sxm.MD_PROBE_POS_X]
+        assert (datasets[idx].original_metadata[reader.MD_PROBE_POS_X]
                 == xy_pos)
-        assert (datasets[idx].original_metadata[reader_sxm.MD_PROBE_POS_Y]
+        assert (datasets[idx].original_metadata[reader.MD_PROBE_POS_Y]
                 == xy_pos)
 
         # Assert names are stored
@@ -125,8 +125,8 @@ def scan_last_vals():
 
 def test_read_scan(scan_md_path, channels, units, scan_first_vals,
                    scan_last_vals):
-    reader = reader_sxm.SXMScanReader(scan_md_path)
-    datasets = reader.read()
+    sxm_reader = reader.SXMScanReader(scan_md_path)
+    datasets = sxm_reader.read()
 
     for idx, ds in enumerate(datasets):
         # Compare channels/units
