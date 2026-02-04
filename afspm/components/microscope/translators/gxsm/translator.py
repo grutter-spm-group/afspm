@@ -9,14 +9,11 @@ from afspm.components.microscope.params import (ParameterHandler,
                                                 DEFAULT_PARAMS_FILENAME)
 from afspm.components.microscope.actions import (ActionHandler,
                                                  DEFAULT_ACTIONS_FILENAME)
-from afspm.components.microscope.translator import (
-    get_file_modification_datetime)
 from afspm.components.microscope import config_translator as ct
 from afspm.utils import array_converters as conv
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
-from afspm.io.protos.generated import geometry_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
@@ -54,6 +51,9 @@ class GxsmTranslator(ct.ConfigTranslator):
         last_scan_fname: Holds last filename to minimize loading files
             unnecessarily (basic cache check).
         old_scans: Holds last scans for cache purposes.
+        last_spec_fname: Holds last filename to minimize loading files
+            unecessarily (basic cache check).
+        old_spec: Holds last spec for cache purposes.
     """
 
     STATE_RUNNING_THRESH = 0

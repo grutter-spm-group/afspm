@@ -149,7 +149,7 @@ class AsylumTranslator(ct.ConfigTranslator):
 
     def _set_save_params(self, saving_mode: int, scanning_mode: int,
                          store_old_vals: bool):
-        """Set the saving mdoe and scanning mode of the controller.
+        """Set the saving mode and scanning mode of the controller.
 
         Args:
             saving_mode: whether or not to save images as we scan. See
@@ -232,7 +232,7 @@ class AsylumTranslator(ct.ConfigTranslator):
             return scan_pb2.ScopeState.SS_SCANNING
         elif params.ScopeState.SINGLE_SPEC.value & val:
             return scan_pb2.ScopeState.SS_SPEC
-        return scan_pb2.SS_FREE
+        return scan_pb2.ScopeState.SS_FREE
 
     def _get_latest_file(self, prefix: str) -> str | None:
         val = self.param_handler.get_param(params.AsylumParam.IMG_PATH.name)
@@ -300,7 +300,7 @@ def _init_action_handler(client: XopClient) -> actions.AsylumActionHandler:
 
 
 def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
-    """Initialize Asylum action handler pointing to default config."""
+    """Initialize Asylum param handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
     return params.AsylumParameterHandler(client, params_config_path)

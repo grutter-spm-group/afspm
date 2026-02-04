@@ -180,7 +180,7 @@ class ScanHandler:
         # Handling desired state logic
         first_startup = (last_state == scan_pb2.ScopeState.SS_UNDEFINED and
                          self._scope_state == scan_pb2.ScopeState.SS_FREE)
-        interrupted = self._scope_state == scan_pb2.SS_INTERRUPTED
+        interrupted = self._scope_state == scan_pb2.ScopeState.SS_INTERRUPTED
         finished_collecting = (last_state in self.COLLECTING_STATES and
                                self._scope_state == scan_pb2.ScopeState.SS_FREE)
         finished_moving = (last_state == scan_pb2.ScopeState.SS_MOVING and

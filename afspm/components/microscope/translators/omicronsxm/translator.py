@@ -189,18 +189,17 @@ class SXMTranslator(ct.ConfigTranslator):
 
 
 # TODO: Consider pulling client up to translator level if it needs resetting?
-# TODO: Update! This still says Asylum!!!
 def _init_action_handler(client: sxm.DDEClient
-                         ) -> actions.AsylumActionHandler:
-    """Initialize Asylum action handler pointing to defulat config."""
+                         ) -> actions.SXMActionHandler:
+    """Initialize SXM action handler pointing to default config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
     return actions.SXMActionHandler(client, actions_config_path)
 
 
 def _init_param_handler(client: sxm.DDEClient
-                        ) -> params.AsylumParameterHandler:
-    """Initialize Asylum action handler pointing to defulat config."""
+                        ) -> params.SXMParameterHandler:
+    """Initialize SXM action handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
     return params.SXMParameterHandler(client, params_config_path)

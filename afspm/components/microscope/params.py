@@ -159,7 +159,7 @@ class ParameterNotSupportedError(Exception):
 
 
 class ParameterConfigurationError(Exception):
-    """There was an error with the config file tied to requested parameter."""
+    """There was an error with the config tied to requested parameter."""
 
     pass
 
