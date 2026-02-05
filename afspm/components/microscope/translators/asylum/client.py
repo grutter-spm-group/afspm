@@ -106,7 +106,7 @@ class XopClient:
                     # (We log the specific errors, and the user of this
                     # method should not have to concern themselves with
                     # such particulars)
-                    raise XopMessageError(getattr(e, 'message', repr(e)))
+                    raise XopMessageError(str(e))
 
                 msg_received = req_msg_id == rep_msg_id
         return msg_received, ret_val
