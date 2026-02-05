@@ -107,7 +107,6 @@ class NanonisParameterHandler(params.ParameterHandler):
 
         # Populate specific_uuid-to-reqrep mappings
         for key, val in self.param_infos.items():
-#            class_name = val.split('.')[-1]
             struct = _evaluate_value_str(val.uuid + base.STRUCT)
 
             # Store get information
