@@ -291,6 +291,19 @@ class NanonisParam(params.MicroscopeParameter):
     BIAS_SPEC_STATUS = 'bias-spec-status'
     Z_SPEC_STATUS = 'z-spec-status'
 
+    # The system path is same as save path
+    FILE_PATH = 'file-path'
+
+    # Scan startup settings
+    SCAN_CONTINUOUS_SCAN = 'scan-continuous-scan'
+    SCAN_AUTO_SAVE = 'scan-auto-save'
+
+    # Spectra startup settings
+    BIAS_SPEC_AUTO_SAVE = 'bias-spec-auto-save'
+    BIAS_SHOW_SAVE_DIALOG = 'bias-spec-save-dialog'
+    Z_SPEC_AUTO_SAVE = 'z-spec-auto-save'
+    Z_SHOW_SAVE_DIALOG = 'bias-spec-save-dialog'
+
 
 # ----- Top-Left Position Methods ----- #
 def center_to_top_left(pos: float, size: float):
