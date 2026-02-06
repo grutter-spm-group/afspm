@@ -3,6 +3,8 @@
 import socket
 import logging
 
+from .message import base
+
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +14,10 @@ DEFAULT_HOST = '127.0.0.1'
 DEFAULT_PORT = 6501
 DEFAULT_TIMEOUT_S = 5.0
 DEFAULT_BUFSIZE = 1024
+
+
+class NanonisCommunicationError(Exception):
+    """Something went amuck sending requests and getting responses."""
 
 
 class NanonisClient:
@@ -75,3 +81,37 @@ class NanonisClient:
                 logger.error('Timeout error receiving response from request.')
                 raise e
         return response
+
+
+def send_request(client: NanonisClient, req: base.NanonisRequset,
+                 rep: base.NanonisResponse | None
+                 ) -> base.NanonisResponse | None:
+    """Send a request and receive a response (if expected).
+
+    This is effectively a wrapper around NanonisClient.send_request(),
+    where we pack our NanonisRequest before sending and unpack our
+    NanonisResponse on receipt (if applicable). If rep is None, we
+    do not expect a response.
+
+    Args:
+        client: NanonisClient used to send our request and receive a reply.
+        req: NanonisRequest we wish to send.
+        rep: NanonisResponse type we expect. If None, we do not expect to
+            receive a response.
+
+    Returns:
+        NanonisResponse of type rep that has been populated with received data,
+            or None if no rep was provided.
+    """
+    req_buffer = base.to_bytes(req)
+    rep_buffer = client.send_request(req_buffer, rep is not None)
+
+    if rep:
+        if not rep_buffer:
+            msg = (f'Expected response for {req.get_command_name()},'
+                   ' but got none.')
+            logger.error(msg)
+            raise NanonisCommunicationError(msg)  # TODO: Catch in params/actions
+
+        rep = base.from_bytes(rep_buffer, rep)
+    return rep
