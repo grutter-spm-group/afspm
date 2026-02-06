@@ -21,10 +21,10 @@ Particularly, we use VARIABLE as the uuid in params.toml. From this, we can
 instantiate the struct, request, and response as needed.
 """
 import logging
-
+import enum
 import struct
 
-from dataclasses import dataclass, replace, fields
+from dataclasses import dataclass, replace, fields, astuple
 from abc import ABC, abstractmethod
 
 
@@ -172,16 +172,12 @@ class NanonisMessageError(Exception):
     """The parsed response indicates an error."""
 
 
-def from_bytes(buffer: bytes, rep: NanonisResponse,
-               requested_response: bool) -> NanonisResponse:
+def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     """Populate NanonisResponse from bytes array and initialized response.
 
     Args:
         buffer: bytes array of received data.
         rep: NanonisResponse we expect, which we will populate.
-        requested_response: whether or not we expected a response from the
-            NanonisRequest linked to this NanonisResponse. You should be
-            able to query the req.request_response() to get this attr.
 
     Returns:
         NanonisResponse of same type as rep, unpacked from buffer.
@@ -199,19 +195,18 @@ def from_bytes(buffer: bytes, rep: NanonisResponse,
     # Update struct with proper values
     inst = replace(rep, dict(zip(fields(rep), tuple_data)))
 
-    # Unpack error message (if expected)
-    if requested_response:
-        offset += struct.calcsize(format)
-        format = ErrorRep.get_format(buffer, offset)
-        tuple_data = struct.unpack_from(format, offset, buffer)
-        error_rep = ErrorRep(*tuple_data)
+    # Unpack error message
+    offset += struct.calcsize(format)
+    format = ErrorRep.get_format(buffer, offset)
+    tuple_data = struct.unpack_from(format, offset, buffer)
+    error_rep = ErrorRep(*tuple_data)
 
-        if error_rep.status:  # Error occurred
-            msg = (f"Error for {type(inst).__name__} message:"
-                   f"{error_rep.description}")
-            logger.error(msg)
-            logger.error(inst)
-            raise NanonisMessageError(msg)
+    if error_rep.status:  # Error occurred
+        msg = (f"Error for {type(inst).__name__} message:"
+               f"{error_rep.description}")
+        logger.error(msg)
+        logger.error(inst)
+        raise NanonisMessageError(msg)
     return inst
 
 
@@ -228,7 +223,7 @@ def to_bytes(req: NanonisRequest) -> bytes:
             (0, struct.calcsize(req_header.format()))):
         format = this_req.get_format()
         local_buff = struct.pack_into(format, offset,
-                                      *dataclass.astuple(this_req))
+                                      *astuple(this_req))
         buffer = buffer + local_buff
     return buffer
 
