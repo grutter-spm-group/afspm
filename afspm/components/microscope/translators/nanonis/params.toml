@@ -20,14 +20,14 @@ index = 4
 [scan-size-x]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
 unit = 'm'
-range = [0, 90]  # TODO: Update
+range = [1e-10, 3e-6]  # [1 A, 3um]
 type = 1.0
 index = 2
 
 [scan-size-y]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
 unit = 'm'
-range = [0, 90]  # TODO: Update
+range = [1e-10, 3e-6]  # [1 A, 3um]
 type = 1.0
 index = 3
 
@@ -35,33 +35,33 @@ index = 3
 [scan-resolution-x]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanBuffer'
 unit = 'm'
-range = [32, 1536]  # TODO: Update!
+range = [16, 8192]  # [1, 8192] pix
 type = 1
 index = 2
 
 [scan-resolution-y]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanBuffer'
 unit = 'm'
-range = [32, 1536]  # TODO: Update!
+range = [1, 8192]  # [1, 8192] pix
 type = 1
 index = 3
 
 # ----- Feedback Parameters ----- #
 [zctrl-setpoint]  # Unitless
 uuid = 'afspm.components.microscope.translators.nanonis.message.zctrl.ZCtrlSetpoint'
-range = [32, 1536]  # TODO: Update!
+range = [10e-13, 10e-9]  # [100f, 10n]
 type = 1.0
 index = 0
 
 [zctrl-pgain]  # Unitless
 uuid = 'afspm.components.microscope.translators.nanonis.message.zctrl.ZCtrlGain'
-range = [32, 1536]  # TODO: Update!
+range = [10e-13, 10e-9]  # [100f, 10n] No real range, matching setpoint range.
 type = 1.0
 index = 0
 
 [zctrl-igain]  # Unitless
 uuid = 'afspm.components.microscope.translators.nanonis.message.zctrl.ZCtrlGain'
-range = [32, 1536]  # TODO: Update!
+range = [10e-13, 10e-9]  # [100f, 10n] No real range, matching setpoint range.
 type = 1.0
 index = 2
 
@@ -69,14 +69,14 @@ index = 2
 [sample-slope-x]
 uuid = 'afspm.components.microscope.translators.nanonis.message.piezo.PiezoTilt'
 unit = 'degrees'
-range = [32, 1536]  # TODO: Update!
+range = [-30.0, 30.0]  # [-30, 30]
 type = 1.0
 index = 0
 
 [sample-slope-y]
 uuid = 'afspm.components.microscope.translators.nanonis.message.piezo.PiezoTilt'
 unit = 'degrees'
-range = [32, 1536]  # TODO: Update!
+range = [-30.0, 30.0]  # [-30, 30]
 type = 1.0
 index = 1
 
@@ -84,7 +84,7 @@ index = 1
 [scan-speed]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanSpeed'
 unit = 'm/s'
-range = [0, 5e-4]  #  TODO: Update!
+range = [3.7e^-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
 type = 1.0
 index = 0
 # NOTE: special setter for scan speed, to ensure we keep forward/backward const!
@@ -95,7 +95,7 @@ setter = 'afspm.components.microscope.translators.nanonis.params.set_scan_speed'
 [move-speed]
 uuid = 'afspm.components.microscope.translators.nanonis.message.probe.Speed'
 unit = 'm/s'
-range = [0, 5e-4]  #  TODO: Update!
+range = [3.7e^-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
 type = 1.0
 index = 0
 
@@ -103,14 +103,14 @@ index = 0
 [probe-pos-x]
 uuid = 'afspm.components.microscope.translators.nanonis.message.probe.XYPos'
 unit = 'm'
-range = [0, 9e-5]  # [0 nm, 90 um]  # TODO: Update me!
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
 type = 1.0
 index = 0
 
 [probe-pos-y]
 uuid = 'afspm.components.microscope.translators.nanonis.message.probe.XYPos'
 unit = 'm'
-range = [0, 9e-5]  # [0 nm, 90 um]  # TODO: Update me!
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
 type = 1.0
 index = 1
 
@@ -118,7 +118,7 @@ index = 1
 [tip-bias-voltage]
 uuid = 'afspm.components.microscope.translators.nanonis.message.bias.Bias'
 unit = 'V'
-range = [0, 10.0]  # TODO: Update
+range = [-10.0, 10.0]  # [-10, 10] V  NOTE: This range seems 'soft'
 type = 1.0
 index = 0
 
@@ -127,14 +127,14 @@ index = 0
 [center-x]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
 unit = 'm'
-range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
 type = 1.0
 index = 0
 
 [center-y]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
 unit = 'm'
-range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
 type = 1.0
 index = 1
 
