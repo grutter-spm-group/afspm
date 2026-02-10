@@ -397,16 +397,12 @@ def set_scan_speed(handler: params.ParameterHandler,
 
 # Special parameters for get only (ScanAction is needed for actions.py)
 BASE_UUID = 'afspm.components.microscope.translators.nanonis.message.'
-
-SCAN_STATUS_UUID = 'afspm.components.microscope.translators.nanonis.message.scan.ScanStatus'
-BIAS_SPEC_STATUS_UUID = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.BiasSpectraStatus'
-Z_SPEC_STATUS_UUID = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.ZSpectraStatus'
-
 STATUS_GENERIC_IDS = [NanonisParam.SCAN_STATUS, NanonisParam.BIAS_SPEC_STATUS,
-                      NanonisParam.Z_SPEC_STATUS]
+                      NanonisParam.Z_SPEC_STATUS, NanonisParam.FILE_PATH]
 STATUS_UUIDS = [BASE_UUID + 'scan.ScanStatus',
                 BASE_UUID + 'spectroscopy.BiasSpectraStatus',
-                BASE_UUID + 'spectroscopy.ZSpectraStatus']
+                BASE_UUID + 'spectroscopy.ZSpectraStatus',
+                BASE_UUID + 'util.SessionPath']
 
 
 def _create_status_param_info_entries() -> dict:

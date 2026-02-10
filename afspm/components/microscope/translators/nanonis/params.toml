@@ -131,11 +131,6 @@ range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
 type = 1.0
 index = 1
 
-[file-path]
-uuid = 'afspm.components.microscope.translators.nanonis.message.util.SessionPath'
-type = ''
-index = 0
-
 [scan-continuous-scan]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanProps'
 type = 1

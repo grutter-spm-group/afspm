@@ -36,7 +36,6 @@ class NanonisTranslator(ct.ConfigTranslator):
 
     Attributes:
         _mode: SpectroscopyMode we are to be running in.
-        _file_path: path to saved scans/spectroscopies.
 
         _old_scans: the last scans, to send out if it has not changed.
         _old_scan_path: the prior scan filepath. We use this to avoid loading
@@ -50,7 +49,6 @@ class NanonisTranslator(ct.ConfigTranslator):
     """
 
     DEFAULT_MODE = spectroscopy.SpectroscopyMode.Bias
-    DEFAULT_FILE_PATH = ''  # TODO: Fill out!
     DESIRED_SETUP_PROPERTIES = params.SetupProperties(
         scan_auto_save=base.SettingState.ON,
         scan_continuous_scan=base.SettingState.OFF,
@@ -65,12 +63,10 @@ class NanonisTranslator(ct.ConfigTranslator):
                  action_handler: ActionHandler | None = None,
                  client: NanonisClient | None = None,
                  mode: spectroscopy.SpectroscopyMode = DEFAULT_MODE,
-                 file_path: str = DEFAULT_FILE_PATH,
                  **kwargs):
         """Construct translator."""
         self._mode = None
         self.set_spectroscopy_mode(mode)
-        self._file_path = file_path
 
         self._old_scan_path = None
         self._old_scans = []
@@ -111,7 +107,8 @@ class NanonisTranslator(ct.ConfigTranslator):
         self.action_handler.set_spectroscopy_mode(self._mode)
 
     def _get_latest_file(self, ext: str) -> str | None:
-        images = sorted(glob.glob(self.file_path + os.sep + "*"
+        file_path = self.param_handler.get_param(params.NanonisParam.FILE_PATH)
+        images = sorted(glob.glob(file_path + os.sep + "*"
                                   + ext),
                         key=os.path.getmtime)  # Sorted by access time
         return images[-1] if images else None  # Get latest
