@@ -1,13 +1,12 @@
 """Holds Nanonis controller parameters (and other extra logic)."""
 
 import logging
-import enum
 from dataclasses import dataclass, replace, astuple, fields
 from typing import Any
 
 from ... import params
 from .....utils.parser import _evaluate_value_str
-from .client import NanonisClient
+from . import client as clnt
 from .message import base
 
 
@@ -81,7 +80,7 @@ class NanonisParameterHandler(params.ParameterHandler):
             an index.)
     """
 
-    def __init__(self, client: NanonisClient,
+    def __init__(self, client: clnt.NanonisClient,
                  **kwargs):
         """Override create_parameter_info for our special one.
 
@@ -138,7 +137,7 @@ class NanonisParameterHandler(params.ParameterHandler):
             _create_status_struct_index_entries())
 
     # --- Helpers to try/catch KeyErrors --- #
-    def _get_req_rep_get(self, spm_uuid: str) -> base.NanonisReqRep:
+    def _get_getter_req_rep(self, spm_uuid: str) -> base.NanonisReqRep:
         """Getter of GET ReqRep with KeyError handling."""
         try:
             req_rep = self._uuid_to_reqrep_get_map[spm_uuid]
@@ -148,7 +147,7 @@ class NanonisParameterHandler(params.ParameterHandler):
             raise params.ParameterConfigurationError(msg)
         return req_rep
 
-    def _get_req_rep_set(self, spm_uuid: str) -> base.NanonisReqRep:
+    def _get_setter_req_rep(self, spm_uuid: str) -> base.NanonisReqRep:
         """Getter of SET ReqRep with KeyError handling."""
         try:
             req_rep = self._uuid_to_reqrep_set_map[spm_uuid]
@@ -169,20 +168,14 @@ class NanonisParameterHandler(params.ParameterHandler):
         return idx
     # --- End KeyError catching helpers --- #
 
-    def _get_param_spm_struct(self, spm_uuid: str
-                              ) -> base.NanonisResponse | None:
+    def _get_param_spm_rep(self, spm_uuid: str
+                           ) -> base.NanonisResponse | None:
         """Like get_param_spm(), but we return the NanonisResponse."""
-        req_rep = self._get_req_rep_get(spm_uuid)
-
-        requested_response = req_rep.req.request_response()
-        req_buffer = base.to_bytes(req_rep.req)
-        rep_buffer = self._client.send_request(req_buffer, requested_response)
-
-        if requested_response:
-            get_rep = base.from_bytes(rep_buffer, req_rep.rep,
-                                      requested_response)
-            return get_rep
-        return None
+        req_rep = self._get_getter_req_rep(spm_uuid)
+        req = req_rep.req
+        rep = (self._get_setter_req_rep(spm_uuid).rep if req.request_response()
+               else None)
+        return send_request(self._client, req, rep)
 
     def get_param_spm(self, spm_uuid: str) -> Any:
         """Implement.
@@ -195,47 +188,67 @@ class NanonisParameterHandler(params.ParameterHandler):
         Note, however, that we *also* need the index of the struct we are
         getting
         """
-        get_rep = self._get_param_spm_struct(spm_uuid)
+        get_rep = self._get_param_spm_rep(spm_uuid)
         if get_rep:
             val_idx = self._uuid_to_struct_index_map[spm_uuid]
             val = astuple(get_rep)[val_idx]
             return val
         return None
 
-    def _obtain_set_struct(self, spm_uuid: str) -> base.NanonisMessage:
-        """Obtain structure we will be using to set.
+    def _obtain_base_set_req(self, spm_uuid: str) -> base.NanonisRequest:
+        """Obtain base request we will be using to set.
 
         Many of the parameters we wish to set are part of a composite structure
         which causes us to need to 'get' the current state of the structure
         first. This is notably  not the case for *all* parameters. This method
-        will return the base structure, either (a) via getting the composite
+        will return the base request, either (a) via getting the composite
         struct or (b) grabbing from our reqrep map.
         """
-        req_rep = self._get_req_rep_set(spm_uuid)
+        set_req = self._get_setter_req_rep(spm_uuid)
 
-        if len(astuple(req_rep.req)) > 1:
-            return self._get_param_spm_struct(spm_uuid)
-        return req_rep.req
+        if len(astuple(set_req)) > 1:
+            get_rep = self._get_param_spm_rep(spm_uuid)
+            return copy_data(set_req, get_rep)
+        return set_req
 
-    def _prepare_set_struct(self, spm_uuid: str, spm_val: Any
-                            ) -> base.NanonisMessage:
-        """Populate a structure for setting.
+    def _prepare_set_req(self, spm_uuid: str, spm_val: Any
+                         ) -> base.NanonisMessage:
+        """Obtain and populate a NanonisRequest for setting.
 
         Here, we obtain the base structure associated with our set call and
         modify the appropriate attribute (linked to our parameter of interest).
         The returned structure is ready to be sent out to our setter method.
         """
         idx = self._get_struct_idx(spm_uuid)
-        get_rep = self._obtain_set_struct(spm_uuid)
+        set_req = self._obtain_base_set_req(spm_uuid)
 
-        tuple_data = astuple(get_rep)
+        tuple_data = astuple(set_req)
         tuple_data[idx] = spm_val
+        return copy_data_from_tuple(set_req, tuple_data)
 
-        # Fill set request with struct data (should match our get reply
-        # structure).
-        set_req = self._uuid_to_reqrep_set_map.req
-        set_req = replace(set_req, dict(zip(fields(set_req), tuple_data)))
-        return set_req
+    # TODO: Remove me
+    # def _send_request(self, req: base.NanonisRequest,
+    #                   rep: base.NanonisResponse | None
+    #                   ) -> base.NanonisResponse | None:
+    #     """Send a request and receive a response (if expected).
+
+    #     This is effectively a wrapper around self._client.send_request(),
+    #     where we pack our NanonisRequest before sending and unpack our
+    #     NanonisResponse on receipt (if applicable). If rep is None, we
+    #     do not expect a response.
+    #     """
+    #     req_buffer = base.to_bytes(req)
+    #     rep_buffer = self._client.send_request(req_buffer, rep is not None)
+
+    #     if rep:
+    #         if not rep_buffer:
+    #             msg = (f'Expected response for {req.get_command_name()},'
+    #                    ' but got none.')
+    #             logger.error(msg)
+    #             raise params.ParameterError(msg)
+
+    #         rep = base.from_bytes(rep_buffer, rep)
+    #     return rep
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
         """Implement.
@@ -255,16 +268,46 @@ class NanonisParameterHandler(params.ParameterHandler):
         # P and I are very clearly linked? Consider changing I-gain
         # in params TOML accordingly...
         """
-        set_req = self._prepare_set_struct(spm_uuid, spm_val)
-        req_buffer = base.to_bytes(set_req)
+        req = self._prepare_set_struct(spm_uuid, spm_val)
+        rep = (self._get_setter_req_rep(spm_uuid).rep if req.request_response()
+               else None)
+        # Not returning (not expected for set)
+        send_request(self._client, req, rep)
 
-        requested_response = set_req.request_response()
-        rep_buffer = self._client.send_request(req_buffer, requested_response)
-        if requested_response:
-            # Receive response (in case we catch an error), but do  not
-            # parse it (because there should be no struct sent back).
-            set_rep = self._get_req_rep_set(spm_uuid).rep
-            base.from_bytes(rep_buffer, set_rep, requested_response)
+
+def copy_data(copy_to: base.NanonisMessage,
+              copy_from: base.NanonisMessage
+              ) -> base.NanonisMessage:
+    """Copy the data from one message to another.
+
+    This implicitly assumes copy_to and copy_from have the same attributes,
+    which would be the case if they correspond to linked messages (e.g.
+    a ScanBufferSetReq and a ScanBufferGetRep).
+
+    Args:
+        copy_to: NanonisMessage we will copy data to.
+        copy_from: NanonisMessage we will copy data from.
+
+    Returns:
+        Instance of copy_to, with data copied from copy_from.
+    """
+    copy_data_from_tuple(copy_to, astuple(copy_from))
+
+
+def copy_data_from_tuple(copy_to: base.NanonisMessage,
+                         tuple_data: (Any,)) -> base.NanonisMessage:
+    """Equivalen to copy_data(), but copy_from is tuple."""
+    return replace(copy_to, dict(zip(fields(copy_to), tuple_data)))
+
+
+def send_request(client: clnt.NanonisClient, req: base.NanonisRequset,
+                 rep: base.NanonisResponse | None
+                 ) -> base.NanonisResponse | None:
+    """Wrap client.py method, with Exception swapping."""
+    try:
+        clnt.send_request(client, req, rep)
+    except clnt.NanonisCommunicationError as e:
+        raise params.ParameterError(str(e))
 
 
 # ---- Special Conversions ----- #
@@ -361,6 +404,8 @@ def set_scan_speed(handler: params.ParameterHandler,
     # TODO: Set this attr *AND* the ratio between forward and backward.
     # Also, make sure you set const to 0 for this struct.
 
+    # TODO: FINISH ME!
+
 
 # ----- Hard-coded status logic ----- #
 # The parameters here don't fit into the standard set/get paradigm,
@@ -432,3 +477,19 @@ def _create_status_struct_index_entries() -> dict:
     for uuid in STATUS_UUIDS:
         index_map[uuid] = 0
     return index_map
+
+
+@dataclass
+class SetupProperties:
+    """Setup properties tied to scan/spectroscopy saving.
+
+    This merges 'important' properties from three different Nanonis
+    messages: ScanPropsSet/Get, ZSpectrPropsSet/Get, BiasSpectrPropsSet/Get.
+
+    NOTE: the attributes are of type SettingState, not boolean!
+    """
+
+    scan_auto_save: base.SettingState
+    scan_continuous_scan: base.SettingState
+    spec_auto_save: base.SettingState
+    spec_save_dialog: base.SettingState
