@@ -238,3 +238,11 @@ class NanonisReqRep:
 
     req: NanonisRequest
     rep: NanonisResponse
+
+
+class SettingState(enum.Enum):
+    """Setting state for scan/spectra props."""
+
+    NO_CHANGE = 0
+    ON = 1
+    OFF = 2
