@@ -120,9 +120,7 @@ class ZSpectraStatusGet(base.NanonisMessage):
         return 'ZSpectr.StatusGet'
 
 
-# TODO: Remember the name of what these are :(
-# Anyway, matching the 'structure' of getter/setter commands for sake of
-# consistency.
+# Pseudonyms for consistency
 BiasSpectraStatusStruct = SpectraStatusStruct
 ZSpectraStatusStruct = SpectraStatusStruct
 
