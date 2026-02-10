@@ -141,6 +141,94 @@ class ZSpectraStatusGetRep(ZSpectraStatusGet, ZSpectraStatusStruct):
     """Z spectroscopy status request."""
 
 
+class SpectraPropsStruct(base.NanonisMessage):
+    """Spectroscopy properties.
+
+    This struct is mainly used to set up auto-saving spectroscopies.
+    """
+
+    save_all: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
+    number_of_sweeps: int = base.SettingState.NO_CHANGE  # 4 bytes, int32
+    backward_sweep: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
+    number_of_points: int = base.SettingState.NO_CHANGE  # 4 bytes, int32
+    z_offset_m: float = 0  # 4 bytes, float32
+    auto_save: int  # 2 bytes, unsigned int16
+    show_save_dialog: int  # 2 bytes, unsigned int16
+
+    def format(self) -> str:
+        """Override."""
+        return 'HiHifHH'
+
+
+# Pseudonyms for consistency
+BiasSpectraPropsStruct = SpectraPropsStruct
+ZSpectraPropsStruct = SpectraPropsStruct
+
+
+class BiasSpectraPropsSet(base.NanonisMessage):
+    """Bias spectroscopy properties set."""
+
+    def get_command_name(self) -> str:
+        """Override."""
+        return 'BiasSpectr.PropsSet'
+
+
+class BiasSpectraPropsSetReq(BiasSpectraPropsSet, BiasSpectraPropsStruct):
+    """Bias spectroscopy properties set request."""
+
+
+class BiasSpectraPropsSetRep(base.EmptyResponse, BiasSpectraPropsSet):
+    """Bias spectroscopy properties set response."""
+
+
+class ZSpectraPropsSet(base.NanonisMessage):
+    """Z spectroscopy properties set."""
+
+    def get_command_name(self) -> str:
+        """Override."""
+        return 'ZSpectr.PropsSet'
+
+
+class ZSpectraPropsSetReq(ZSpectraPropsSet, ZSpectraPropsStruct):
+    """Z spectroscopy properties set request."""
+
+
+class ZSpectraPropsSetRep(base.EmptyResponse, ZSpectraPropsSet):
+    """Z spectroscopy properties set response."""
+
+
+class BiasSpectraPropsGet(base.NanonisMessage):
+    """Bias spectroscopy properties get."""
+
+    def get_command_name(self) -> str:
+        """Override."""
+        return 'BiasSpectr.PropsGet'
+
+
+class BiasSpectraPropsGetReq(BiasSpectraPropsGet, base.EmptyResponse):
+    """Bias spectroscopy properties get request."""
+
+
+class BiasSpectraPropsGetRep(BiasSpectraPropsGet, BiasSpectraPropsStruct):
+    """Bias spectroscopy properties set response."""
+
+
+class ZSpectraPropsGet(base.NanonisMessage):
+    """Z spectroscopy properties get."""
+
+    def get_command_name(self) -> str:
+        """Override."""
+        return 'ZSpectr.PropsGet'
+
+
+class ZSpectraPropsGetReq(ZSpectraPropsGet, base.EmptyResponse):
+    """Z spectroscopy properties get request."""
+
+
+class ZSpectraPropsGetRep(ZSpectraPropsGet, ZSpectraPropsStruct):
+    """Z spectroscopy properties set response."""
+
+
 class SpectroscopyMode(enum.Enum):
     """The spectroscopy mode used, Bias or Z."""
 
