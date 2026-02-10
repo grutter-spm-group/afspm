@@ -31,8 +31,12 @@ logger = logging.getLogger(__name__)
 class NanonisTranslator(ct.ConfigTranslator):
     """Handles device communication with the Nanonis controller.
 
-    NOTE: Although we store the old SetupProperties, we are not reverting to
+    NOTE:
+    - Although we store the old SetupProperties, we are not reverting to
     them on closure. Consider doing so!
+    - The API accepts multiples of 16 for its x-dim resolution parameter.
+    Keep this in mind.
+
 
     Attributes:
         _mode: SpectroscopyMode we are to be running in.

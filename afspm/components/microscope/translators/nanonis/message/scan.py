@@ -144,12 +144,12 @@ class ScanBufferStruct(base.NanonisMessage):
     """Scan buffer struct.
 
     NOTE:
-    -for this struct, the size of channel_indices is dependent
+    - for this struct, the size of channel_indices is dependent
     on num_channels. This will change how we unpack from and pack to
     bytes arrays.
     - pixels is 'coerced' to closest multiple of 16!
-    - if lines is 0 and 'maintain aspect ratio' is set, it will choose
-    lines to fit aspect ratio with pixels.
+    - if lines is 0 and 'maintain aspect ratio' button is selected in UI,
+    it will choose lines to keep prior aspect ratio.
     """
 
     num_channels: int  # 4 bytes, int32
