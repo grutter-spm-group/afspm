@@ -226,30 +226,6 @@ class NanonisParameterHandler(params.ParameterHandler):
         tuple_data[idx] = spm_val
         return copy_data_from_tuple(set_req, tuple_data)
 
-    # TODO: Remove me
-    # def _send_request(self, req: base.NanonisRequest,
-    #                   rep: base.NanonisResponse | None
-    #                   ) -> base.NanonisResponse | None:
-    #     """Send a request and receive a response (if expected).
-
-    #     This is effectively a wrapper around self._client.send_request(),
-    #     where we pack our NanonisRequest before sending and unpack our
-    #     NanonisResponse on receipt (if applicable). If rep is None, we
-    #     do not expect a response.
-    #     """
-    #     req_buffer = base.to_bytes(req)
-    #     rep_buffer = self._client.send_request(req_buffer, rep is not None)
-
-    #     if rep:
-    #         if not rep_buffer:
-    #             msg = (f'Expected response for {req.get_command_name()},'
-    #                    ' but got none.')
-    #             logger.error(msg)
-    #             raise params.ParameterError(msg)
-
-    #         rep = base.from_bytes(rep_buffer, rep)
-    #     return rep
-
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
         """Implement.
 
