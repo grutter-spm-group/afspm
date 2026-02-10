@@ -7,7 +7,7 @@ from typing import Any
 from ... import params
 from .....utils.parser import _evaluate_value_str
 from . import client as clnt
-from .message import base
+from .message import base, scan
 
 
 logger = logging.getLogger(__name__)
@@ -369,18 +369,24 @@ def set_scan_speed(handler: params.ParameterHandler,
     supports a generic 'scan-speed', we set the forward one and maintain
     the pre-existing ratio between forward and backward.
     """
-    generic_uuid = params.MicroscopeParameter.SCAN_SPEED
-    param_info = handler._get_param_info(generic_uuid)
+    uuid = params.MicroscopeParameter.SCAN_SPEED
+    speed_req = handler._obtain_base_set_req(uuid)
 
-    if param_info.uuid is None:
-        msg = f'Parameter {generic_uuid} does not have SPM uuid.'
-        logger.error(msg)
-        raise params.ParameterNotSupportedError(msg)
+    # Range / type handling
+    param_info = handler._get_param_info(uuid)
+    val = params._correct_val_for_sending(val, param_info, unit,
+                                          uuid)
 
-    # TODO: Set this attr *AND* the ratio between forward and backward.
-    # Also, make sure you set const to 0 for this struct.
+    # Set structure
+    speed_req.fwd_speed = val
+    speed_req.bwd_speed = val
+    # TODO: Test is const should be LINEAR_SPEED or NO_CHANGE.
+    speed_req.keep_parameter_constant = scan.ScanSpeedConstant.LINEAR_SPEED
+    speed_req.speed_ratio = 1.0  # fwd/bwd speed should be same
 
-    # TODO: FINISH ME!
+    # Send
+    speed_rep = handler._get_setter_req_rep(uuid).rep
+    send_request(handler._client, speed_req, speed_rep)
 
 
 # ----- Hard-coded status logic ----- #
