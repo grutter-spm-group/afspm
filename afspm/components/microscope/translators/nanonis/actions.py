@@ -4,7 +4,7 @@ import logging
 
 from afspm.components.microscope import actions
 
-from .client import NanonisClient
+from . import client as clnt
 from .message import base, scan, spectroscopy
 
 
@@ -20,7 +20,7 @@ class NanonisActionHandler(actions.ActionHandler):
             request-reply structures.
     """
 
-    def __init__(self, client: NanonisClient,
+    def __init__(self, client: clnt.NanonisClient,
                  mode: spectroscopy.SpectroscopyMode,
                  **kwargs):
         """Set up spectroscopy mode."""
@@ -69,17 +69,10 @@ class NanonisActionHandler(actions.ActionHandler):
             logger.error(msg)
             raise actions.ActionConfigurationError(msg)
 
-        requested_response = req_rep.req.request_response()
-        req_buffer = base.to_bytes(req_rep.req)
-        rep_buffer = self._client.send_request(req_buffer, requested_response)
-
-        if requested_response:
-            # We ensure we are able to parse the response if its a call
-            # that expects one. In reality, we are just making sure there
-            # is no error in the parsing (handled in the called class).
-            # We do not care about what the method returns here.
-            base.from_bytes(rep_buffer, req_rep.rep,
-                            requested_response)
+        req = self._guid_to_reqrep_map[guid].req
+        rep = (self._guid_to_reqrep_map[guid].rep if req.request_response()
+               else None)
+        rep = send_request(self._client, req, rep)
 
 
 def scan_action(handler: NanonisActionHandler,
@@ -98,3 +91,13 @@ def spec_action(handler: NanonisActionHandler,
             if action == scan.ScanAction.START
             else actions.MicroscopeAction.STOP_SPEC)
     handler._call_action(guid)
+
+
+def send_request(client: clnt.NanonisClient, req: base.NanonisRequset,
+                 rep: base.NanonisResponse | None
+                 ) -> base.NanonisResponse | None:
+    """Wrap client.py method, with Exception swapping."""
+    try:
+        clnt.send_request(client, req, rep)
+    except clnt.NanonisCommunicationError as e:
+        raise actions.ActionError(str(e))
