@@ -233,18 +233,14 @@ class AutoSaveStatus(Enum):
 class ScanPropsStruct(base.NanonisMessage):
     """Scan props struct.
 
-    Attributes with 0 default are ones where 0 means no change. Thus, we
-    default to not changing any of those, and in fact do not provide the
-    associated enums to set them currently.
-
     NOTE:
     - due to variable string sizes, how we unpack from and pack to
     bytes arrays will be different.
     """
 
-    continuous_scan: int = 0  # 4 bytes, unsigned int32
-    bouncy_scan: int = 0  # 4 bytes, unsigned int32
-    auto_save: int = 0  # 4 bytes, unsigned int32
+    continuous_scan: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
+    bouncy_scan: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
+    auto_save: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
     name_size: int  # 4 bytes, int32
     base_name: str  # size defined by name_size
     comment_size: int  # 4 bytes, int32
