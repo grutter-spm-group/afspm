@@ -61,11 +61,14 @@ class XYPosGetRep(base.NanonisResponse, XYPosGet,
 class SpeedStruct(base.NanonisMessage):
     """Speed struct.
 
+    Custom speed set to 1 to ensure set distinguishes it from scan-speed
+    (this is used for move-speed).
+
     Units are m/s
     """
 
     speed: float  # 4 bytes, float32
-    custom_speed: bool  # 4 bytes, unsigned int32
+    custom_speed: bool = 1  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""

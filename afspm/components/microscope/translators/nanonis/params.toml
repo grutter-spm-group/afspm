@@ -89,8 +89,15 @@ type = 1.0
 index = 0
 # NOTE: special setter for scan speed, to ensure we keep forward/backward const!
 # It uses the same range/etc. logic from param_info, we are just adding extra
-# safeties. TODO IMPLEMENT ME!
+# safeties.
 setter = 'afspm.components.microscope.translators.nanonis.params.set_scan_speed'
+
+[move-speed]
+uuid = 'afspm.components.microscope.translators.nanonis.message.probe.Speed'
+unit = 'm/s'
+range = [0, 5e-4]  #  TODO: Update!
+type = 1.0
+index = 0
 
 # ----- Probe Parameters ----- #
 [probe-pos-x]
