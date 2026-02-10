@@ -3,6 +3,7 @@
 import os.path
 import glob
 import logging
+
 import SciFiReaders as sr
 
 from afspm.components.microscope.params import (ParameterHandler,
@@ -30,6 +31,9 @@ logger = logging.getLogger(__name__)
 class NanonisTranslator(ct.ConfigTranslator):
     """Handles device communication with the Nanonis controller.
 
+    NOTE: Although we store the old SetupProperties, we are not reverting to
+    them on closure. Consider doing so!
+
     Attributes:
         _mode: SpectroscopyMode we are to be running in.
         _file_path: path to saved scans/spectroscopies.
@@ -40,10 +44,18 @@ class NanonisTranslator(ct.ConfigTranslator):
         _old_spec: the last spec, to send out if it has not changed.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
+
+        _old_setup_props: holds original setup properties, so we may revert to
+            it on closing.
     """
 
     DEFAULT_MODE = spectroscopy.SpectroscopyMode.Bias
     DEFAULT_FILE_PATH = ''  # TODO: Fill out!
+    DESIRED_SETUP_PROPERTIES = params.SetupProperties(
+        scan_auto_save=base.SettingState.ON,
+        scan_continuous_scan=base.SettingState.OFF,
+        spec_auto_save=base.SettingState.ON,
+        spec_save_dialog=base.SettingState.OFF)
 
     SCAN_EXT = '.sxm'
     SPEC_EXT = '.dat'
@@ -72,6 +84,10 @@ class NanonisTranslator(ct.ConfigTranslator):
         # Tell parent class that Nanonis *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
         super().__init__(**kwargs)
+
+        # Store current setup properties and set to our desired ones.
+        self._old_setup_props = self.get_setup_properties()
+        self.set_setup_properties(self.DESIRED_SETUP_PROPERTIES)
 
     def _init_handlers(self, client: NanonisClient,
                        param_handler: ParameterHandler,
