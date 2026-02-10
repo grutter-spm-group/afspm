@@ -16,8 +16,6 @@ from afspm.utils import array_converters as conv
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
-from afspm.io.protos.generated import geometry_pb2
-from ...io.protos.generated import control_pb2
 
 from . import params
 from . import actions
