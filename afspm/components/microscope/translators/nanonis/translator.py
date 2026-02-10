@@ -131,6 +131,69 @@ class NanonisTranslator(ct.ConfigTranslator):
     # get/set calls (look at this issue in params.py).
     # TODO: Consider implementing?
 
+    def get_setup_properties(self) -> params.SetupProperties:
+        """Get the current SetupProperties."""
+        setup_props = params.SetupProperties()
+
+        # Get scan properties
+        scan_props_uuid = self.param_handler._get_param_info(
+            params.NanonisParam.SCAN_AUTO_SAVE).uuid
+        rep = self.param_handler._get_param_spm_rep(scan_props_uuid)
+        setup_props.scan_auto_save = base.SettingState(rep.auto_save)
+        setup_props.scan_continuous_scan = base.SettingState(
+            rep.continuous_scan)
+
+        # Get spec properties
+        z_spec_props_uuid = self.param_handler._get_param_info(
+            params.NanonisParam.Z_SPEC_AUTO_SAVE)
+        z_rep = self.param_handler._get_param_spm_rep(z_spec_props_uuid)
+        bias_spec_props_uuid = self.param_handler._get_param_info(
+            params.NanonisParam.BIAS_SPEC_AUTO_SAVE)
+        bias_rep = self.param_handler._get_param_spm_rep(
+            bias_spec_props_uuid)
+
+        if z_rep.auto_save != bias_rep.auto_save:
+            logger.warning('Get: Z-Spec and Bias-Spec differ in auto-save'
+                           ' setting, storing bias.')
+        if z_rep.show_save_dialog != bias_rep.show_save_dialog:
+            logger.warning('Get: Z-Spec and Bias-Spec differ in auto-save'
+                           ' setting, storing Bias-Spec.')
+        setup_props.spec_auto_save = bias_rep.auto_save
+        setup_props.spec_save_dialog = bias_rep.show_save_dialog
+
+        return setup_props
+
+    def set_setup_properties(self, props: params.SetupProperties):
+        """Set the current SetupProperties."""
+        # Prep scan properties
+        scan_props_uuid = self.param_handler._get_param_info(
+            params.NanonisParam.SCAN_AUTO_SAVE).uuid
+
+        scan_req = self.param_handler._obtain_base_set_req(scan_props_uuid)
+        scan_req.continuous_scan = props.scan_continuous_scan
+        scan_req.auto_save = props.scan_auto_save
+        scan_rep = self.param_handler._get_setter_req_rep(scan_props_uuid).rep
+        params.send_request(self.param_handler._client, scan_req, scan_rep)
+
+        # Prep spec properties
+        z_spec_props_uuid = self.param_handler._get_param_info(
+            params.NanonisParam.Z_SPEC_AUTO_SAVE)
+        z_req = self.param_handler._obtain_base_set_req(z_spec_props_uuid)
+        z_req.auto_save = props.spec_auto_save
+        z_req.show_save_dialog = props.spec_save_dialog
+        z_rep = self.param_handler._get_setter_req_rep(z_spec_props_uuid).rep
+        params.send_request(self.param_handler._client, z_req, z_rep)
+
+        bias_spec_props_uuid = self.param_handler._get_param_info(
+            params.NanonisParam.BIAS_SPEC_AUTO_SAVE)
+        bias_req = self.param_handler._obtain_base_set_req(
+            bias_spec_props_uuid)
+        bias_req.auto_save = props.spec_auto_save
+        bias_req.show_save_dialog = props.spec_save_dialog
+        bias_rep = self.param_handler._get_setter_req_rep(
+            bias_spec_props_uuid).rep
+        params.send_request(self.param_handler._client, bias_req, bias_rep)
+
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Implement."""
         scan_state = self.param_handler.get_param(
