@@ -144,27 +144,27 @@ class EmptyResponse(NanonisResponse, EmptyMessage):
 class RequestHeader(NanonisRequest):
     """Request header for any call."""
 
-    command_name: str  # 4 bytes, str
+    command_name: str  # 32 bytes, str
     body_size: int  # 4 bytes, int32
     send_response: int  # 2 bytes, uint16
     # Empty: 2 bytes
 
     def format(self) -> str:
         """Override."""
-        return '4siHxx'
+        return '32siHxx'
 
 
 @dataclass
 class ResponseHeader(NanonisResponse):
     """Response header for any call."""
 
-    command_name: str  # 4 bytes, str
+    command_name: str  # 32 bytes, str
     body_size: int  # 4 bytes, int32
     # Empty: 4 bytes
 
     def format(self) -> str:
         """Override."""
-        return '4sixxxx'
+        return '32sixxxx'
 
 
 # ----- Packing / Unpacking methods ----- #
