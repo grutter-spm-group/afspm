@@ -290,7 +290,7 @@ def send_request(client: clnt.NanonisClient, req: base.NanonisRequest,
 # Special conversions due to differences between Nanonis and our generic model.
 
 
-class NanonisParam(params.MicroscopeParameter):
+class NanonisParam(params.MicroscopeParameterBase):
     """Nanonis-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when
