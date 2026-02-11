@@ -40,7 +40,7 @@ class XYPosSetRep(base.EmptyResponse, XYPosSet):
     """XY pos set response."""
 
 
-class XYPosGet(base.NanonisResponse):
+class XYPosGet(base.NanonisMessage):
     """XY pos get call."""
 
     def get_command_name(self) -> str:
@@ -92,7 +92,7 @@ class SpeedSetRep(base.EmptyResponse, SpeedSet):
     """Speed set response."""
 
 
-class SpeedGet(base.NanonisResponse):
+class SpeedGet(base.NanonisMessage):
     """Speed get call."""
 
     def get_command_name(self) -> str:

@@ -59,7 +59,7 @@ class NanonisMessage(ABC):
 
 
 @dataclass
-class NanonisResponse(ABC, NanonisMessage):
+class NanonisResponse(NanonisMessage):
     """Base class for a Nanonis Response."""
 
     def get_format(self, buffer: bytes, offset: int) -> str:

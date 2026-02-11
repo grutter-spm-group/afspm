@@ -186,7 +186,7 @@ class ScanBufferSetRep(base.EmptyResponse, ScanBufferSet):
     """Scan buffer set response."""
 
 
-class ScanBufferGet(base.NanonisResponse):
+class ScanBufferGet(base.NanonisMessage):
     """Scan buffer get call."""
 
     def get_command_name(self) -> str:
@@ -268,7 +268,7 @@ class ScanPropsSetRep(base.EmptyResponse, ScanPropsSet):
     """Scan props set response."""
 
 
-class ScanPropsGet(base.NanonisResponse):
+class ScanPropsGet(base.NanonisMessage):
     """Scan props get call."""
 
     def get_command_name(self) -> str:
@@ -341,7 +341,7 @@ class ScanSpeedSetRep(base.EmptyResponse, ScanSpeedSet):
     """Scan speed set response."""
 
 
-class ScanSpeedGet(base.NanonisResponse):
+class ScanSpeedGet(base.NanonisMessage):
     """Scan speed get call."""
 
     def get_command_name(self) -> str:
