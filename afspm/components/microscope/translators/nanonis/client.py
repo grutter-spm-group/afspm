@@ -83,7 +83,7 @@ class NanonisClient:
         return response
 
 
-def send_request(client: NanonisClient, req: base.NanonisRequset,
+def send_request(client: NanonisClient, req: base.NanonisRequest,
                  rep: base.NanonisResponse | None
                  ) -> base.NanonisResponse | None:
     """Send a request and receive a response (if expected).
