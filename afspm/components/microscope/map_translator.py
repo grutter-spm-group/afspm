@@ -22,7 +22,7 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
     In the MapTranslator, parameter handling and action handling are managed by
     two maps/dicts: self.param_method_map and self.action_method_map. Each of
-    these maps a generic ID (params.MicroscopeParameter and
+    these maps a generic ID (params.MicroscopeParameterBase and
     actions.MicroscopeAction, respectively) to an internal method for handling.
 
     For parameter handling, each method should have the following prototype:
@@ -43,7 +43,7 @@ class MapTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     variables/logic to be used.
 
     Args:
-        param_method_map: dict mapping params.MicroscopeParameters to
+        param_method_map: dict mapping params.MicroscopeParameterBases to
             individual methods for handling parameter requests.
         action_method_map: dict mapping actions.MicroscopeActions to
             individual methods for handling action requests.

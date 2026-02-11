@@ -31,7 +31,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_PARAMS_FILENAME = 'params.toml'
 
 
-class MicroscopeParameter(str, Enum):
+class MicroscopeParameterBase(str, Enum):
+    """Base microscope parameter enumeration.
+
+    Used to inherit from when expanding microscope parameters.
+    """
+
+
+class MicroscopeParameter(MicroscopeParameterBase):
     """Holds generic parameter names that can be set."""
 
     # Physical Scan Parameters
@@ -401,7 +408,7 @@ class ParameterHandler(metaclass=ABCMeta):
                     logger.error(msg)
                     raise ParameterConfigurationError(msg)
 
-    def _get_param_info(self, generic_param: MicroscopeParameter
+    def _get_param_info(self, generic_param: MicroscopeParameterBase
                         ) -> ParameterInfo:
         """Get ParameterInfo with error handling."""
         if generic_param not in self.param_infos:
@@ -410,18 +417,18 @@ class ParameterHandler(metaclass=ABCMeta):
             raise ParameterNotSupportedError(msg)
         return self.param_infos[generic_param]
 
-    def _get_param_methods(self, generic_param: MicroscopeParameter
+    def _get_param_methods(self, generic_param: MicroscopeParameterBase
                            ) -> ParameterMethods:
         """Get ParameterInfo (None if not found)."""
         if generic_param not in self.param_methods:
             return None
         return self.param_methods[generic_param]
 
-    def get_unit(self, generic_param: MicroscopeParameter) -> str | None:
+    def get_unit(self, generic_param: MicroscopeParameterBase) -> str | None:
         """Get the scope-specific unit for the provided parameter.
 
         Args:
-            generic_param: MicroscopeParameter we want to get.
+            generic_param: MicroscopeParameterBase we want to get.
 
         Returns:
             Units as str, None if no unit is defined.
@@ -432,11 +439,11 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         return self._get_param_info(generic_param).unit
 
-    def get_param(self, generic_param: MicroscopeParameter) -> Any:
+    def get_param(self, generic_param: MicroscopeParameterBase) -> Any:
         """Get the current value for the provided parameter.
 
         Args:
-            generic_param: MicroscopeParameter we want to get.
+            generic_param: MicroscopeParameterBase we want to get.
 
         Returns:
             Current value.
@@ -460,12 +467,12 @@ class ParameterHandler(metaclass=ABCMeta):
         val = self.get_param_spm(param_info.uuid)
         return val
 
-    def set_param(self, generic_param: MicroscopeParameter, val: Any,
+    def set_param(self, generic_param: MicroscopeParameterBase, val: Any,
                   curr_unit: str = None):
         """Convert a value to appropriate units and set it.
 
         Args:
-            generic_param: MicroscopeParameter we want to set.
+            generic_param: MicroscopeParameterBase we want to set.
             val: value to set it to, in expected format.
             curr_unit: unit of provided value. optional.
 
@@ -494,17 +501,17 @@ class ParameterHandler(metaclass=ABCMeta):
         logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
         self.set_param_spm(param_info.uuid, val)
 
-    def get_param_list(self, generic_params: list[MicroscopeParameter]
+    def get_param_list(self, generic_params: list[MicroscopeParameterBase]
                        ) -> list[Any]:
         """Get params for a list of provided parameters."""
         return [self.get_param(param) for param in generic_params]
 
-    def set_param_list(self, generic_params: list[MicroscopeParameter],
+    def set_param_list(self, generic_params: list[MicroscopeParameterBase],
                        vals: list[str], curr_units: tuple[str | None]):
         """Convert a list of values to microscope units and set them.
 
         Args:
-            generic_param: MicroscopeParameters we wish to set.
+            generic_param: MicroscopeParameterBases we wish to set.
             vals: values to set them to in str format (as they are sent in
                 ParameterMsg).
             curr_units: units of provided values. optional.
@@ -519,7 +526,7 @@ class ParameterHandler(metaclass=ABCMeta):
         for (param, val, unit) in zip(generic_params, vals, curr_units):
             self.set_param(param, val, unit)
 
-    def get_unit_list(self, generic_params: list[MicroscopeParameter]
+    def get_unit_list(self, generic_params: list[MicroscopeParameterBase]
                       ) -> list[Any]:
         """Get units for a list of provided parameters."""
         return [self.get_unit(param) for param in generic_params]
