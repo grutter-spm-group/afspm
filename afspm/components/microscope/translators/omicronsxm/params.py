@@ -183,7 +183,7 @@ class SXMParameterHandler(params.ParameterHandler):
         self.mode = mode
 
 
-class SXMParam(params.MicroscopeParameter):
+class SXMParam(params.MicroscopeParameterBase):
     """SXM-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when
