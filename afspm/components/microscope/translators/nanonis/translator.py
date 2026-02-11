@@ -50,7 +50,7 @@ class NanonisTranslator(ct.ConfigTranslator):
             it on closing.
     """
 
-    DEFAULT_MODE = spectroscopy.SpectroscopyMode.Bias
+    DEFAULT_MODE = spectroscopy.SpectroscopyMode.BIAS
     DESIRED_SETUP_PROPERTIES = params.SetupProperties(
         scan_auto_save=base.SettingState.ON,
         scan_continuous_scan=base.SettingState.OFF,
@@ -68,12 +68,11 @@ class NanonisTranslator(ct.ConfigTranslator):
                  **kwargs):
         """Construct translator."""
         self._mode = None
-        self.set_spectroscopy_mode(mode)
-
         self._old_scan_path = None
         self._old_scans = []
         self._old_spec_path = None
         self._old_spec = None
+        self._old_setup_props = None
 
         # Default initialization of handler
         kwargs = self._init_handlers(client, param_handler, action_handler,
@@ -86,6 +85,8 @@ class NanonisTranslator(ct.ConfigTranslator):
         # Store current setup properties and set to our desired ones.
         self._old_setup_props = self.get_setup_properties()
         self.set_setup_properties(self.DESIRED_SETUP_PROPERTIES)
+
+        self.set_spectroscopy_mode(mode)
 
     def _init_handlers(self, client: NanonisClient,
                        param_handler: ParameterHandler,
