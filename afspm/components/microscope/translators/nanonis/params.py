@@ -276,7 +276,7 @@ def copy_data_from_tuple(copy_to: base.NanonisMessage,
     return replace(copy_to, dict(zip(fields(copy_to), tuple_data)))
 
 
-def send_request(client: clnt.NanonisClient, req: base.NanonisRequset,
+def send_request(client: clnt.NanonisClient, req: base.NanonisRequest,
                  rep: base.NanonisResponse | None
                  ) -> base.NanonisResponse | None:
     """Wrap client.py method, with Exception swapping."""

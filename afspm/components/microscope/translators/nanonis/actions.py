@@ -93,7 +93,7 @@ def spec_action(handler: NanonisActionHandler,
     handler._call_action(guid)
 
 
-def send_request(client: clnt.NanonisClient, req: base.NanonisRequset,
+def send_request(client: clnt.NanonisClient, req: base.NanonisRequest,
                  rep: base.NanonisResponse | None
                  ) -> base.NanonisResponse | None:
     """Wrap client.py method, with Exception swapping."""
