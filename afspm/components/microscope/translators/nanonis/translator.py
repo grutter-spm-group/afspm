@@ -235,7 +235,7 @@ def _init_action_handler(client: NanonisClient
     """Initialize Nanonis action handler pointing to default config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
-    return actions.AsylumActionHandler(client, actions_config_path)
+    return actions.NanonisActionHandler(client, actions_config_path)
 
 
 def _init_param_handler(client: NanonisClient
@@ -243,12 +243,12 @@ def _init_param_handler(client: NanonisClient
     """Initialize Nanonis param handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
-    return params.AsylumParameterHandler(client, params_config_path)
+    return params.NanonisParameterHandler(client, params_config_path)
 
 
 def load_scans_from_file(scan_path: str
                          ) -> list[scan_pb2.Scan2d] | None:
-    """Load Asylum scan, filling in info possible from file only.
+    """Load Nanonis scan, filling in info possible from file only.
 
     NOTE: We follow the suggestions of config_translator and use correct_scan()
     in the calling method (avoids any coordinate system differences).
