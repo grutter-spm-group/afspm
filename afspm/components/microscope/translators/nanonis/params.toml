@@ -84,7 +84,7 @@ index = 1
 [scan-speed]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanSpeed'
 unit = 'm/s'
-range = [3.7e^-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
+range = [3.7e-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
 type = 1.0
 index = 0
 # NOTE: special setter for scan speed, to ensure we keep forward/backward const!
@@ -95,7 +95,7 @@ setter = 'afspm.components.microscope.translators.nanonis.params.set_scan_speed'
 [move-speed]
 uuid = 'afspm.components.microscope.translators.nanonis.message.probe.Speed'
 unit = 'm/s'
-range = [3.7e^-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
+range = [3.7e-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
 type = 1.0
 index = 0
 
