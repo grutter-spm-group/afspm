@@ -1,6 +1,6 @@
 """Scan message structures."""
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import struct
 
@@ -172,7 +172,8 @@ class ScanBufferStruct(base.NanonisMessage):
     """
 
     num_channels: int = base.DEF_INT  # 4 bytes, int32
-    channel_indices: list[int] = []  # each value is 4 bytes, int32
+    # each value is 4 bytes, int32
+    channel_indices: list[int] = field(default_factory=list)
     pixels: int = base.DEF_INT  # 4 bytes, int32
     lines: int = base.DEF_INT  # 4 bytes, int32
 
