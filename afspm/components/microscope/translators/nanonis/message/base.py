@@ -25,7 +25,6 @@ import enum
 import struct
 
 from dataclasses import dataclass, replace, fields, astuple
-from abc import ABC, abstractmethod
 
 
 logger = logging.getLogger(__name__)
@@ -41,28 +40,29 @@ SET_REP = 'SetRep'
 
 
 # ----- Base Classes ----- #
-@dataclass
-class NanonisMessage(ABC):
+class NanonisMessage():
     """Base class for Nanonis message.
 
     For getter/setter, it makes sense to put the data structure here,
     having the setter Req and the getter Rep inherit it.
     """
 
-    @abstractmethod
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Get command name for calling."""
+        return ''
 
-    @abstractmethod
-    def format(self) -> str:
+    @staticmethod
+    def format() -> str:
         """Return format of data structure."""
+        return ''
 
 
-@dataclass
 class NanonisResponse(NanonisMessage):
     """Base class for a Nanonis Response."""
 
-    def get_format(self, buffer: bytes, offset: int) -> str:
+    @classmethod
+    def get_format(cls, buffer: bytes, offset: int) -> str:
         """Return the bytes format of the message.
 
         Note that in cases where the response contains a string,
@@ -82,20 +82,22 @@ class NanonisResponse(NanonisMessage):
         Returns:
             str: formatting for struct to unpack.
         """
-        return self.format()
+        return cls.format()
 
 
 class NanonisRequest(NanonisMessage):
     """Nanonis request message."""
 
-    def request_response(self) -> bool:
+    @staticmethod
+    def request_response() -> bool:
         """Whether or not we want this message to request for a response.
 
         Defaults to True.
         """
         return True
 
-    def get_format(self) -> str:
+    @classmethod
+    def get_format(cls) -> str:
         """Return the bytes format of the message.
 
         For the request, we should not need any buffer. We are using
@@ -103,7 +105,7 @@ class NanonisRequest(NanonisMessage):
 
         Default is to return format().
         """
-        return self.format()
+        return cls.format()
 
 
 @dataclass
@@ -114,10 +116,11 @@ class ErrorRep(NanonisResponse):
     description_size: int  # 4 bytes, int32
     description: str  # size defined by description_size
 
-    def get_format(self, buffer: bytes, offset: int) -> str:
+    @classmethod
+    def get_format(cls, buffer: bytes, offset: int) -> str:
         """Override."""
         base_format = 'Ii'
-        __, str_size = struct.unpack_from(base_format, offset, buffer)
+        __, str_size = struct.unpack_from(base_format, buffer, offset)
         base_format += '%ds' % (str_size,)
         return base_format
 
@@ -126,7 +129,8 @@ class ErrorRep(NanonisResponse):
 class EmptyMessage(NanonisMessage):
     """Empty structure."""
 
-    def format(self, buffer: bytes) -> str:
+    @staticmethod
+    def format(buffer: bytes) -> str:
         """Override."""
         return ''
 
@@ -149,9 +153,15 @@ class RequestHeader(NanonisRequest):
     send_response: int  # 2 bytes, uint16
     # Empty: 2 bytes
 
-    def format(self) -> str:
+    @staticmethod
+    def format() -> str:
         """Override."""
         return '32siHxx'
+
+    @staticmethod
+    def get_command_name() -> str:
+        """Override, not used."""
+        return ''
 
 
 @dataclass
@@ -162,14 +172,23 @@ class ResponseHeader(NanonisResponse):
     body_size: int  # 4 bytes, int32
     # Empty: 4 bytes
 
-    def format(self) -> str:
+    @staticmethod
+    def format() -> str:
         """Override."""
         return '32sixxxx'
+
+    @staticmethod
+    def get_command_name() -> str:
+        """Override, not used."""
+        return ''
 
 
 # ----- Packing / Unpacking methods ----- #
 class NanonisMessageError(Exception):
     """The parsed response indicates an error."""
+
+
+BIG_ENDIAN = '>'  # To force big-endian encoding everywhere
 
 
 def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
@@ -186,19 +205,32 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
         NanonisMessageError if we requested a response and the response
             indicates an error.
     """
-    rep_header = ResponseHeader()
-    offset = struct.calcsize(rep_header.get_format())
+    # Unpack header
+    offset = 0
+    format = BIG_ENDIAN + ResponseHeader.format()
+    tuple_data = struct.unpack_from(format, buffer, offset)
+    # Extract attributes as list, converting str to utf-8 encoded bytes
+    tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
+                  for t in tuple_data]
 
-    # Unpack response
-    format = rep.get_format(buffer, offset)  # Get format for unpacking
-    tuple_data = struct.unpack_from(format, offset, buffer)
+    # Unpack response (get format for unpacking)
+    offset = struct.calcsize(ResponseHeader.format())
+    format = BIG_ENDIAN + rep.get_format(buffer, offset)
+    tuple_data = struct.unpack_from(format, buffer, offset)
+    # Extract attributes as list, converting str to utf-8 encoded bytes
+    tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
+                  for t in tuple_data]
+
     # Update struct with proper values
-    inst = replace(rep, dict(zip(fields(rep), tuple_data)))
+    inst = replace(rep, **dict(zip([f.name for f in fields(rep)], tuple_data)))
 
     # Unpack error message
     offset += struct.calcsize(format)
-    format = ErrorRep.get_format(buffer, offset)
-    tuple_data = struct.unpack_from(format, offset, buffer)
+    format = BIG_ENDIAN + ErrorRep.get_format(buffer, offset)
+    tuple_data = struct.unpack_from(format, buffer, offset)
+    # Extract attributes as list, converting str to utf-8 encoded bytes
+    tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
+                  for t in tuple_data]
     error_rep = ErrorRep(*tuple_data)
 
     if error_rep.status:  # Error occurred
@@ -217,13 +249,15 @@ def to_bytes(req: NanonisRequest) -> bytes:
         struct.calcsize(req.get_format()),  # Body size from request format
         req.request_response())
 
-    buffer = bytes()
-    for this_req, offset in enumerate(
+    buffer = bytearray()
+    for this_req, offset in zip(
             (req_header, req),
             (0, struct.calcsize(req_header.format()))):
-        format = this_req.get_format()
-        local_buff = struct.pack_into(format, offset,
-                                      *astuple(this_req))
+        format = BIG_ENDIAN + this_req.get_format()
+        # Extract attributes as list, converting str to utf-8 encoded bytes
+        data = [t.encode('utf-8') if isinstance(t, str) else t
+                for t in astuple(this_req)]
+        local_buff = struct.pack(format, *data)
         buffer = buffer + local_buff
     return buffer
 
