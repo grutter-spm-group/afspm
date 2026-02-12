@@ -60,7 +60,9 @@ class NanonisParameterInfo(params.ParameterInfo):
 def create_param_info(param_dict: dict) -> NanonisParameterInfo:
     """Like params.create_parameter_info, but for NanonisParameterInfo."""
     vals = []
-    for key in NanonisParameterInfo.__annotations__.keys():
+    annotations = (list(params.ParameterInfo.__annotations__.keys()) +
+                   list(NanonisParameterInfo.__annotations__.keys()))
+    for key in annotations:
         vals.append(param_dict[key] if key in param_dict else None)
     return NanonisParameterInfo(*vals)
 
