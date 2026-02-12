@@ -23,11 +23,18 @@ instantiate the struct, request, and response as needed.
 import logging
 import enum
 import struct
+from abc import ABC, abstractmethod
 
 from dataclasses import dataclass, replace, fields, astuple
 
 
 logger = logging.getLogger(__name__)
+
+
+# --- Default vals --- #
+DEF_FLT = float('inf')
+DEF_STR = ''
+DEF_INT = 2**15  # Should apply even for 2-byte uint16.
 
 
 # ----- Common Strings ----- #
@@ -40,7 +47,7 @@ SET_REP = 'SetRep'
 
 
 # ----- Base Classes ----- #
-class NanonisMessage():
+class NanonisMessage(ABC):
     """Base class for Nanonis message.
 
     For getter/setter, it makes sense to put the data structure here,
@@ -48,21 +55,19 @@ class NanonisMessage():
     """
 
     @staticmethod
+    @abstractmethod
     def get_command_name() -> str:
         """Get command name for calling."""
-        return ''
 
-    @staticmethod
-    def format() -> str:
+    @abstractmethod
+    def format(self) -> str:
         """Return format of data structure."""
-        return ''
 
 
 class NanonisResponse(NanonisMessage):
     """Base class for a Nanonis Response."""
 
-    @classmethod
-    def get_format(cls, buffer: bytes, offset: int) -> str:
+    def get_format(self, buffer: bytes, offset: int) -> str:
         """Return the bytes format of the message.
 
         Note that in cases where the response contains a string,
@@ -82,7 +87,7 @@ class NanonisResponse(NanonisMessage):
         Returns:
             str: formatting for struct to unpack.
         """
-        return cls.format()
+        return self.format()
 
 
 class NanonisRequest(NanonisMessage):
@@ -96,8 +101,7 @@ class NanonisRequest(NanonisMessage):
         """
         return True
 
-    @classmethod
-    def get_format(cls) -> str:
+    def get_format(self) -> str:
         """Return the bytes format of the message.
 
         For the request, we should not need any buffer. We are using
@@ -105,18 +109,17 @@ class NanonisRequest(NanonisMessage):
 
         Default is to return format().
         """
-        return cls.format()
+        return self.format()
 
 
 @dataclass
 class ErrorRep(NanonisResponse):
     """Nanonis error portion of response."""
 
-    status: int  # 4 bytes, unsigned int32
-    description_size: int  # 4 bytes, int32
-    description: str  # size defined by description_size
+    status: int = DEF_INT  # 4 bytes, unsigned int32
+    description_size: int = DEF_INT  # 4 bytes, int32
+    description: str = DEF_STR  # size defined by description_size
 
-    @classmethod
     def get_format(cls, buffer: bytes, offset: int) -> str:
         """Override."""
         base_format = 'Ii'
@@ -124,13 +127,21 @@ class ErrorRep(NanonisResponse):
         base_format += '%ds' % (str_size,)
         return base_format
 
+    @staticmethod
+    def get_command_name() -> str:
+        """Override. Empty because not applicable."""
+        return ''
+
+    def format(self) -> str:
+        """Override. Empty because get_format is overriden."""
+        return ''
+
 
 # ----- Empty Req / Rep ----- #
 class EmptyMessage(NanonisMessage):
     """Empty structure."""
 
-    @staticmethod
-    def format(buffer: bytes) -> str:
+    def format(self) -> str:
         """Override."""
         return ''
 
@@ -148,13 +159,12 @@ class EmptyResponse(NanonisResponse, EmptyMessage):
 class RequestHeader(NanonisRequest):
     """Request header for any call."""
 
-    command_name: str  # 32 bytes, str
-    body_size: int  # 4 bytes, int32
-    send_response: int  # 2 bytes, uint16
+    command_name: str = DEF_STR  # 32 bytes, str
+    body_size: int = DEF_INT  # 4 bytes, int32
+    send_response: int = DEF_INT  # 2 bytes, uint16
     # Empty: 2 bytes
 
-    @staticmethod
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return '32siHxx'
 
@@ -168,12 +178,11 @@ class RequestHeader(NanonisRequest):
 class ResponseHeader(NanonisResponse):
     """Response header for any call."""
 
-    command_name: str  # 32 bytes, str
-    body_size: int  # 4 bytes, int32
+    command_name: str = DEF_STR  # 32 bytes, str
+    body_size: int = DEF_INT  # 4 bytes, int32
     # Empty: 4 bytes
 
-    @staticmethod
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return '32sixxxx'
 
@@ -191,6 +200,7 @@ class NanonisMessageError(Exception):
 BIG_ENDIAN = '>'  # To force big-endian encoding everywhere
 
 
+# TODO: loop this so it is less ugly.
 def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     """Populate NanonisResponse from bytes array and initialized response.
 
@@ -207,14 +217,15 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     """
     # Unpack header
     offset = 0
-    format = BIG_ENDIAN + ResponseHeader.format()
+    rep_header = ResponseHeader()
+    format = BIG_ENDIAN + rep_header.format()
     tuple_data = struct.unpack_from(format, buffer, offset)
     # Extract attributes as list, converting str to utf-8 encoded bytes
     tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
                   for t in tuple_data]
 
     # Unpack response (get format for unpacking)
-    offset = struct.calcsize(ResponseHeader.format())
+    offset = struct.calcsize(rep_header.format())
     format = BIG_ENDIAN + rep.get_format(buffer, offset)
     tuple_data = struct.unpack_from(format, buffer, offset)
     # Extract attributes as list, converting str to utf-8 encoded bytes
@@ -226,12 +237,13 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
 
     # Unpack error message
     offset += struct.calcsize(format)
-    format = BIG_ENDIAN + ErrorRep.get_format(buffer, offset)
+    error_rep = ErrorRep()
+    format = BIG_ENDIAN + error_rep.get_format(buffer, offset)
     tuple_data = struct.unpack_from(format, buffer, offset)
     # Extract attributes as list, converting str to utf-8 encoded bytes
     tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
                   for t in tuple_data]
-    error_rep = ErrorRep(*tuple_data)
+    error_rep = ErrorRep(*tuple_data)  # TODO: use replace from above!
 
     if error_rep.status:  # Error occurred
         msg = (f"Error for {type(inst).__name__} message:"

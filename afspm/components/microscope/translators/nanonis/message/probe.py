@@ -15,11 +15,10 @@ class XYPosStruct(base.NanonisMessage):
     Units are m.
     """
 
-    x: float  # 8 bytes, float64
-    y: float  # 8 bytes, float64
+    x: float = base.DEF_FLT  # 8 bytes, float64
+    y: float = base.DEF_FLT  # 8 bytes, float64
 
-    @staticmethod
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return 'dd'
 
@@ -31,8 +30,7 @@ class XYPosSetStruct(XYPosStruct):
     # NOTE: We default to wait until the tip stops what it is doing.
     wait_end_of_move: bool = 1  # 4 bytes, unsigned int32
 
-    @staticmethod
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return super().format() + 'I'
 
@@ -47,7 +45,7 @@ class XYPosSet(base.NanonisMessage):
 
 
 class XYPosSetReq(base.NanonisRequest, XYPosSet,
-                  XYPosStruct):
+                  XYPosSetStruct):
     """XY pos set request."""
 
 
@@ -69,15 +67,14 @@ class XYPosGet(base.NanonisMessage):
 class XYPosGetReq(base.NanonisRequest, XYPosGet):
     """XY pos get request."""
 
-    wait_for_newest_data: int  # 4 bytes, unsigned int32
+    wait_for_newest_data: int = 0  # 4 bytes, unsigned int32
 
-    @staticmethod
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return 'I'
 
 
-class XYPosGetRep(XYPosStruct, base.NanonisResponse, XYPosGet):
+class XYPosGetRep(base.NanonisResponse, XYPosGet, XYPosStruct):
     """XY pos get request."""
 
 
@@ -92,11 +89,10 @@ class SpeedStruct(base.NanonisMessage):
     Units are m/s
     """
 
-    speed: float  # 4 bytes, float32
-    custom_speed: bool = 1  # 4 bytes, unsigned int32
+    speed: float = base.DEF_FLT  # 4 bytes, float32
+    custom_speed: bool = 0  # 4 bytes, unsigned int32
 
-    @staticmethod
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return 'fI'
 
