@@ -93,7 +93,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         self._uuid_to_struct_index_map = {}
 
         kwargs['param_info_init'] = create_param_info
-        self.__init__(**kwargs)
+        super().__init__(**kwargs)
 
     def _load_config_build_params(self, params_config_path: str):
         """Override, to populate Message mapping for all ParameterInfos.

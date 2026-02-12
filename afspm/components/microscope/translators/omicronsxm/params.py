@@ -101,7 +101,7 @@ class SXMParameterHandler(params.ParameterHandler):
         self.client = client
         self.uuid_to_caller_map = {}
         kwargs['param_info_init'] = create_param_info
-        self.__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Asserting some parameters' units are the same. If they're not
         # we cannot predict what some of our calls will do!
