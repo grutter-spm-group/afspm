@@ -1,5 +1,6 @@
 """Scan message structures."""
 import logging
+from dataclasses import dataclass
 from enum import Enum
 import struct
 
@@ -26,11 +27,17 @@ class ScanDirection(Enum):
     DOWN = 1
 
 
+@dataclass
 class ScanActionStruct(base.NanonisMessage):
-    """Scan Action struct."""
+    """Scan Action struct.
 
-    action: int  # 2 bytes, unsigned int16
-    direction: int  # 4 bytes, unsigned int32
+    NOTE:
+    - We default to non-sensical attribute values to ensure we are properly
+    parsing get() calls.
+    """
+
+    action: int = -1  # 2 bytes, unsigned int16
+    direction: int = -1  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""
@@ -40,7 +47,8 @@ class ScanActionStruct(base.NanonisMessage):
 class ScanActionCall(base.NanonisMessage):
     """Scan Action call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.Action'
 
@@ -61,10 +69,16 @@ class ScanStatus(Enum):
     RUNNING = 1
 
 
+@dataclass
 class ScanStatusStruct(base.NanonisMessage):
-    """Scan status struct."""
+    """Scan status struct.
 
-    status: int  # 4 bytes, unsigned int32
+    NOTE:
+    - We default to a non-sensical value to ensure we are properly parsing
+    get() calls.
+    """
+
+    status: int = -1  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""
@@ -74,7 +88,8 @@ class ScanStatusStruct(base.NanonisMessage):
 class ScanStatusCall(base.NanonisMessage):
     """Scan status call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.StatusGet'
 
@@ -88,17 +103,18 @@ class ScanStatusRep(base.NanonisResponse, ScanStatusCall, ScanStatusStruct):
 
 
 # ----- Scan Frame ----- #
+@dataclass
 class ScanFrameStruct(base.NanonisMessage):
     """Scan frame struct.
 
     All attributes are in units of m (except angle which is deg).
     """
 
-    center_x: float  # 4 bytes, float32
-    center_y: float  # 4 bytes, float32
-    width: float  # 4 bytes, float32
-    height: float  # 4 bytes, float32
-    angle: float  # 4 bytes, float32
+    center_x: float = base.DEF_FLT  # 4 bytes, float32
+    center_y: float = base.DEF_FLT  # 4 bytes, float32
+    width: float = base.DEF_FLT  # 4 bytes, float32
+    height: float = base.DEF_FLT  # 4 bytes, float32
+    angle: float = base.DEF_FLT  # 4 bytes, float32
 
     def format(self) -> str:
         """Override."""
@@ -108,7 +124,8 @@ class ScanFrameStruct(base.NanonisMessage):
 class ScanFrameSet(base.NanonisMessage):
     """Scan frame set call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.FrameSet'
 
@@ -125,7 +142,8 @@ class ScanFrameSetRep(base.EmptyResponse, ScanFrameSet):
 class ScanFrameGet(base.NanonisMessage):
     """Scan frame get call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.FrameGet'
 
@@ -140,6 +158,7 @@ class ScanFrameGetRep(base.NanonisResponse, ScanFrameGet,
 
 
 # ----- Scan Buffer ----- #
+@dataclass
 class ScanBufferStruct(base.NanonisMessage):
     """Scan buffer struct.
 
@@ -152,10 +171,10 @@ class ScanBufferStruct(base.NanonisMessage):
     it will choose lines to keep prior aspect ratio.
     """
 
-    num_channels: int  # 4 bytes, int32
-    channel_indices: list[int]  # each value is 4 bytes, int32
-    pixels: int  # 4 bytes, int32
-    lines: int  # 4 bytes, int32
+    num_channels: int = base.DEF_INT  # 4 bytes, int32
+    channel_indices: list[int] = []  # each value is 4 bytes, int32
+    pixels: int = base.DEF_INT  # 4 bytes, int32
+    lines: int = base.DEF_INT  # 4 bytes, int32
 
     def __init__(self, *args):
         """Override dataclass init to set up attributes properly."""
@@ -172,7 +191,8 @@ class ScanBufferStruct(base.NanonisMessage):
 class ScanBufferSet(base.NanonisMessage):
     """Scan buffer set call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.BufferSet'
 
@@ -189,7 +209,8 @@ class ScanBufferSetRep(base.EmptyResponse, ScanBufferSet):
 class ScanBufferGet(base.NanonisMessage):
     """Scan buffer get call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.BufferGet'
 
@@ -208,7 +229,7 @@ class ScanBufferGetRep(base.NanonisResponse, ScanBufferGet,
 
     def get_format(self, buffer: bytes, offset: int) -> str:
         """Override due to variable channel_indices."""
-        self.num_channels = struct.unpack_from('i', offset, buffer)
+        self.num_channels = struct.unpack('i', buffer)
         return self.format()
 
 
@@ -230,21 +251,24 @@ class AutoSaveStatus(Enum):
     OFF = 3
 
 
+@dataclass
 class ScanPropsStruct(base.NanonisMessage):
     """Scan props struct.
 
     NOTE:
     - due to variable string sizes, how we unpack from and pack to
     bytes arrays will be different.
+    - We default base_name to '' to try and avoid changing it. Same with
+    comment.
     """
 
     continuous_scan: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
     bouncy_scan: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
     auto_save: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
-    name_size: int  # 4 bytes, int32
-    base_name: str  # size defined by name_size
-    comment_size: int  # 4 bytes, int32
-    comment: str  # size defined by comment_size
+    name_size: int = base.DEF_INT  # 4 bytes, int32
+    base_name: str = base.DEF_STR  # size defined by name_size
+    comment_size: int = base.DEF_INT  # 4 bytes, int32
+    comment: str = base.DEF_STR  # size defined by comment_size
 
     def format(self) -> str:
         """Override."""
@@ -254,7 +278,8 @@ class ScanPropsStruct(base.NanonisMessage):
 class ScanPropsSet(base.NanonisMessage):
     """Scan props set call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.PropsSet'
 
@@ -271,7 +296,8 @@ class ScanPropsSetRep(base.EmptyResponse, ScanPropsSet):
 class ScanPropsGet(base.NanonisMessage):
     """Scan props get call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.PropsGet'
 
@@ -290,9 +316,9 @@ class ScanPropsGetRep(base.NanonisResponse, ScanPropsGet,
 
     def get_format(self, buffer: bytes, offset: int) -> str:
         """Override due to variable channel_indices."""
-        __, __, __, self.name_size = struct.unpack_from('IIIi', offset, buffer)
-        __, __, __, self.name_size, __, self.comment_size = struct.unpack_from(
-            'IIIi%dsi', (self.name_size), offset, buffer)
+        __, __, __, self.name_size = struct.unpack('IIIi', buffer)
+        __, __, __, self.name_size, __, self.comment_size = struct.unpack(
+            'IIIi%dsi', (self.name_size), buffer)
         return self.format()
 
 
@@ -305,6 +331,7 @@ class ScanSpeedConstant(Enum):
     TIME_PER_LINE = 2
 
 
+@dataclass
 class ScanSpeedStruct(base.NanonisMessage):
     """Scan speed struct.
 
@@ -312,12 +339,12 @@ class ScanSpeedStruct(base.NanonisMessage):
     speed_ratio defines the bwd_speed / fwd_speed ratio.
     """
 
-    fwd_speed: float  # 4 bytes, float32
-    bwd_speed: float  # 4 bytes, float32
-    fwd_time_per_line: float  # 4 bytes, float32
-    bwd_time_per_line: float  # 4 bytes, float32
-    keep_parameter_constant: int  # 2 bytes, unsigned int16
-    speed_ratio: float  # 4 bytes, float32
+    fwd_speed: float = base.DEF_FLT  # 4 bytes, float32
+    bwd_speed: float = base.DEF_FLT  # 4 bytes, float32
+    fwd_time_per_line: float = base.DEF_FLT  # 4 bytes, float32
+    bwd_time_per_line: float = base.DEF_FLT  # 4 bytes, float32
+    keep_parameter_constant: int = base.DEF_INT  # 2 bytes, unsigned int16
+    speed_ratio: float = base.DEF_FLT  # 4 bytes, float32
 
     def format(self) -> str:
         """Override."""
@@ -327,7 +354,8 @@ class ScanSpeedStruct(base.NanonisMessage):
 class ScanSpeedSet(base.NanonisMessage):
     """Scan speed set call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.SpeedSet'
 
@@ -344,7 +372,8 @@ class ScanSpeedSetRep(base.EmptyResponse, ScanSpeedSet):
 class ScanSpeedGet(base.NanonisMessage):
     """Scan speed get call."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Scan.SpeedGet'
 

@@ -1,21 +1,23 @@
 """Pizeo message structures."""
 import logging
+from dataclasses import dataclass
 from . import base
 
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class PiezoTiltStruct(base.NanonisMessage):
     """Piezo tilt struct.
 
     Units are in deg.
     """
 
-    tilt_x: float  # 4 bytes, float32
-    tilt_y: float  # 4 bytes, float32
+    tilt_x: float = base.DEF_FLT  # 4 bytes, float32
+    tilt_y: float = base.DEF_FLT  # 4 bytes, float32
 
-    def format(self) -> str:
+    def format() -> str:
         """Override."""
         return 'ff'
 
@@ -23,7 +25,8 @@ class PiezoTiltStruct(base.NanonisMessage):
 class PiezoTiltSet(base.NanonisMessage):
     """PiezoTilt set."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Piezo.TiltSet'
 
@@ -39,7 +42,8 @@ class PiezoTiltSetRep(base.EmptyResponse, PiezoTiltSet):
 class PiezoTiltGet(base.NanonisMessage):
     """PiezoTilt get."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Piezo.TiltGet'
 

@@ -1,25 +1,29 @@
 """Bias message structures."""
 import logging
+from dataclasses import dataclass
 from . import base
 
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
 class BiasStruct(base.NanonisMessage):
     """Voltage Bias. Unit is in V."""
 
-    value: float  # 4 bytes, float32
+    value: float = base.DEF_FLT  # 4 bytes, float32
 
     def format(self) -> str:
-        """Format of data structure."""
+        """Override."""
         return 'f'
 
 
+@dataclass
 class BiasSet(base.NanonisMessage):
     """Voltage Bias set."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Bias.Set'
 
@@ -35,7 +39,8 @@ class BiasSetRep(base.EmptyResponse, BiasSet):
 class BiasGet(base.NanonisMessage):
     """Voltage Bias get."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'Bias.Get'
 

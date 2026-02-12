@@ -23,18 +23,6 @@ class XYPosStruct(base.NanonisMessage):
         return 'dd'
 
 
-@dataclass
-class XYPosSetStruct(XYPosStruct):
-    """We add one attr for setting here."""
-
-    # NOTE: We default to wait until the tip stops what it is doing.
-    wait_end_of_move: bool = 1  # 4 bytes, unsigned int32
-
-    def format(self) -> str:
-        """Override."""
-        return super().format() + 'I'
-
-
 class XYPosSet(base.NanonisMessage):
     """XY pos set call."""
 
@@ -44,9 +32,20 @@ class XYPosSet(base.NanonisMessage):
         return 'FolMe.XYPosSet'
 
 
+@dataclass
 class XYPosSetReq(base.NanonisRequest, XYPosSet,
-                  XYPosSetStruct):
-    """XY pos set request."""
+                  XYPosStruct):
+    """XY pos set request.
+
+    NOTE:
+    - We default to wait until the tip stops what it is doing.
+    """
+
+    wait_end_of_move: bool = 1  # 4 bytes, unsigned int32
+
+    def format(self) -> str:
+        """Override."""
+        return super().format() + 'I'
 
 
 class XYPosSetRep(base.EmptyResponse, XYPosSet):
@@ -62,10 +61,13 @@ class XYPosGet(base.NanonisMessage):
         return 'FolMe.XYPosGet'
 
 
-# TODO: Whenever having attributes, we must declare it as a dataclass!!!
 @dataclass
 class XYPosGetReq(base.NanonisRequest, XYPosGet):
-    """XY pos get request."""
+    """XY pos get request.
+
+    NOTE:
+    - We default to not waiting for newest data.
+    """
 
     wait_for_newest_data: int = 0  # 4 bytes, unsigned int32
 
@@ -83,14 +85,14 @@ class XYPosGetRep(base.NanonisResponse, XYPosGet, XYPosStruct):
 class SpeedStruct(base.NanonisMessage):
     """Speed struct.
 
-    Custom speed set to 1 to ensure set distinguishes it from scan-speed
+    Custom speed set to 1 ensures set distinguishes it from scan-speed
     (this is used for move-speed).
 
-    Units are m/s
+    Units are m/s.
     """
 
     speed: float = base.DEF_FLT  # 4 bytes, float32
-    custom_speed: bool = 0  # 4 bytes, unsigned int32
+    custom_speed: bool = 1  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""

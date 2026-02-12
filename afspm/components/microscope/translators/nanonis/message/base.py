@@ -32,9 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 # --- Default vals --- #
-DEF_FLT = float('inf')
+DEF_FLT = float(0)  # Default to 0 to not interfere on setting.
 DEF_STR = ''
-DEF_INT = 2**15  # Should apply even for 2-byte uint16.
+DEF_INT = 0  # Default to 0 to not interfere on setting.
 
 
 # ----- Common Strings ----- #

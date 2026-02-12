@@ -1,5 +1,6 @@
 """Z Control message structures."""
 import logging
+from dataclasses import dataclass
 from . import base
 
 
@@ -7,10 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 # ----- ZCtrl Setpoint ----- #
+@dataclass
 class ZCtrlSetpointStruct(base.NanonisMessage):
     """Z-Control Setpoint."""
 
-    value: float  # 4 bytes, float32
+    value: float = base.DEF_FLT  # 4 bytes, float32
 
     def format(self) -> str:
         """Override."""
@@ -20,7 +22,8 @@ class ZCtrlSetpointStruct(base.NanonisMessage):
 class ZCtrlSetpointSet(base.NanonisMessage):
     """Z-Control Setpoint set."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZCtrl.SetpntSet'
 
@@ -37,7 +40,8 @@ class ZCtrlSetpointSetRep(base.EmptyResponse, ZCtrlSetpointSet):
 class ZCtrlSetpointGet(base.NanonisMessage):
     """Z-Control Setpoint get."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZCtrl.SetpntGet'
 
@@ -52,12 +56,13 @@ class ZCtrlSetpointGetRep(base.NanonisResponse, ZCtrlSetpointGet,
 
 
 # ----- ZCtrl Gain ----- #
+@dataclass
 class ZCtrlGainStruct(base.NanonisMessage):
     """Z-Control Gain."""
 
-    proportional: float  # 4 bytes, float32
-    time_constant: float  # 4 bytes, float32
-    integral: float  # 4 bytes, float32
+    proportional: float = base.DEF_FLT  # 4 bytes, float32
+    time_constant: float = base.DEF_FLT  # 4 bytes, float32
+    integral: float = base.DEF_FLT  # 4 bytes, float32
 
     def format(self) -> str:
         """Override."""
@@ -67,7 +72,8 @@ class ZCtrlGainStruct(base.NanonisMessage):
 class ZCtrlGainSet(base.NanonisMessage):
     """Z-Control gain set."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZCtrl.GainSet'
 
@@ -84,7 +90,8 @@ class ZCtrlGainSetRep(base.EmptyResponse, ZCtrlGainSet):
 class ZCtrlGainGet(base.NanonisMessage):
     """Z-Control Gain get."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZCtrl.GainGet'
 

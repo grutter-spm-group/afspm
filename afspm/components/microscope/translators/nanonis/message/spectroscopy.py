@@ -1,5 +1,6 @@
 """Spectroscopy message structures."""
 import logging
+from dataclasses import dataclass
 import enum
 from . import base
 
@@ -8,15 +9,19 @@ logger = logging.getLogger(__name__)
 
 
 # ----- Spectra Start ----- #
+@dataclass
 class SpectraStart(base.NanonisMessage):
     """Spectroscopy start.
 
-    NOTE: The channels to record must be set via the UI before using!
+    NOTE:
+    - The channels to record must be set via the UI before using!
+    - By default, get_data is 0 so we do not request the data.
+    - By default, base_name is '', so we do not change the base name.
     """
 
-    get_data: bool = 0  # 4 bytes, unsigned int32  (default False)
-    name_size: int  # 4 bytes, int32
-    base_name: str  # Size defined by name_size
+    get_data: bool = base.DEF_INT  # 4 bytes, unsigned int32  (default False)
+    name_size: int = base.DEF_INT  # 4 bytes, int32
+    base_name: str = base.DEF_STR  # Size defined by name_size
 
     def format(self) -> str:
         """Override."""
@@ -26,7 +31,8 @@ class SpectraStart(base.NanonisMessage):
 class SpectraStartReq(base.NanonisRequest, SpectraStart):
     """Spectroscopy start request."""
 
-    def request_response(self) -> bool:
+    @staticmethod
+    def request_response() -> bool:
         """Not requesting response, in hopes we get asynchronous.
 
         The documentation implies that the full spectroscopy is returned,
@@ -39,7 +45,8 @@ class SpectraStartReq(base.NanonisRequest, SpectraStart):
 class BiasSpectraStart(SpectraStart):
     """Bias spectroscopy start."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'BiasSpectr.Start'
 
@@ -55,7 +62,8 @@ class BiasSpectraStartRep(base.EmptyResponse):
 class ZSpectraStart(SpectraStart):
     """Z spectroscopy start."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZSpectr.Start'
 
@@ -72,7 +80,8 @@ class ZSpectraStartRep(base.EmptyResponse):
 class BiasSpectraStopReq(base.EmptyRequest):
     """Bias spectroscopy stop request."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'BiasSpectr.Stop'
 
@@ -84,7 +93,8 @@ class BiasSpectrastopRep(base.EmptyResponse):
 class ZSpectraStopReq(base.EmptyRequest):
     """Z spectroscopy stop request."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZSpectr.Stop'
 
@@ -94,10 +104,15 @@ class ZSpectrastopRep(base.EmptyResponse):
 
 
 # ----- Spectra Status ----- #
+@dataclass
 class SpectraStatusStruct(base.NanonisMessage):
-    """Spectroscopy status."""
+    """Spectroscopy status.
 
-    status: int  # 4 bytes, unsigned int32
+    NOTE:
+    - Default status to non-sensical value to ensure parsing properly.
+    """
+
+    status: int = -1  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""
@@ -107,7 +122,8 @@ class SpectraStatusStruct(base.NanonisMessage):
 class BiasSpectraStatusGet(base.NanonisMessage):
     """Bias spectroscopy status."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'BiasSpectr.StatusGet'
 
@@ -115,7 +131,8 @@ class BiasSpectraStatusGet(base.NanonisMessage):
 class ZSpectraStatusGet(base.NanonisMessage):
     """Z spectroscopy status."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZSpectr.StatusGet'
 
@@ -141,19 +158,23 @@ class ZSpectraStatusGetRep(ZSpectraStatusGet, ZSpectraStatusStruct):
     """Z spectroscopy status request."""
 
 
+@dataclass
 class SpectraPropsStruct(base.NanonisMessage):
     """Spectroscopy properties.
 
     This struct is mainly used to set up auto-saving spectroscopies.
+
+    NOTE:
+    - By default, z_offset_m is 0 to not change the z-position.
     """
 
     save_all: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
     number_of_sweeps: int = base.SettingState.NO_CHANGE  # 4 bytes, int32
     backward_sweep: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
     number_of_points: int = base.SettingState.NO_CHANGE  # 4 bytes, int32
-    z_offset_m: float = 0  # 4 bytes, float32
-    auto_save: int  # 2 bytes, unsigned int16
-    show_save_dialog: int  # 2 bytes, unsigned int16
+    z_offset_m: float = base.DEF_FLT  # 4 bytes, float32
+    auto_save: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
+    show_save_dialog: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
 
     def format(self) -> str:
         """Override."""
@@ -168,7 +189,8 @@ ZSpectraPropsStruct = SpectraPropsStruct
 class BiasSpectraPropsSet(base.NanonisMessage):
     """Bias spectroscopy properties set."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'BiasSpectr.PropsSet'
 
@@ -184,7 +206,8 @@ class BiasSpectraPropsSetRep(base.EmptyResponse, BiasSpectraPropsSet):
 class ZSpectraPropsSet(base.NanonisMessage):
     """Z spectroscopy properties set."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZSpectr.PropsSet'
 
@@ -200,7 +223,8 @@ class ZSpectraPropsSetRep(base.EmptyResponse, ZSpectraPropsSet):
 class BiasSpectraPropsGet(base.NanonisMessage):
     """Bias spectroscopy properties get."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'BiasSpectr.PropsGet'
 
@@ -216,7 +240,8 @@ class BiasSpectraPropsGetRep(BiasSpectraPropsGet, BiasSpectraPropsStruct):
 class ZSpectraPropsGet(base.NanonisMessage):
     """Z spectroscopy properties get."""
 
-    def get_command_name(self) -> str:
+    @staticmethod
+    def get_command_name() -> str:
         """Override."""
         return 'ZSpectr.PropsGet'
 
