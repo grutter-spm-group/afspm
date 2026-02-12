@@ -358,6 +358,30 @@ def set_scan_y(handler: params.ParameterHandler,
     handler.set_param(NanonisParam.CENTER_Y, pos, unit)
 
 
+def get_scan_x(handler: params.ParameterHandler) -> Any:
+    """Get top-left x-position of scan.
+
+    Nanonis stores the center position, so we need to add half of
+    (width/height) to what we receive.
+    """
+    generic_ids = [NanonisParam.CENTER_X,
+                   params.MicroscopeParameter.SCAN_SIZE_X]
+    vals = handler.get_param_list(generic_ids)
+    return center_to_top_left(vals[0], vals[1])
+
+
+def get_scan_y(handler: params.ParameterHandler) -> Any:
+    """Get top-left y-position of scan.
+
+    Nanonis stores the center position, so we need to add half of
+    (width/height) to what we receive.
+    """
+    generic_ids = [NanonisParam.CENTER_Y,
+                   params.MicroscopeParameter.SCAN_SIZE_Y]
+    vals = handler.get_param_list(generic_ids)
+    return center_to_top_left(vals[0], vals[1])
+
+
 def set_scan_speed(handler: params.ParameterHandler,
                    val: Any, unit: str):
     """Set scan speed.
