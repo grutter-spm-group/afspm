@@ -194,7 +194,8 @@ def _init_action_handler(client: sxm.DDEClient
     """Initialize SXM action handler pointing to default config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
-    return actions.SXMActionHandler(client, actions_config_path)
+    return actions.SXMActionHandler(
+        client, actions_config_path=actions_config_path)
 
 
 def _init_param_handler(client: sxm.DDEClient
@@ -202,7 +203,8 @@ def _init_param_handler(client: sxm.DDEClient
     """Initialize SXM action handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
-    return params.SXMParameterHandler(client, params_config_path)
+    return params.SXMParameterHandler(
+        client, params_config_path=params_config_path)
 
 
 def load_scans_from_file(md_path: str

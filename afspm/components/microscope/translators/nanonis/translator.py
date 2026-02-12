@@ -235,7 +235,8 @@ def _init_action_handler(client: NanonisClient
     """Initialize Nanonis action handler pointing to default config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
-    return actions.NanonisActionHandler(client, actions_config_path)
+    return actions.NanonisActionHandler(
+        client, actions_config_path=actions_config_path)
 
 
 def _init_param_handler(client: NanonisClient
@@ -243,7 +244,8 @@ def _init_param_handler(client: NanonisClient
     """Initialize Nanonis param handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
-    return params.NanonisParameterHandler(client, params_config_path)
+    return params.NanonisParameterHandler(
+        client, params_config_path=params_config_path)
 
 
 def load_scans_from_file(scan_path: str
