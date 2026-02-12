@@ -39,7 +39,6 @@ DEF_INT = 0  # Default to 0 to not interfere on setting.
 
 # ----- Common Strings ----- #
 # Some common strings for our Nanonis controller message handling.
-STRUCT = 'Struct'
 GET_REQ = 'GetReq'
 GET_REP = 'GetRep'
 SET_REQ = 'SetReq'
