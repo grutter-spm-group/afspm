@@ -498,10 +498,12 @@ class SetupProperties:
     This merges 'important' properties from three different Nanonis
     messages: ScanPropsSet/Get, ZSpectrPropsSet/Get, BiasSpectrPropsSet/Get.
 
-    NOTE: the attributes are of type SettingState, not boolean!
+    NOTE:
+    - The attributes are of type SettingState, not boolean!
+    - All are defaulted to NO_CHANGE.
     """
 
-    scan_auto_save: base.SettingState
-    scan_continuous_scan: base.SettingState
-    spec_auto_save: base.SettingState
-    spec_save_dialog: base.SettingState
+    scan_auto_save: base.SettingState = base.SettingState.NO_CHANGE
+    scan_continuous_scan: base.SettingState = base.SettingState.NO_CHANGE
+    spec_auto_save: base.SettingState = base.SettingState.NO_CHANGE
+    spec_save_dialog: base.SettingState = base.SettingState.NO_CHANGE
