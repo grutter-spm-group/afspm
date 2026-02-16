@@ -200,12 +200,17 @@ class ParameterMethods:
     getter: Callable[[Any], Any] | None
 
 
-def create_parameter_info(param_dict: dict) -> ParameterInfo | None:
+def create_parameter_info(param_dict: dict, key: str) -> ParameterInfo | None:
     """Create ParameterInfo from a param_dict (from params config).
+
+    We will raise a warning if the necessary attributes are not found
+    and return None.
 
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
+        key: str of key associated with dict, for logging purposes.
+
     Returns:
         ParameterInfo instance or None (if no vals are provided).
     """
@@ -219,21 +224,27 @@ def create_parameter_info(param_dict: dict) -> ParameterInfo | None:
 
     # Ensure we at least have a uuid and type
     if param_info.uuid is None or param_info.type is None:
+        logger.warning(f"Parameter {key} provided without 'uuid' or 'type'"
+                       " attributes.")
         return None
     return param_info
 
 
-def create_parameter_methods(param_dict: dict) -> ParameterMethods:
+def create_parameter_methods(param_dict: dict, key: str
+                             ) -> ParameterMethods | None:
     """Create ParameterMethods from a param_dict (from params config).
 
     Attempts to import setter and getter methods for a param dict.
+    Logs a warning if only getter or setter are provided.
 
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
+        key: str key associated to this dict. Used for logging purposes.
 
     Returns:
-        ParameterMethods instance.
+        ParameterMethods instance or None (if we cannot construct from
+            the provided dict).
 
     Raises:
         ModuleNotFoundError if module could not be found when trying
@@ -244,6 +255,20 @@ def create_parameter_methods(param_dict: dict) -> ParameterMethods:
         # Try to import method if in param_dict, else pass None.
         methods.append(import_from_string(param_dict[key])
                        if key in param_dict else None)
+
+    param_methods = ParameterMethods(*methods)
+    # Validate we have getter and setter
+    if not param_methods.getter and not param_methods.setter:
+        logger.warning(f'For parameter {key}, ParameterMethods getter and'
+                       ' setter not provided.')
+        return None
+    # Warning logging.
+    no_setter_or_getter = ('setter' if not param_methods.setter
+                           else 'getter' if not param_methods.getter
+                           else None)
+    if no_setter_or_getter:
+        logger.warning(f'For parameter {key}, {no_setter_or_getter} not '
+                       'provided! Continuing.')
     return ParameterMethods(*methods)
 
 
@@ -386,34 +411,19 @@ class ParameterHandler(metaclass=ABCMeta):
         for key, val in params_config.items():
             if isinstance(val, dict):
                 # Ceck if we have our own set/get methods
-                param_methods = self.param_methods_init(val)
-
+                param_methods = self.param_methods_init(val, key)
                 if param_methods.setter or param_methods.getter:
-                    no_setter_or_getter = (
-                        'setter' if not param_methods.setter
-                        else 'getter' if not param_methods.getter
-                        else None)
-                    if no_setter_or_getter:
-                        logger.warning(f'For parameter {key}'
-                                       f', {no_setter_or_getter} not '
-                                       'provided! Continuing.')
-
-                    logger.debug('Custom setter/getter provided for ' +
-                                 f'parameter {key}. Using.')
                     self.param_methods[key] = param_methods
 
                 # Load all the param info we can get.
-                param_info = self.param_info_init(val)
+                param_info = self.param_info_init(val, key)
                 if param_info:
                     self.param_infos[key] = param_info
 
-                # Check that we have what is needed to set/get:
-                # either a uuid + type from param_info or a getter/setter.
-                no_uuid_or_type = (param_info.uuid is None or
-                                   param_info.type is None)
-                if key not in self.param_methods and no_uuid_or_type:
-                    msg = (f"Parameter {key} provided without either set/" +
-                           "get methods or both 'type' and 'uuid' attributes.")
+                if (key not in self.param_methods and key not in
+                        self.param_infos):
+                    msg = (f'Parameter {key} provided without either set/'
+                           'get methods or minimum ParameterInfo attributes.')
                     logger.error(msg)
                     raise ParameterConfigurationError(msg)
 
@@ -568,7 +578,7 @@ def _cap_val_in_range(val: Any, val_range: tuple[Any] | None,
         old_val = val
         val = (val_range[0] if val < val_range[0] else val_range[1]
                if val > val_range[1] else val)
-        logger.info(f'Trying to set {generic_uuid} with value {old_val}, ' +
+        logger.info(f'Trying to set {generic_uuid} with value {old_val}, '
                     f'which is outside of range {val_range}. Capping to {val}.')
     return val
 
@@ -600,7 +610,7 @@ def _typify_val(val: Any, sample_type: Any) -> Any:
     elif isinstance(sample_type, bool):
         return bool(val)
 
-    msg = (f'Sample type {sample_type} is not of supported types for ' +
+    msg = (f'Sample type {sample_type} is not of supported types for '
            'conversion - cannot convert val to it.')
     logger.error(msg)
     raise AttributeError(msg)
