@@ -106,7 +106,6 @@ class NanonisTranslator(ct.ConfigTranslator):
     def set_spectroscopy_mode(self, mode: spectroscopy.SpectroscopyMode):
         """Set spectroscopy mode."""
         self._mode = mode
-        self.param_handler.set_spectroscopy_mode(self._mode)
         self.action_handler.set_spectroscopy_mode(self._mode)
 
     def _get_latest_file(self, ext: str) -> str | None:

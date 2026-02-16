@@ -21,12 +21,9 @@ class NanonisActionHandler(actions.ActionHandler):
     """
 
     def __init__(self, client: clnt.NanonisClient,
-                 mode: spectroscopy.SpectroscopyMode,
                  **kwargs):
         """Set up spectroscopy mode."""
         self._client = client
-        self._switch_spectroscopy_mode(mode)
-
         self._guid_to_reqrep_map = {}
         self._populate_guid_to_reqrep_map()
 
