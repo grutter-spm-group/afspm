@@ -20,8 +20,7 @@ class NanonisActionHandler(actions.ActionHandler):
             request-reply structures.
     """
 
-    def __init__(self, client: clnt.NanonisClient,
-                 **kwargs):
+    def __init__(self, client: clnt.NanonisClient, **kwargs):
         """Set up spectroscopy mode."""
         self._client = client
         self._guid_to_reqrep_map = {}
@@ -32,8 +31,8 @@ class NanonisActionHandler(actions.ActionHandler):
             base.NanonisReqRep(scan.ScanActionReq(), scan.ScanActionRep()))
         self._guid_to_reqrep_map[actions.MicroscopeAction.STOP_SCAN] = (
             self._guid_to_reqrep_map[actions.MicroscopeAction.START_SCAN])
-
-        self._update_spec_mappings()
+        # Set default spectroscopy mapping
+        self._update_spec_mappings(spectroscopy.SpectroscopyMode.BIAS)
 
     def _update_spec_mappings(self, mode: spectroscopy.SpectroscopyMode):
         """Update mappings for spectroscopy actions based on current mode."""
