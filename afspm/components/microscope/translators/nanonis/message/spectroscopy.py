@@ -55,7 +55,7 @@ class BiasSpectraStartReq(BiasSpectraStart, SpectraStartReq):
     """Bias spectroscopy start request."""
 
 
-class BiasSpectraStartRep(base.EmptyResponse):
+class BiasSpectraStartRep(base.EmptyResponse, BiasSpectraStart):
     """Bias spectroscopy start request."""
 
 
@@ -72,13 +72,13 @@ class ZSpectraStartReq(ZSpectraStart, SpectraStartReq):
     """Z spectroscopy start request."""
 
 
-class ZSpectraStartRep(base.EmptyResponse):
+class ZSpectraStartRep(base.EmptyResponse, ZSpectraStart):
     """Z spectroscopy start request."""
 
 
 # ----- Spectra Stop ----- #
-class BiasSpectraStopReq(base.EmptyRequest):
-    """Bias spectroscopy stop request."""
+class BiasSpectraStop(base.EmptyRequest):
+    """Bias spectroscopy stop."""
 
     @staticmethod
     def get_command_name() -> str:
@@ -86,12 +86,16 @@ class BiasSpectraStopReq(base.EmptyRequest):
         return 'BiasSpectr.Stop'
 
 
-class BiasSpectrastopRep(base.EmptyResponse):
+class BiasSpectraStopReq(base.EmptyRequest, BiasSpectraStop):
+    """Bias spectroscopy stop request."""
+
+
+class BiasSpectraStopRep(base.EmptyResponse, BiasSpectraStop):
     """Bias spectroscopy stop response."""
 
 
-class ZSpectraStopReq(base.EmptyRequest):
-    """Z spectroscopy stop request."""
+class ZSpectraStop(base.EmptyRequest):
+    """Z spectroscopy stop."""
 
     @staticmethod
     def get_command_name() -> str:
@@ -99,7 +103,11 @@ class ZSpectraStopReq(base.EmptyRequest):
         return 'ZSpectr.Stop'
 
 
-class ZSpectrastopRep(base.EmptyResponse):
+class ZSpectraStopReq(base.EmptyRequest, ZSpectraStop):
+    """Z spectroscopy stop request."""
+
+
+class ZSpectraStopRep(base.EmptyResponse, ZSpectraStop):
     """Z spectroscopy stop response."""
 
 
