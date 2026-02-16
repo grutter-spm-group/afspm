@@ -178,7 +178,7 @@ class ParameterInfo:
 
     uuid: str  # Microscope-specific param UUID
     unit: str | None  # Microscope units for this param
-    range: tuple[Any]  # Acceptable range for this param.
+    range: tuple[Any] | None  # Acceptable range for this param.
     type: Any  # A sample value of the type of this param, for type handling
 
 
@@ -200,19 +200,27 @@ class ParameterMethods:
     getter: Callable[[Any], Any] | None
 
 
-def create_parameter_info(param_dict: dict) -> ParameterInfo:
+def create_parameter_info(param_dict: dict) -> ParameterInfo | None:
     """Create ParameterInfo from a param_dict (from params config).
 
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
     Returns:
-        ParameterInfo instance.
+        ParameterInfo instance or None (if no vals are provided).
     """
     vals = []
-    for key in ParameterInfo.__annotations__.keys():
+    keys = ParameterInfo.__annotations__.keys()
+    for key in keys:
         vals.append(param_dict[key] if key in param_dict else None)
-    return ParameterInfo(*vals)
+
+    kwargs = dict(zip(keys, vals))
+    param_info = ParameterInfo(**kwargs)
+
+    # Ensure we at least have a uuid and type
+    if param_info.uuid is None or param_info.type is None:
+        return None
+    return param_info
 
 
 def create_parameter_methods(param_dict: dict) -> ParameterMethods:
@@ -396,7 +404,8 @@ class ParameterHandler(metaclass=ABCMeta):
 
                 # Load all the param info we can get.
                 param_info = self.param_info_init(val)
-                self.param_infos[key] = param_info
+                if param_info:
+                    self.param_infos[key] = param_info
 
                 # Check that we have what is needed to set/get:
                 # either a uuid + type from param_info or a getter/setter.

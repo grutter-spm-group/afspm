@@ -57,14 +57,22 @@ class NanonisParameterInfo(params.ParameterInfo):
     index: int  # Indicates VARIABLEStruct index for this parameter.
 
 
-def create_param_info(param_dict: dict) -> NanonisParameterInfo:
+def create_param_info(param_dict: dict) -> NanonisParameterInfo | None:
     """Like params.create_parameter_info, but for NanonisParameterInfo."""
     vals = []
-    annotations = (list(params.ParameterInfo.__annotations__.keys()) +
-                   list(NanonisParameterInfo.__annotations__.keys()))
-    for key in annotations:
+    keys = (list(params.ParameterInfo.__annotations__.keys()) +
+            list(NanonisParameterInfo.__annotations__.keys()))
+    for key in keys:
         vals.append(param_dict[key] if key in param_dict else None)
-    return NanonisParameterInfo(*vals)
+
+    kwargs = dict(zip(keys, vals))
+    param_info = NanonisParameterInfo(**kwargs)
+
+    # Ensure we at least have a uuid, type, and index
+    if (param_info.uuid is None or param_info.type is None or
+            param_info.index is None):
+        return None
+    return param_info
 
 
 class NanonisParameterHandler(params.ParameterHandler):
