@@ -94,7 +94,7 @@ class BiasSpectraStopRep(base.EmptyResponse, BiasSpectraStop):
     """Bias spectroscopy stop response."""
 
 
-class ZSpectraStop(base.EmptyRequest):
+class ZSpectraStop(base.NanonisMessage):
     """Z spectroscopy stop."""
 
     @staticmethod
