@@ -57,7 +57,8 @@ class NanonisParameterInfo(params.ParameterInfo):
     index: int  # Indicates VARIABLEStruct index for this parameter.
 
 
-def create_param_info(param_dict: dict) -> NanonisParameterInfo | None:
+def create_param_info(param_dict: dict, key: str
+                      ) -> NanonisParameterInfo | None:
     """Like params.create_parameter_info, but for NanonisParameterInfo."""
     vals = []
     keys = (list(params.ParameterInfo.__annotations__.keys()) +
