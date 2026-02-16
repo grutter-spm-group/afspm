@@ -412,7 +412,7 @@ class ParameterHandler(metaclass=ABCMeta):
             if isinstance(val, dict):
                 # Ceck if we have our own set/get methods
                 param_methods = self.param_methods_init(val, key)
-                if param_methods.setter or param_methods.getter:
+                if param_methods:
                     self.param_methods[key] = param_methods
 
                 # Load all the param info we can get.
