@@ -452,7 +452,8 @@ def _create_status_param_info_entries() -> dict:
     """
     param_info_map = {}
     for generic_id, uuid in zip(STATUS_GENERIC_IDS, STATUS_UUIDS):
-        info = params.ParameterInfo(uuid, type=1)  # int for all statuses
+        info = params.ParameterInfo(uuid, unit=None, range=None,
+                                    type=1)  # int for all statuses
         param_info_map[generic_id] = info
     return param_info_map
 
