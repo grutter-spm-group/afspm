@@ -77,7 +77,7 @@ class ZSpectraStartRep(base.EmptyResponse, ZSpectraStart):
 
 
 # ----- Spectra Stop ----- #
-class BiasSpectraStop(base.EmptyRequest):
+class BiasSpectraStop(base.NanonisMessage):
     """Bias spectroscopy stop."""
 
     @staticmethod
