@@ -25,6 +25,7 @@ class NanonisActionHandler(actions.ActionHandler):
         self._client = client
         self._guid_to_reqrep_map = {}
         self._populate_guid_to_reqrep_map()
+        super().__init__(**kwargs)
 
     def _populate_guid_to_reqrep_map(self):
         self._guid_to_reqrep_map[actions.MicroscopeAction.START_SCAN] = (
