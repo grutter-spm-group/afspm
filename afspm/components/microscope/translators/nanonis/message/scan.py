@@ -94,11 +94,11 @@ class ScanStatusCall(base.NanonisMessage):
         return 'Scan.StatusGet'
 
 
-class ScanStatusReq(base.EmptyRequest, ScanStatusCall):
+class ScanStatusGetReq(base.EmptyRequest, ScanStatusCall):
     """Scan status request."""
 
 
-class ScanStatusRep(base.NanonisResponse, ScanStatusCall, ScanStatusStruct):
+class ScanStatusGetRep(base.NanonisResponse, ScanStatusCall, ScanStatusStruct):
     """Scan status response."""
 
 
