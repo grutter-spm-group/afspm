@@ -15,7 +15,7 @@ class to implement the get_param_spm()/set_param_spm() methods.
 
 import logging
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from enum import Enum
 from typing import Any, Callable
 from abc import ABCMeta, abstractmethod
@@ -215,7 +215,7 @@ def create_parameter_info(param_dict: dict, key: str) -> ParameterInfo | None:
         ParameterInfo instance or None (if no vals are provided).
     """
     vals = []
-    keys = ParameterInfo.__annotations__.keys()
+    keys = [f.name for f in fields(ParameterInfo)]
     for key in keys:
         vals.append(param_dict[key] if key in param_dict else None)
 
@@ -251,7 +251,8 @@ def create_parameter_methods(param_dict: dict, key: str
             import.
     """
     methods = []
-    for key in ParameterMethods.__annotations__.keys():
+    keys = [f.name for f in fields(ParameterMethods)]
+    for key in keys:
         # Try to import method if in param_dict, else pass None.
         methods.append(import_from_string(param_dict[key])
                        if key in param_dict else None)
