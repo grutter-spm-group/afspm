@@ -284,7 +284,7 @@ def copy_data(copy_to: base.NanonisMessage,
 def copy_data_from_tuple(copy_to: base.NanonisMessage,
                          tuple_data: (Any,)) -> base.NanonisMessage:
     """Equivalen to copy_data(), but copy_from is tuple."""
-    return replace(copy_to, dict(zip(fields(copy_to), tuple_data)))
+    return replace(copy_to, **copy_to.create_data_dict(tuple_data))
 
 
 def send_request(client: clnt.NanonisClient, req: base.NanonisRequest,

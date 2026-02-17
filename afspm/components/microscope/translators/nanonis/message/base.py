@@ -24,6 +24,7 @@ import logging
 import enum
 import struct
 from abc import ABC, abstractmethod
+from typing import Any
 
 from dataclasses import dataclass, replace, fields, astuple
 
@@ -46,6 +47,7 @@ SET_REP = 'SetRep'
 
 
 # ----- Base Classes ----- #
+@dataclass
 class NanonisMessage(ABC):
     """Base class for Nanonis message.
 
@@ -61,6 +63,30 @@ class NanonisMessage(ABC):
     @abstractmethod
     def format(self) -> str:
         """Return format of data structure."""
+
+    @classmethod
+    def create_data_dict(cls, tuple_data: tuple[Any]
+                         ) -> dict[str, Any]:
+        """Givn a tuple of data for this class, provide kwargs dict.
+
+        The idea is that we can provide a dict that may be used with
+        dataclasses.replace() to instantiate a new dataclass of this type.
+
+        In this base implementation, we assume the size of tuple_data matches
+        the number of fields (i.e. a 1-to-1 relationship).
+
+        Args:
+            tuple_data: tuple[Any] of values linked to our dataclass.
+
+        Returns:
+            dict[str, Any] that can be used with replace() to instantiate
+                a new instance of this class.
+
+        Raises:
+            AssertionError if len(tuple_data) != len(fields(self))
+        """
+        assert len(tuple_data) == len(fields(cls))
+        return dict(zip([f.name for f in fields(cls)], tuple_data))
 
 
 class NanonisResponse(NanonisMessage):
@@ -232,7 +258,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
                   for t in tuple_data]
 
     # Update struct with proper values
-    inst = replace(rep, **dict(zip([f.name for f in fields(rep)], tuple_data)))
+    inst = replace(rep, **rep.create_data_dict(tuple_data))
 
     # Unpack error message
     offset += struct.calcsize(format)
@@ -242,7 +268,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     # Extract attributes as list, converting str to utf-8 encoded bytes
     tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
                   for t in tuple_data]
-    error_rep = ErrorRep(*tuple_data)  # TODO: use replace from above!
+    error_rep = ErrorRep(**ErrorRep.create_data_dict(tuple_data))
 
     if error_rep.status:  # Error occurred
         msg = (f"Error for {type(inst).__name__} message:"

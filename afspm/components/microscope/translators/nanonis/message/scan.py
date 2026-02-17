@@ -3,6 +3,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 import struct
+from typing import Any
 
 from . import base
 
@@ -177,16 +178,30 @@ class ScanBufferStruct(base.NanonisMessage):
     pixels: int = base.DEF_INT  # 4 bytes, int32
     lines: int = base.DEF_INT  # 4 bytes, int32
 
-    def __init__(self, *args):
-        """Override dataclass init to set up attributes properly."""
-        self.num_channels = args[0]
-        self.channel_indices = list(args[1:-2])
-        self.pixels = args[-2]
-        self.lines = args[-1]
+    def __post__init(self):
+        assert len(self.channel_indices) == self.num_channels
 
     def format(self) -> str:
         """Override."""
         return 'i%diii' % (self.num_channels)
+
+    def create_data_dict(self, tuple_data: tuple[Any]
+                         ) -> dict[str, Any]:
+        """Override due to channel_indices.
+
+        Because our tuple is of the form:
+        (num_channels, channel_indices[0], ..., channel_indices[-1], ... )
+
+        (i.e., the channel_indices are not pre-packed in their own iterable),
+        we need to manually pack them here.
+        """
+        num_channels = tuple_data[0]
+        channel_indices = list(tuple_data[1:-2])
+        pixels = tuple_data[-2]
+        lines = tuple_data[-1]
+
+        new_tuple_data = (num_channels, channel_indices, pixels, lines)
+        return super().create_data_dict(new_tuple_data)
 
 
 class ScanBufferSet(base.NanonisMessage):
