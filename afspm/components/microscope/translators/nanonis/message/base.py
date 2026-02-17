@@ -225,7 +225,6 @@ class NanonisMessageError(Exception):
 BIG_ENDIAN = '>'  # To force big-endian encoding everywhere
 
 
-# TODO: loop this so it is less ugly.
 def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     """Populate NanonisResponse from bytes array and initialized response.
 
@@ -240,36 +239,31 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
         NanonisMessageError if we requested a response and the response
             indicates an error.
     """
-    # Unpack header
+    logger.trace(f'from_bytes: {repr(rep)}')
     offset = 0
-    rep_header = ResponseHeader()
-    format = BIG_ENDIAN + rep_header.format()
-    tuple_data = struct.unpack_from(format, buffer, offset)
-    # Extract attributes as list, converting str to utf-8 encoded bytes
-    tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
-                  for t in tuple_data]
+    rep_parts = [ResponseHeader(), rep, ErrorRep()]
+    results = []
+    for idx, rep_part in enumerate(rep_parts):
+        offset += (struct.calcsize(rep_parts[idx - 1].format())
+                   if idx > 0 else 0)
+        format = BIG_ENDIAN + rep_part.get_format(buffer, offset)
+        logger.trace(f'Offset: {offset}, format: {format}')
+        tuple_data = struct.unpack_from(format, buffer, offset)
+        logger.trace(f'tuple_data: {tuple_data}')
+        # Extract attributes as list, converting str to utf-8 encoded bytes
+        tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
+                      for t in tuple_data]
 
-    # Unpack response (get format for unpacking)
-    offset = struct.calcsize(rep_header.format())
-    format = BIG_ENDIAN + rep.get_format(buffer, offset)
-    tuple_data = struct.unpack_from(format, buffer, offset)
-    # Extract attributes as list, converting str to utf-8 encoded bytes
-    tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
-                  for t in tuple_data]
+        # Update struct with proper values
+        results.append(replace(rep_part,
+                               **rep_part.create_data_dict(tuple_data)))
 
-    # Update struct with proper values
-    inst = replace(rep, **rep.create_data_dict(tuple_data))
+    logger.trace(f'{repr(results[0])}')
+    logger.trace(f'{repr(results[1])}')
+    logger.trace(f'{repr(results[2])}')
 
-    # Unpack error message
-    offset += struct.calcsize(format)
-    error_rep = ErrorRep()
-    format = BIG_ENDIAN + error_rep.get_format(buffer, offset)
-    tuple_data = struct.unpack_from(format, buffer, offset)
-    # Extract attributes as list, converting str to utf-8 encoded bytes
-    tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
-                  for t in tuple_data]
-    error_rep = ErrorRep(**ErrorRep.create_data_dict(tuple_data))
-
+    inst = results[1]
+    error_rep = results[2]
     if error_rep.status:  # Error occurred
         msg = (f"Error for {type(inst).__name__} message:"
                f"{error_rep.description}")
@@ -281,6 +275,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
 
 def to_bytes(req: NanonisRequest) -> bytes:
     """Create bytes array from NanonisRequest."""
+    logger.trace(f'to_bytes: {repr(req)}')
     req_header = RequestHeader(
         req.get_command_name(),
         struct.calcsize(req.get_format()),  # Body size from request format
@@ -294,8 +289,13 @@ def to_bytes(req: NanonisRequest) -> bytes:
         # Extract attributes as list, converting str to utf-8 encoded bytes
         data = [t.encode('utf-8') if isinstance(t, str) else t
                 for t in astuple(this_req)]
+        logger.trace(f'this_req: {repr(this_req)}')
+        logger.trace(f'offset: {offset}, format: {repr(format)}')
+        logger.trace(f'Data: {data}')
         local_buff = struct.pack(format, *data)
+        logger.trace(f'local_buff: {local_buff}')
         buffer = buffer + local_buff
+    logger.trace(f'buffer: {buffer}')
     return buffer
 
 
