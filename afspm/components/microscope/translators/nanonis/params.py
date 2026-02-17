@@ -120,14 +120,14 @@ class NanonisParameterHandler(params.ParameterHandler):
         # Populate specific_uuid-to-reqrep mappings
         for key, val in self.param_infos.items():
             # Store get information
-            req = _evaluate_value_str(val.uuid + base.GET_REQ)
-            rep = _evaluate_value_str(val.uuid + base.GET_REP)
+            req = _evaluate_value_str(val.uuid + base.GET_REQ)()
+            rep = _evaluate_value_str(val.uuid + base.GET_REP)()
             reqrep = base.NanonisReqRep(req, rep)
             self._uuid_to_reqrep_get_map[val.uuid] = reqrep
 
             # Store set information
-            req = _evaluate_value_str(val.uuid + base.SET_REQ)
-            rep = _evaluate_value_str(val.uuid + base.SET_REP)
+            req = _evaluate_value_str(val.uuid + base.SET_REQ)()
+            rep = _evaluate_value_str(val.uuid + base.SET_REP)()
             reqrep = base.NanonisReqRep(req, rep)
             self._uuid_to_reqrep_set_map[val.uuid] = reqrep
 
@@ -471,8 +471,8 @@ def _create_status_reqrep_map_entries() -> dict:
     reqrep_map = {}
     for uuid in STATUS_UUIDS:
         # Store get information
-        req = _evaluate_value_str(uuid + base.GET_REQ)
-        rep = _evaluate_value_str(uuid + base.GET_REP)
+        req = _evaluate_value_str(uuid + base.GET_REQ)()
+        rep = _evaluate_value_str(uuid + base.GET_REP)()
         reqrep = base.NanonisReqRep(req, rep)
         reqrep_map[uuid] = reqrep
     return reqrep_map
