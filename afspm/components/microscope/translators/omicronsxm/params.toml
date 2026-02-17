@@ -2,34 +2,36 @@
 # parameter ranges if you want to constrain any further.
 
 # ----- Physical Scan Parameters ----- #
+# NOTE: The true ranges of top-left and scan-size are linked. If you were to
+# make the max top-left smaller, the max scan-size would increase (and
+# vice-versa). We've chosen 'reasonable defaults', but feel free to change.
+
 [scan-top-left-x]  # Changeable attributes in [center-x] below
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_x'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_x'
-# TODO: type and range?  CONFIRM how center-x is expected to work.
 
 [scan-top-left-y]  # Changeable attributes in [center-y] below
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_y'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_y'
-# TODO: type and range?
 
 [scan-angle]
 uuid = 'Angle'
 unit = 'degrees'
 type = 1.0
-range = [-360.0, 360.0]  # Will return in range [0, 360]
+range = [-180.0, 180.0]  # Will return in range [0, 360]
 caller = 'SCAN'
 
 [scan-size-x]   # [size-x-ratio] below
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_size_x'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_size_x'
-range = [0, 90]  # TODO: Update
+range = [0.0, 1000.0]  # [0, 1000nm]
 type = 1.0
 
 [scan-size-y]
 uuid = 'Range'
 unit = 'nm'
 type = 1.0
-range = [0, 90]  # TODO: Update!
+range = [0.0, 1000.0]  # [0, 1000 nm]
 caller = 'SCAN'
 
 # ----- Digital Scan Parameters ----- #
@@ -37,46 +39,48 @@ caller = 'SCAN'
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_x'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_res_x'
 type = 1
-range = [32, 1536]  # TODO: Update!
+range = [32, 4100]  # TODO: Update!
 
 [scan-resolution-y]  # Unitless
 uuid = 'Pixel'
 type = 1
-range = [32, 1536]  # TODO: update!
+range = [32, 4100]  # TODO: update!
 caller = 'SCAN'
 
 # ----- Feedback Parameters ----- #
 [zctrl-setpoint]
 uuid = 'Ref'
-# Note: units are uA, but we consider it unitless, because in
+# Note: units are pA, but we consider it unitless, because in
 # ZCtrlParameters it is unitless.
 type = 1.0
-range = [0, 10]   # TODO: Update!
+range = [0, 1000.0]   # [0, 1000.0] pA
 caller = 'FEEDBACK'
 
 [zctrl-pgain]  # Unitless
 uuid = 'Kp'
 type = 1.0
-range = [0, 4096]   # TODO: Update!
+range = [0, 1]   # [0, 1.0]  #  More conservative, we don't change this often.
 caller = 'FEEDBACK'
 
 [zctrl-igain]  # Unitless
 uuid = 'Ki'
 type = 1.0
-range = [0, 4096]   # TODO: Update!
+range = [0, 100]   # [0, 100.0]  # Less conservative, we change this often.
 caller = 'FEEDBACK'
 
 # ----- Sample Slope Correction ----- #
 [sample-slope-x]
 uuid = 'SlopeX'
+unit = 'deg'
 type = 1.0
-range = [0, 4096]   # TODO: Update!
+range = [0, 10.0]   # [0, 10] \deg
 caller = 'SCAN'
 
 [sample-slope-y]
 uuid = 'SlopeY'
+unit = 'deg'
 type = 1.0
-range = [0, 4096]   # TODO: Update!
+range = [0, 10.0]   # [0, 10] \deg
 caller = 'SCAN'
 
 # ----- Probe / Scan Parameters ----- #
@@ -85,7 +89,7 @@ getter = 'afspm.components.microscope.translators.asylum.params.get_scan_speed'
 setter = 'afspm.components.microscope.translators.asylum.params.set_scan_speed'
 unit = 'nm/s'
 type = 1.0
-range = [0, 5e-4]  #  TODO: Update!
+range = [0, 100]  #  [0, 100] nm/s
 
 # ----- Probe Parameters ----- #
 [probe-pos-x]  # See spec-pos-x *and* tip-pos-x
@@ -93,7 +97,7 @@ getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_x'
 setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_x'
 unit = 'nm'
 type = 1.0
-range = [0, 9e-5]  # [0 nm, 90 um]  # TODO: Update me!
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 # This is in absolute coordinate system
 
 [probe-pos-y]  # See spec-pos-y *and* tip-pos-y
@@ -101,7 +105,7 @@ getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_y'
 setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_y'
 unit = 'nm'
 type = 1.0
-range = [0, 9e-5]  # [0 nm, 90 um]
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 # This is in absolute coordinate system
 
 # ----- Other ----- #
@@ -109,7 +113,7 @@ range = [0, 9e-5]  # [0 nm, 90 um]
 uuid = 'Bias'
 unit = 'mV'
 type = 1.0
-range = [0, 1000.0]  # TODO: Update!
+range = [-10e4, 10e4]  # [-10.0, 10.0] V
 caller = 'FEEDBACK'
 
 
@@ -121,14 +125,14 @@ caller = 'FEEDBACK'
 uuid = 'X'
 unit = 'nm'
 type = 1.0
-range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 caller = 'SCAN'
 
 [center-y]
 uuid = 'Y'
 unit = 'nm'
 type = 1.0
-range = [-3.5e-5, 3.5e-5]  # TODO: Update range!
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 caller = 'SCAN'
 
 [size-x-ratio]
