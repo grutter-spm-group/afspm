@@ -74,7 +74,7 @@ def create_param_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
     vals = []
     keys = ([f.name for f in fields(params.ParameterInfo)] +
             [f.name for f in fields(SXMParameterInfo)])
-    for key in SXMParameterInfo.__annotations__.keys():
+    for key in keys:
         vals.append(param_dict[key] if key in param_dict else None)
 
     kwargs = dict(zip(keys, vals))
@@ -86,7 +86,7 @@ def create_param_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
         logger.debug(f"Parameter {dict_key} provided without 'type', 'uuid',"
                      " and 'caller' attributes.")
         return None
-    return SXMParameterInfo(*vals)
+    return param_info
 
 
 class SXMParameterHandler(params.ParameterHandler):
