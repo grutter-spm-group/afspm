@@ -214,7 +214,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         will return the base request, either (a) via getting the composite
         struct or (b) grabbing from our reqrep map.
         """
-        set_req = self._get_setter_req_rep(spm_uuid)
+        set_req = self._get_setter_req_rep(spm_uuid).req
 
         if len(astuple(set_req)) > 1:
             get_rep = self._get_param_spm_rep(spm_uuid)
