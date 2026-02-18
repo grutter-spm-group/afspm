@@ -39,12 +39,12 @@ caller = 'SCAN'
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_x'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_res_x'
 type = 1
-range = [32, 4100]  # TODO: Update!
+range = [32, 4100]
 
 [scan-resolution-y]  # Unitless
 uuid = 'Pixel'
 type = 1
-range = [32, 4100]  # TODO: update!
+range = [32, 4100]
 caller = 'SCAN'
 
 # ----- Feedback Parameters ----- #
@@ -85,24 +85,24 @@ caller = 'SCAN'
 
 # ----- Probe / Scan Parameters ----- #
 [scan-speed]  # Uses [speed-lines-s] below.
-getter = 'afspm.components.microscope.translators.asylum.params.get_scan_speed'
-setter = 'afspm.components.microscope.translators.asylum.params.set_scan_speed'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_speed'
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_speed'
 unit = 'nm/s'
 type = 1.0
 range = [0, 100]  #  [0, 100] nm/s
 
 # ----- Probe Parameters ----- #
 [probe-pos-x]  # See spec-pos-x *and* tip-pos-x
-getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_x'
-setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_probe_pos_x'
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_probe_pos_x'
 unit = 'nm'
 type = 1.0
 range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 # This is in absolute coordinate system
 
 [probe-pos-y]  # See spec-pos-y *and* tip-pos-y
-getter = 'afspm.components.microscope.translators.asylum.params.get_probe_pos_y'
-setter = 'afspm.components.microscope.translators.asylum.params.set_probe_pos_y'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_probe_pos_y'
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_probe_pos_y'
 unit = 'nm'
 type = 1.0
 range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
