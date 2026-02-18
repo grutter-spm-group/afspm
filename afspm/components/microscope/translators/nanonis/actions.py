@@ -95,6 +95,6 @@ def send_request(client: clnt.NanonisClient, req: base.NanonisRequest,
                  ) -> base.NanonisResponse | None:
     """Wrap client.py method, with Exception swapping."""
     try:
-        clnt.send_request(client, req, rep)
+        return clnt.send_request(client, req, rep)
     except clnt.NanonisCommunicationError as e:
         raise actions.ActionError(str(e))
