@@ -160,10 +160,11 @@ class NanonisTranslator(ct.ConfigTranslator):
 
         # Get spec properties
         z_spec_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.Z_SPEC_AUTO_SAVE)
+            params.NanonisParam.Z_SPEC_AUTO_SAVE).uuid
         z_rep = self.param_handler._get_param_spm_rep(z_spec_props_uuid)
+
         bias_spec_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.BIAS_SPEC_AUTO_SAVE)
+            params.NanonisParam.BIAS_SPEC_AUTO_SAVE).uuid
         bias_rep = self.param_handler._get_param_spm_rep(
             bias_spec_props_uuid)
 
@@ -192,7 +193,7 @@ class NanonisTranslator(ct.ConfigTranslator):
 
         # Prep spec properties
         z_spec_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.Z_SPEC_AUTO_SAVE)
+            params.NanonisParam.Z_SPEC_AUTO_SAVE).uuid
         z_req = self.param_handler._obtain_base_set_req(z_spec_props_uuid)
         z_req.auto_save = props.spec_auto_save
         z_req.show_save_dialog = props.spec_save_dialog
@@ -200,7 +201,7 @@ class NanonisTranslator(ct.ConfigTranslator):
         params.send_request(self.param_handler._client, z_req, z_rep)
 
         bias_spec_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.BIAS_SPEC_AUTO_SAVE)
+            params.NanonisParam.BIAS_SPEC_AUTO_SAVE).uuid
         bias_req = self.param_handler._obtain_base_set_req(
             bias_spec_props_uuid)
         bias_req.auto_save = props.spec_auto_save
