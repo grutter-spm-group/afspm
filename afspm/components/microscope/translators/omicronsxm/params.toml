@@ -143,7 +143,7 @@ type = 1.0
 caller = 'SCAN'
 
 [pixel-x-ratio]
-uuid = 'PixelRatio'
+uuid = 'PixelDensity'
 # No units
 type = 1.0
 caller = 'SCAN'
