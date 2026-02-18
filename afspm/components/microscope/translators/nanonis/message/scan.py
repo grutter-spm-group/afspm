@@ -279,9 +279,9 @@ class ScanPropsStruct(base.NanonisMessage):
     comment.
     """
 
-    continuous_scan: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
-    bouncy_scan: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
-    auto_save: int = base.SettingState.NO_CHANGE  # 4 bytes, unsigned int32
+    continuous_scan: int = base.NO_CHANGE_VAL  # 4 bytes, unsigned int32
+    bouncy_scan: int = base.NO_CHANGE_VAL  # 4 bytes, unsigned int32
+    auto_save: int = base.NO_CHANGE_VAL  # 4 bytes, unsigned int32
     name_size: int = base.DEF_INT  # 4 bytes, int32
     base_name: str = base.DEF_STR  # size defined by name_size
     comment_size: int = base.DEF_INT  # 4 bytes, int32

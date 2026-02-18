@@ -321,3 +321,6 @@ class SettingState(enum.Enum):
     NO_CHANGE = 0
     ON = 1
     OFF = 2
+
+
+NO_CHANGE_VAL = SettingState.NO_CHANGE.value

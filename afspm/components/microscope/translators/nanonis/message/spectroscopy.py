@@ -176,13 +176,13 @@ class SpectraPropsStruct(base.NanonisMessage):
     - By default, z_offset_m is 0 to not change the z-position.
     """
 
-    save_all: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
-    number_of_sweeps: int = base.SettingState.NO_CHANGE  # 4 bytes, int32
-    backward_sweep: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
-    number_of_points: int = base.SettingState.NO_CHANGE  # 4 bytes, int32
+    save_all: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+    number_of_sweeps: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+    backward_sweep: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+    number_of_points: int = base.NO_CHANGE_VAL  # 4 bytes, int32
     z_offset_m: float = base.DEF_FLT  # 4 bytes, float32
-    auto_save: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
-    show_save_dialog: int = base.SettingState.NO_CHANGE  # 2 bytes, unsigned int16
+    auto_save: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+    show_save_dialog: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
 
     def format(self) -> str:
         """Override."""

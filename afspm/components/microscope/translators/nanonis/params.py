@@ -502,7 +502,7 @@ class SetupProperties:
     - All are defaulted to NO_CHANGE.
     """
 
-    scan_auto_save: base.SettingState = base.SettingState.NO_CHANGE.value
-    scan_continuous_scan: base.SettingState = base.SettingState.NO_CHANGE.value
-    spec_auto_save: base.SettingState = base.SettingState.NO_CHANGE.value
-    spec_save_dialog: base.SettingState = base.SettingState.NO_CHANGE.value
+    scan_auto_save: base.SettingState = base.NO_CHANGE_VAL
+    scan_continuous_scan: base.SettingState = base.NO_CHANGE_VAL
+    spec_auto_save: base.SettingState = base.NO_CHANGE_VAL
+    spec_save_dialog: base.SettingState = base.NO_CHANGE_VAL
