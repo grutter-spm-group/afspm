@@ -24,6 +24,7 @@ caller = 'SCAN'
 [scan-size-x]   # [size-x-ratio] below
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_size_x'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_size_x'
+unit = 'nm'
 range = [0.0, 1000.0]  # [0, 1000nm]
 type = 1.0
 
