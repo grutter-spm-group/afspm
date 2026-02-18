@@ -334,7 +334,7 @@ class ScanPropsGetRep(base.NanonisResponse, ScanPropsGet,
         """Override due to variable channel_indices."""
         __, __, __, self.name_size = struct.unpack_from('IIIi', buffer, offset)
         __, __, __, self.name_size, __, self.comment_size = struct.unpack_from(
-            'IIIi%dsi', (self.name_size), buffer, offset)
+            'IIIi%dsi' % (self.name_size,), buffer, offset)
         return self.format()
 
 
