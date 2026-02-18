@@ -203,7 +203,8 @@ class BiasSpectraPropsSet(base.NanonisMessage):
         return 'BiasSpectr.PropsSet'
 
 
-class BiasSpectraPropsSetReq(BiasSpectraPropsSet, BiasSpectraPropsStruct):
+class BiasSpectraPropsSetReq(base.NanonisRequest, BiasSpectraPropsSet,
+                             BiasSpectraPropsStruct):
     """Bias spectroscopy properties set request."""
 
 
@@ -220,7 +221,8 @@ class ZSpectraPropsSet(base.NanonisMessage):
         return 'ZSpectr.PropsSet'
 
 
-class ZSpectraPropsSetReq(ZSpectraPropsSet, ZSpectraPropsStruct):
+class ZSpectraPropsSetReq(base.NanonisRequest, ZSpectraPropsSet,
+                          ZSpectraPropsStruct):
     """Z spectroscopy properties set request."""
 
 
