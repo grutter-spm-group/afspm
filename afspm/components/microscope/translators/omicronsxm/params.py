@@ -126,6 +126,7 @@ class SXMParameterHandler(params.ParameterHandler):
 
     def _load_config_build_params(self, params_config_path: str):
         """Override to populate self.uuid_to_caller_map."""
+        super()._load_config_build_params(params_config_path)
         for key, val in self.param_infos.items():
             self.uuid_to_caller_map[val.uuid] = val.caller
 
