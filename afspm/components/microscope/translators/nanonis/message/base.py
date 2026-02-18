@@ -244,9 +244,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     offset = 0
     rep_parts = [ResponseHeader(), rep, ErrorRep()]
     results = []
-    for idx, rep_part in enumerate(rep_parts):
-        offset += (struct.calcsize(rep_parts[idx - 1].format())
-                   if idx > 0 else 0)
+    for rep_part in rep_parts:
         format = rep_part.get_format(buffer, offset)
         logger.trace(f'Offset: {offset}, format: {format}')
         tuple_data = struct.unpack_from(format, buffer, offset)
@@ -256,8 +254,11 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
                       for t in tuple_data]
 
         # Update struct with proper values
-        results.append(replace(rep_part,
-                               **rep_part.create_data_dict(tuple_data)))
+        new_rep = replace(rep_part, **rep_part.create_data_dict(tuple_data))
+        results.append(new_rep)
+
+        # Update offset for next rep_part
+        offset += struct.calcsize(new_rep.get_format())
 
     logger.trace(f'{repr(results[0])}')
     logger.trace(f'{repr(results[1])}')
