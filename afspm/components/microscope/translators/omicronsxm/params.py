@@ -144,7 +144,7 @@ class SXMParameterHandler(params.ParameterHandler):
     def _call_get(self, method: str, attr: str) -> Any:
         """Error handling around get call."""
         try:
-            call_str = "a:=" + method + "(" + attr + ");\r\n writeln(a);"
+            call_str = "a:=" + method + f"('{attr}');\r\n  writeln(a);"
             val = self.client.execute_and_return(call_str)
             if val is not None:
                 return val
