@@ -46,6 +46,10 @@ SET_REQ = 'SetReq'
 SET_REP = 'SetRep'
 
 
+# ----- Endianness ----- #
+BIG_ENDIAN = '>'  # To force big-endian encoding everywhere
+
+
 # ----- Base Classes ----- #
 @dataclass
 class NanonisMessage(ABC):
@@ -103,7 +107,7 @@ class NanonisResponse(NanonisMessage):
         The buffer also contains the response header, so we need
         to provide the offset of this, to skip it when unpacking.
 
-        Default is to just return format().
+        Default is to just return big-endian + format().
 
         Args:
             buffer: bytes array of received message.
@@ -112,7 +116,7 @@ class NanonisResponse(NanonisMessage):
         Returns:
             str: formatting for struct to unpack.
         """
-        return self.format()
+        return BIG_ENDIAN + self.format()
 
 
 class NanonisRequest(NanonisMessage):
@@ -132,9 +136,9 @@ class NanonisRequest(NanonisMessage):
         For the request, we should not need any buffer. We are using
         this data structure to *create* the buffer!
 
-        Default is to return format().
+        Default is to return big-endian + format().
         """
-        return self.format()
+        return BIG_ENDIAN + self.format()
 
 
 @dataclass
@@ -147,7 +151,7 @@ class ErrorRep(NanonisResponse):
 
     def get_format(cls, buffer: bytes, offset: int) -> str:
         """Override."""
-        base_format = 'Ii'
+        base_format = BIG_ENDIAN + 'Ii'
         __, str_size = struct.unpack_from(base_format, buffer, offset)
         base_format += '%ds' % (str_size,)
         return base_format
@@ -222,9 +226,6 @@ class NanonisMessageError(Exception):
     """The parsed response indicates an error."""
 
 
-BIG_ENDIAN = '>'  # To force big-endian encoding everywhere
-
-
 def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     """Populate NanonisResponse from bytes array and initialized response.
 
@@ -246,7 +247,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     for idx, rep_part in enumerate(rep_parts):
         offset += (struct.calcsize(rep_parts[idx - 1].format())
                    if idx > 0 else 0)
-        format = BIG_ENDIAN + rep_part.get_format(buffer, offset)
+        format = rep_part.get_format(buffer, offset)
         logger.trace(f'Offset: {offset}, format: {format}')
         tuple_data = struct.unpack_from(format, buffer, offset)
         logger.trace(f'tuple_data: {tuple_data}')
@@ -285,7 +286,7 @@ def to_bytes(req: NanonisRequest) -> bytes:
     for this_req, offset in zip(
             (req_header, req),
             (0, struct.calcsize(req_header.format()))):
-        format = BIG_ENDIAN + this_req.get_format()
+        format = this_req.get_format()
         # Extract attributes as list, converting str to utf-8 encoded bytes
         data = [t.encode('utf-8') if isinstance(t, str) else t
                 for t in astuple(this_req)]

@@ -43,5 +43,6 @@ class SessionPathGetRep(base.NanonisResponse, SessionPathGet,
 
     def get_format(self, buffer: bytes, offset: int) -> str:
         """Override due to variable session_path."""
-        self.session_path_size = struct.unpack_from('i', buffer, offset)
+        format = base.BIG_ENDIAN + 'i'
+        self.session_path_size = struct.unpack_from(format, buffer, offset)
         return self.format()
