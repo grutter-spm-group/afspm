@@ -184,8 +184,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         """Like get_param_spm(), but we return the NanonisResponse."""
         req_rep = self._get_getter_req_rep(spm_uuid)
         req = req_rep.req
-        rep = (self._get_setter_req_rep(spm_uuid).rep if req.request_response()
-               else None)
+        rep = (req_rep.rep if req.request_response() else None)
         return send_request(self._client, req, rep)
 
     def get_param_spm(self, spm_uuid: str) -> Any:
