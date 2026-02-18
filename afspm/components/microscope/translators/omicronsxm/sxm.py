@@ -251,6 +251,13 @@ class DDEClient(object):
             raise DDEError("Unable to send command", self._idInst)
         DDE.FreeDataHandle(hDdeData)
 
+        # Loop to flush response. Even though we do not expect returns here,
+        # we do receive a Command structure acknowleging a request was sent
+        # and handled.
+        while self.NotGotAnswer:
+            loop()
+        return
+
     def request(self, item, timeout=5000):
         """Request data from DDE service."""
         from ctypes import byref
