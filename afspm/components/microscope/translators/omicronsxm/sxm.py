@@ -359,11 +359,7 @@ class DDEClient(object):
         whatever variable it got. The backend here reads what is printed
         as a response.
         """
-        logger.trace(f'Executing: {cmd}')
         self.execute(cmd, 1000)
-
-        while self.NotGotAnswer:
-            loop()
 
         BackStr = self.LastAnswer
         BackStr = str(BackStr, 'utf-8').split('\r\n')
