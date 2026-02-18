@@ -247,7 +247,7 @@ class ScanBufferGetRep(base.NanonisResponse, ScanBufferGet,
         """Override due to variable channel_indices."""
         format = base.BIG_ENDIAN + 'i'
         self.num_channels = struct.unpack_from(format, buffer, offset)
-        return self.format()
+        return base.BIG_ENDIAN + self.format()
 
 
 # ----- Scan Props ----- $
@@ -338,7 +338,7 @@ class ScanPropsGetRep(base.NanonisResponse, ScanPropsGet,
         format += '%dsi' % (self.name_size,)
         __, __, __, self.name_size, __, self.comment_size = struct.unpack_from(
             format, buffer, offset)
-        return self.format()
+        return base.BIG_ENDIAN + self.format()
 
 
 # ----- Scan Speed ----- #
