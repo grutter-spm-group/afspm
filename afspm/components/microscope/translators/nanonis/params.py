@@ -57,8 +57,7 @@ class NanonisParameterInfo(params.ParameterInfo):
     index: int  # Indicates VARIABLEStruct index for this parameter.
 
 
-def create_param_info(param_dict: dict, dict_key: str
-                      ) -> NanonisParameterInfo | None:
+def create_parameter_info(param_dict: dict) -> NanonisParameterInfo:
     """Like params.create_parameter_info, but for NanonisParameterInfo."""
     vals = []
     keys = ([f.name for f in fields(params.ParameterInfo)] +
@@ -68,14 +67,16 @@ def create_param_info(param_dict: dict, dict_key: str
 
     kwargs = dict(zip(keys, vals))
     param_info = NanonisParameterInfo(**kwargs)
-
-    # Ensure we at least have a uuid, type, and index
-    if (param_info.uuid is None or param_info.type is None or
-            param_info.index is None):
-        logger.debug(f"Parameter {dict_key} provided without 'type', 'uuid',"
-                     " and 'index' attributes.")
-        return None
     return param_info
+
+
+def validate_parameter(param_info: params.ParameterInfo,
+                       param_methods: params.ParameterMethods,
+                       uuid: str) -> bool:
+    """Like params.create_parameter_info, but for NanonisParameterInfo."""
+    param_info_met = param_info.uuid and param_info.type and param_info.int
+    param_methods_met = param_methods.getter and param_methods.setter
+    return param_info_met or param_methods_met
 
 
 class NanonisParameterHandler(params.ParameterHandler):
@@ -105,7 +106,8 @@ class NanonisParameterHandler(params.ParameterHandler):
         self._uuid_to_reqrep_set_map = {}
         self._uuid_to_struct_index_map = {}
 
-        kwargs['param_info_init'] = create_param_info
+        kwargs['param_info_init'] = create_parameter_info
+        kwargs['validate_parameter'] = validate_parameter
         super().__init__(**kwargs)
 
     def _load_config_build_params(self, params_config_path: str):

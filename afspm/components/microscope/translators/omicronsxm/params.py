@@ -69,8 +69,8 @@ class SXMParameterInfo(params.ParameterInfo):
     caller: CallerType  # Indicates 'grouping' this param is in.
 
 
-def create_param_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
-    """Like params.create_parameter_info, but for SXM ParameterInfo."""
+def create_parameter_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
+    """Like params.create_parameter_info, but for SXMParameterInfo."""
     vals = []
     keys = ([f.name for f in fields(params.ParameterInfo)] +
             [f.name for f in fields(SXMParameterInfo)])
@@ -79,14 +79,16 @@ def create_param_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
 
     kwargs = dict(zip(keys, vals))
     param_info = SXMParameterInfo(**kwargs)
-
-    # Ensure we at least have a uuid, type, and caller
-    if (param_info.uuid is None or param_info.type is None or
-            param_info.caller is None):
-        logger.debug(f"Parameter {dict_key} provided without 'type', 'uuid',"
-                     " and 'caller' attributes.")
-        return None
     return param_info
+
+
+def validate_parameter(param_info: params.ParameterInfo,
+                       param_methods: params.ParameterMethods,
+                       uuid: str) -> bool:
+    """Like params.validate_parameter, but for SXMParameterInfo."""
+    param_info_met = param_info.uuid and param_info.type and param_info.caller
+    param_methods_met = param_methods.getter and param_methods.setter
+    return param_info_met or param_methods_met
 
 
 class SXMParameterHandler(params.ParameterHandler):
@@ -111,7 +113,8 @@ class SXMParameterHandler(params.ParameterHandler):
         """
         self.client = client
         self.uuid_to_caller_map = {}
-        kwargs['param_info_init'] = create_param_info
+        kwargs['param_info_init'] = create_parameter_info
+        kwargs['validate_parameter'] = validate_parameter
         super().__init__(**kwargs)
 
         # Asserting some parameters' units are the same. If they're not

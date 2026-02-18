@@ -200,17 +200,17 @@ class ParameterMethods:
     getter: Callable[[Any], Any] | None
 
 
-def create_parameter_info(param_dict: dict, dict_key: str
-                          ) -> ParameterInfo | None:
+def create_parameter_info(param_dict: dict) -> ParameterInfo:
     """Create ParameterInfo from a param_dict (from params config).
 
-    We will raise a warning if the necessary attributes are not found
-    and return None.
+    Instantiates ParameterInfo from provided dict.
+
+    If you have created additional fields in your ParameterInfo child class,
+    you should expand upon this method.
 
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
-        dict_key: str of key associated with dict, for logging purposes.
 
     Returns:
         ParameterInfo instance or None (if no vals are provided).
@@ -222,30 +222,23 @@ def create_parameter_info(param_dict: dict, dict_key: str
 
     kwargs = dict(zip(keys, vals))
     param_info = ParameterInfo(**kwargs)
-
-    # Ensure we at least have a uuid and type
-    if param_info.uuid is None or param_info.type is None:
-        logger.debug(f"Parameter {dict_key} provided without 'uuid'"
-                     " or 'type' attributes.")
-        return None
     return param_info
 
 
-def create_parameter_methods(param_dict: dict, dict_key: str
-                             ) -> ParameterMethods | None:
+def create_parameter_methods(param_dict: dict) -> ParameterMethods:
     """Create ParameterMethods from a param_dict (from params config).
 
     Attempts to import setter and getter methods for a param dict.
-    Logs a warning if only getter or setter are provided.
+
+    If you have created additional fields in your ParameterInfo child class,
+    you should expand upon this method.
 
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
-        dict_key: str key associated to this dict. Used for logging purposes.
 
     Returns:
-        ParameterMethods instance or None (if we cannot construct from
-            the provided dict).
+        ParameterMethods instance.
 
     Raises:
         ModuleNotFoundError if module could not be found when trying
@@ -259,19 +252,39 @@ def create_parameter_methods(param_dict: dict, dict_key: str
                        if key in param_dict else None)
 
     param_methods = ParameterMethods(*methods)
-    # Validate we have getter and setter
-    if not param_methods.getter and not param_methods.setter:
-        logger.debug(f'For parameter {dict_key}, ParameterMethods getter and'
-                     ' setter not provided.')
-        return None
-    # Warning logging.
-    no_setter_or_getter = ('setter' if not param_methods.setter
-                           else 'getter' if not param_methods.getter
-                           else None)
-    if no_setter_or_getter:
-        logger.debug(f'For parameter {dict_key}, {no_setter_or_getter} not '
-                     'provided! Continuing.')
-    return ParameterMethods(*methods)
+    return param_methods
+
+
+def validate_parameter(param_info: ParameterInfo,
+                       param_methods: ParameterMethods,
+                       uuid: str) -> bool:
+    """Validate we have enough infor in our param_info or param_methods.
+
+    This method allows us to validate that we have sufficient information for
+    a loaded parameter. After loading, we will have ParameterInfo and
+    ParameterMethods classes instantiated. Our goal is to ensure we have
+    enough in either one of them to continue.
+
+    In this base implementation, we expect either ParameterInfo to have both
+    type and uuid defined; or ParameterMethods to have both getter and setter.
+
+    Note that if you write your own version of this method, you can filter for
+    special parameters via the uuid.
+
+    Args:
+        param_info: ParameterInfo that has been instantiated for this
+            Parameter.
+        param_methods: ParameterMethods that has been instantiated for this
+            Parameter.
+        uuid: str associated to our MicroscopeParameter. Equivalent to
+            MicroscopeParameter.value.
+
+    Returns:
+        True if we have sufficient info from either, else False.
+    """
+    param_info_met = param_info.uuid and param_info.type
+    param_methods_met = param_methods.getter and param_methods.setter
+    return param_info_met or param_methods_met
 
 
 # ----- Main handler class ----- #
@@ -344,16 +357,21 @@ class ParameterHandler(metaclass=ABCMeta):
             the val in the key:val pair of a config file.
         param_methods_init: method to call to create a ParameterMethods
             from the val in the key:val pair of a config file.
+        validate_parameter: method to validate whether we have the minimum
+            in either our ParameterInfo or ParameterMethods for a given
+            parameter.
     """
 
     def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME,
                  param_info_init: Callable = create_parameter_info,
-                 param_methods_init: Callable = create_parameter_methods):
+                 param_methods_init: Callable = create_parameter_methods,
+                 validate_parameter: Callable = validate_parameter):
         """Init class, loading params config for these purposes."""
         self.param_infos = {}
         self.param_methods = {}
         self.param_info_init = param_info_init
         self.param_methods_init = param_methods_init
+        self.validate_parameter = validate_parameter
         self._load_config_build_params(params_config_path)
 
     @abstractmethod
@@ -412,22 +430,17 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for key, val in params_config.items():
             if isinstance(val, dict):
-                # Check if we have our own set/get methods
                 param_methods = self.param_methods_init(val, key)
-                if param_methods:
-                    self.param_methods[key] = param_methods
-
-                # Load all the param info we can get.
                 param_info = self.param_info_init(val, key)
-                if param_info:
-                    self.param_infos[key] = param_info
 
-                if (key not in self.param_methods and key not in
-                        self.param_infos):
-                    msg = (f'Parameter {key} provided without either set/'
-                           'get methods or minimum ParameterInfo attributes.')
+                if not self.validate_parameter(param_info, param_methods):
+                    msg = (f'Parameter {key} provided without minimum'
+                           'ParameterMethods or ParameterInfo attributes.')
                     logger.error(msg)
                     raise ParameterConfigurationError(msg)
+
+                self.param_methods[key] = param_methods
+                self.param_infos[key] = param_info
 
     def _get_param_info(self, generic_param: MicroscopeParameterBase
                         ) -> ParameterInfo:
