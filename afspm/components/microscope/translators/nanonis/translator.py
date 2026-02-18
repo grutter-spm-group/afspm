@@ -52,10 +52,10 @@ class NanonisTranslator(ct.ConfigTranslator):
 
     DEFAULT_MODE = spectroscopy.SpectroscopyMode.BIAS
     DESIRED_SETUP_PROPERTIES = params.SetupProperties(
-        scan_auto_save=base.SettingState.ON,
-        scan_continuous_scan=base.SettingState.OFF,
-        spec_auto_save=base.SettingState.ON,
-        spec_save_dialog=base.SettingState.OFF)
+        scan_auto_save=base.SettingState.ON.value,
+        scan_continuous_scan=base.SettingState.OFF.value,
+        spec_auto_save=base.SettingState.ON.value,
+        spec_save_dialog=base.SettingState.OFF.value)
 
     SCAN_EXT = '.sxm'
     SPEC_EXT = '.dat'
@@ -154,9 +154,9 @@ class NanonisTranslator(ct.ConfigTranslator):
         scan_props_uuid = self.param_handler._get_param_info(
             params.NanonisParam.SCAN_AUTO_SAVE).uuid
         rep = self.param_handler._get_param_spm_rep(scan_props_uuid)
-        setup_props.scan_auto_save = base.SettingState(rep.auto_save)
+        setup_props.scan_auto_save = base.SettingState(rep.auto_save).value
         setup_props.scan_continuous_scan = base.SettingState(
-            rep.continuous_scan)
+            rep.continuous_scan).value
 
         # Get spec properties
         z_spec_props_uuid = self.param_handler._get_param_info(
