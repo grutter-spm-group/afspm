@@ -241,7 +241,8 @@ class BiasSpectraPropsGetReq(base.EmptyRequest, BiasSpectraPropsGet):
     """Bias spectroscopy properties get request."""
 
 
-class BiasSpectraPropsGetRep(BiasSpectraPropsGet, BiasSpectraPropsStruct):
+class BiasSpectraPropsGetRep(base.NanonisResponse, BiasSpectraPropsGet,
+                             BiasSpectraPropsStruct):
     """Bias spectroscopy properties set response."""
 
 
@@ -258,7 +259,8 @@ class ZSpectraPropsGetReq(base.EmptyRequest, ZSpectraPropsGet):
     """Z spectroscopy properties get request."""
 
 
-class ZSpectraPropsGetRep(ZSpectraPropsGet, ZSpectraPropsStruct):
+class ZSpectraPropsGetRep(base.NanonisResponse, ZSpectraPropsGet,
+                          ZSpectraPropsStruct):
     """Z spectroscopy properties set response."""
 
 
