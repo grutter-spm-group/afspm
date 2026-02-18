@@ -69,7 +69,7 @@ class SXMParameterInfo(params.ParameterInfo):
     caller: CallerType  # Indicates 'grouping' this param is in.
 
 
-def create_parameter_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
+def create_parameter_info(param_dict: dict) -> SXMParameterInfo:
     """Like params.create_parameter_info, but for SXMParameterInfo."""
     vals = []
     keys = ([f.name for f in fields(params.ParameterInfo)] +
@@ -138,7 +138,7 @@ class SXMParameterHandler(params.ParameterHandler):
         if caller == CallerType.CHANNEL:
             spm_uuid = '-' + spm_uuid
 
-        method_substr = get_getter_substr(self.client, caller)
+        method_substr = get_getter_substr(caller)
         return self._call_get(method_substr, spm_uuid)
 
     def _call_get(self, method: str, attr: str) -> Any:

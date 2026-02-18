@@ -430,10 +430,10 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for key, val in params_config.items():
             if isinstance(val, dict):
-                param_methods = self.param_methods_init(val, key)
-                param_info = self.param_info_init(val, key)
+                param_methods = self.param_methods_init(val)
+                param_info = self.param_info_init(val)
 
-                if not self.validate_parameter(param_info, param_methods):
+                if not self.validate_parameter(param_info, param_methods, key):
                     msg = (f'Parameter {key} provided without minimum'
                            'ParameterMethods or ParameterInfo attributes.')
                     logger.error(msg)
