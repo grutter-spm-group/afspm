@@ -345,7 +345,7 @@ def set_size_x(handler: params.ParameterHandler,
 
     # Ensure within expected ranges!
     gid = params.MicroscopeParameter.SCAN_SIZE_X
-    val = handler._correct_val_for_sending(
+    val = params._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
     val = val / size_y
@@ -368,7 +368,7 @@ def set_res_x(handler: params.ParameterHandler,
 
     # Ensure within expected ranges!
     gid = params.MicroscopeParameter.SCAN_RESOLUTION_X
-    val = handler._correct_val_for_sending(
+    val = params._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
     val = val / res_y
@@ -411,7 +411,7 @@ def set_scan_speed(handler: params.ParameterHandler,
     """
     # Ensure within expected ranges!
     gid = params.MicroscopeParameter.SCAN_SPEED
-    val = handler._correct_val_for_sending(
+    val = params._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
     size_uuid = params.MicroscopeParameter.SCAN_SIZE_X
@@ -451,12 +451,11 @@ def set_probe_pos_x(handler: params.ParameterHandler,
     the probe position.
     """
     gid = params.MicroscopeParameter.PROBE_POS_X
-    val = handler._correct_val_for_sending(
+    val = params._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
-#    handler.set_param(SXMParam.TIP_POS_X, val, unit)
+    handler.set_param(SXMParam.TIP_POS_X, val, unit)
     handler.set_param(SXMParam.SPEC_POS_X, val, unit)
-    # TODO: Set autosave OFF, start, set autosave ON?
 
 
 def set_probe_pos_y(handler: params.ParameterHandler,
@@ -467,7 +466,7 @@ def set_probe_pos_y(handler: params.ParameterHandler,
     the custom functions are needed.
     """
     gid = params.MicroscopeParameter.PROBE_POS_Y
-    val = handler._correct_val_for_sending(
+    val = params._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
     handler.set_param(SXMParam.TIP_POS_Y, val, unit)
