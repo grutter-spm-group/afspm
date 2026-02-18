@@ -139,6 +139,7 @@ class SXMParameterHandler(params.ParameterHandler):
         """Override for SPM-specific getter."""
         caller = self.uuid_to_caller_map[spm_uuid]
         # Special case for CHANNEL get calls.
+        # Get is negative, Set positive (for mysterious reasons).
         if caller == CallerType.CHANNEL:
             spm_uuid = -1 * spm_uuid
 
@@ -453,8 +454,9 @@ def set_probe_pos_x(handler: params.ParameterHandler,
     val = handler._correct_val_for_sending(
         val, handler.get_param_info(gid), unit, gid)
 
-    handler.set_param(SXMParam.TIP_POS_X, val, unit)
+#    handler.set_param(SXMParam.TIP_POS_X, val, unit)
     handler.set_param(SXMParam.SPEC_POS_X, val, unit)
+    # TODO: Set autosave OFF, start, set autosave ON?
 
 
 def set_probe_pos_y(handler: params.ParameterHandler,
