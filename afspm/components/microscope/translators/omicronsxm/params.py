@@ -6,9 +6,8 @@ import enum
 from dataclasses import dataclass
 from typing import Any
 
-from afspm.components.microscope import params
-
-from sxm import DDEClient
+from ... import params
+from .sxm import DDEClient
 
 
 logger = logging.getLogger(__name__)

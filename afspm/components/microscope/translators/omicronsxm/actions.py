@@ -1,9 +1,9 @@
 """Holds asylum controller action handling."""
 
 import logging
-from afspm.components.microscope import actions
 
-from sxm import DDEClient
+from ... import actions
+from .sxm import DDEClient
 
 
 logger = logging.getLogger(__name__)
