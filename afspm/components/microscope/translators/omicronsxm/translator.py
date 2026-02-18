@@ -93,8 +93,8 @@ class SXMTranslator(ct.ConfigTranslator):
 
     def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
         """Ensure we detect when scans/specs end, to update scope state."""
-        client.register_spect_save_callback(self.on_scan_spec_end)
-        client.register_scan_end_callback(self.on_scan_spec_end)
+        client.register_spect_save_callback(self._on_scan_spec_end)
+        client.register_scan_end_callback(self._on_scan_spec_end)
 
     def _on_scan_spec_end(self):
         """Return scope state to free when scan/spec ends.
