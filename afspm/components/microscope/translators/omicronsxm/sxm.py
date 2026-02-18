@@ -235,6 +235,7 @@ class DDEClient(object):
 
     def execute(self, command, timeout=5000):
         """Execute a DDE command."""
+        logger.trace(f'Executing: {command}')
         self.NotGotAnswer = True
         command = 'begin\r\n  '+command+'\r\nend.\r\n'
         command = bytes(command, 'utf-16')
@@ -308,7 +309,7 @@ class DDEClient(object):
         if wType == XTYP_XACT_COMPLETE:
             pass
         elif wType == XTYP_DISCONNECT:
-            logger.info('Disconnect');
+            logger.info('Disconnect')
         elif wType == XTYP_ADVDATA:
             from ctypes import byref, create_string_buffer
 
@@ -321,7 +322,7 @@ class DDEClient(object):
                 DDE.UnaccessData(hDdeData)
             return DDE_FACK
         else:
-            logger.info('Unhandled Callback' + hex(wType));
+            logger.info('Unhandled Callback' + hex(wType))
 
         return 0
 
@@ -337,7 +338,7 @@ class DDEClient(object):
 
     def get_ini_entry(self, section, item):
         """Get current iniFile."""
-        IniName = self.request('IniFileName');
+        IniName = self.request('IniFileName')
         IniName = str(IniName, 'utf-8')
         IniName = IniName.strip('\r\n')
         self.config.read(IniName)
@@ -351,12 +352,13 @@ class DDEClient(object):
         whatever variable it got. The backend here reads what is printed
         as a response.
         """
+        logger.trace(f'Executing: {cmd}')
         self.execute(cmd, 1000)
 
         while self.NotGotAnswer:
             loop()
 
-        BackStr = self.LastAnswer;
+        BackStr = self.LastAnswer
         BackStr = str(BackStr, 'utf-8').split('\r\n')
         logger.trace(f'Received answer: {BackStr}')
         if len(BackStr) >= 2:
