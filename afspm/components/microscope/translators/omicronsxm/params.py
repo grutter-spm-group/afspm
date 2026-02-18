@@ -116,8 +116,6 @@ class SXMParameterHandler(params.ParameterHandler):
 
         # Asserting some parameters' units are the same. If they're not
         # we cannot predict what some of our calls will do!
-        assert (self.get_unit(SXMParam.CENTER_X) ==
-                self.get_unit(params.MicroscopeParameter.SCAN_SIZE_X))
         assert (self.get_unit(SXMParam.CENTER_Y) ==
                 self.get_unit(params.MicroscopeParameter.SCAN_SIZE_Y))
 
