@@ -412,7 +412,7 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for key, val in params_config.items():
             if isinstance(val, dict):
-                # Ceck if we have our own set/get methods
+                # Check if we have our own set/get methods
                 param_methods = self.param_methods_init(val, key)
                 if param_methods:
                     self.param_methods[key] = param_methods
