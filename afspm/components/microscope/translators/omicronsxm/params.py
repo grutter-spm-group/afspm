@@ -181,7 +181,7 @@ class SXMParameterHandler(params.ParameterHandler):
     def _switch_feedback_mode(self, mode: FeedbackMode):
         """Switch to using the appropriate feedback mode."""
         ratio = 0 if mode == FeedbackMode.AFM else 100
-        self.client.SendWait(f"SendFeedPara('Ratio', {ratio})")
+        self.client.execute(f"SendFeedPara('Ratio', {ratio})")
         # Change Ki/Kp value for appropriate mode.
         gid = params.MicroscopeParameter.ZCTRL_PGAIN
         info = self._get_param_info(gid)
