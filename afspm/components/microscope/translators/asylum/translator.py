@@ -59,16 +59,6 @@ class AsylumTranslator(ct.ConfigTranslator):
     SCAN_PREFIX = 'Image'
     SPEC_PREFIX = 'Force'
 
-    # NOTE: We need our own order of scan params, because we are calling it
-    # in a different order (we need to due to internals).
-    SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
-                   MicroscopeParameter.SCAN_TOP_LEFT_Y,
-                   MicroscopeParameter.SCAN_SIZE_Y,  # <-- this is different
-                   MicroscopeParameter.SCAN_SIZE_X,
-                   MicroscopeParameter.SCAN_RESOLUTION_X,
-                   MicroscopeParameter.SCAN_RESOLUTION_Y,
-                   MicroscopeParameter.SCAN_ANGLE]
-
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
                  xop_client: XopClient = None,
@@ -100,6 +90,8 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         # Tell parent class that Asylum *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
+        # Tell parent class that Asylum requires setting y before x.
+        kwargs[ct.SET_X_BEFORE_Y_KEY] = False
         super().__init__(**kwargs)
 
         # Do some setup
@@ -170,43 +162,6 @@ class AsylumTranslator(ct.ConfigTranslator):
                                      saving_mode)
         self.param_handler.set_param(params.AsylumParam.SCANNING_MODE,
                                      scanning_mode)
-
-    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
-                           ) -> control_pb2.ControlResponse:
-        """Override setting of scan params.
-
-        We must set the scan params in a different order from default.
-
-        As a reminder: we do not send data units, because the translator
-        has no concept of the 'units' of data at the 'scan parameter' level.
-        When we read saved scans or specs, we are able to retrieve their
-        data units, but this is not something we concern ourselves with at
-        the MicroscopeTranslator granularity.
-        """
-        vals = [scan_params.spatial.roi.top_left.x,
-                scan_params.spatial.roi.top_left.y,
-                scan_params.spatial.roi.size.y,  # <-- this is different
-                scan_params.spatial.roi.size.x,
-                scan_params.data.shape.x,
-                scan_params.data.shape.y,
-                scan_params.spatial.roi.angle]
-        attr_units = [scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      None, None,
-                      scan_params.spatial.angular_units]
-
-        try:
-            self.param_handler.set_param_list(self.SCAN_PARAMS, vals,
-                                              attr_units)
-            if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._handle_sending_fake_move()
-        except ParameterNotSupportedError:
-            return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
-        except ParameterError:
-            return control_pb2.ControlResponse.REP_PARAM_ERROR
-        return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
                          ) -> control_pb2.ControlResponse:

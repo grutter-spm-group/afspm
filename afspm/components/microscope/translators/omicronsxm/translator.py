@@ -71,6 +71,8 @@ class SXMTranslator(ct.ConfigTranslator):
                                      **kwargs)
         # Tell parent class that SXM *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
+        # Tell parent class that SXM requires setting y before x.
+        kwargs[ct.SET_X_BEFORE_Y_KEY] = False
         super().__init__(**kwargs)
         self._init_spec_settings()
 

@@ -131,13 +131,20 @@ DESCRIPTIONS = {
 }
 
 # ----- Helper lists of Microscope Parameters ----- #
-SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
-               MicroscopeParameter.SCAN_TOP_LEFT_Y,
-               MicroscopeParameter.SCAN_SIZE_X,
-               MicroscopeParameter.SCAN_SIZE_Y,
-               MicroscopeParameter.SCAN_RESOLUTION_X,
-               MicroscopeParameter.SCAN_RESOLUTION_Y,
-               MicroscopeParameter.SCAN_ANGLE]
+SCAN_PARAMS_XY = [MicroscopeParameter.SCAN_TOP_LEFT_X,
+                  MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                  MicroscopeParameter.SCAN_SIZE_X,
+                  MicroscopeParameter.SCAN_SIZE_Y,
+                  MicroscopeParameter.SCAN_RESOLUTION_X,
+                  MicroscopeParameter.SCAN_RESOLUTION_Y,
+                  MicroscopeParameter.SCAN_ANGLE]
+SCAN_PARAMS_YX = [MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                  MicroscopeParameter.SCAN_TOP_LEFT_X,
+                  MicroscopeParameter.SCAN_SIZE_Y,
+                  MicroscopeParameter.SCAN_SIZE_X,
+                  MicroscopeParameter.SCAN_RESOLUTION_Y,
+                  MicroscopeParameter.SCAN_RESOLUTION_X,
+                  MicroscopeParameter.SCAN_ANGLE]
 
 
 ZCTRL_PARAMS = [MicroscopeParameter.ZCTRL_SETPOINT,

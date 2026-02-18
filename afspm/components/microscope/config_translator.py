@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 DETECTS_MOVING_KEY = 'detects_moving'
 PARAM_HANDLER_KEY = 'param_handler'
 ACTION_HANDLER_KEY = 'action_handler'
+SET_X_BEFORE_Y_KEY = 'set_x_before_y'
 
 
 class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
@@ -83,6 +84,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         _latest_probe_pos: ProbePosition of XY position when last spec was
             done. Needed in order to create Spec1d from saved file, as not
             all file formats appear to store the XY position.
+        _set_x_before_y: whether or not, when setting, we prefer the x-dim
+            coordinates before the y-dim coordinates. If False, we set y-dim
+            before x-dim. Useful for translators where the two parameters are
+            linked, and thus the order is important.
     """
 
     def __init__(self, name: str, publisher: pub.Publisher,
@@ -90,6 +95,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                  param_handler: params.ParameterHandler,
                  action_handler: actions.ActionHandler,
                  detects_moving: bool = True,
+                 set_x_before_y: bool = True,
                  **kwargs):
         """Init our configured translator.
 
@@ -103,6 +109,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             action_handler: ActionHandler class, for handling action requests.
             detects_moving: whether or not the controller can detect SS_MOVING
                 events.
+            set_x_before_y: whether or not, when setting, we prefer the x-dim
+                coordinates before the y-dim coordinates. If False, we set
+                y-dim before x-dim. Useful for translators where the two
+                parameters are linked, and thus the order is important.
         """
         self.param_handler = param_handler
         self.action_handler = action_handler
@@ -110,6 +120,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         self._latest_scan_params = None
         self._latest_probe_pos = None
+        self._set_x_before_y = set_x_before_y
 
         super().__init__(name, publisher, control_server, **kwargs)
         self._validate_required_actions_exist()
@@ -130,13 +141,25 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         data units, but this is not something we concern ourselves with at
         the MicroscopeTranslator granularity.
         """
-        vals = [scan_params.spatial.roi.top_left.x,
-                scan_params.spatial.roi.top_left.y,
-                scan_params.spatial.roi.size.x,
-                scan_params.spatial.roi.size.y,
-                scan_params.data.shape.x,
-                scan_params.data.shape.y,
-                scan_params.spatial.roi.angle]
+        if self._set_x_before_y:
+            vals = [scan_params.spatial.roi.top_left.x,
+                    scan_params.spatial.roi.top_left.y,
+                    scan_params.spatial.roi.size.x,
+                    scan_params.spatial.roi.size.y,
+                    scan_params.data.shape.x,
+                    scan_params.data.shape.y,
+                    scan_params.spatial.roi.angle]
+            scan_param_ids = params.SCAN_PARAMS_XY
+        else:
+            vals = [scan_params.spatial.roi.top_left.y,
+                    scan_params.spatial.roi.top_left.x,
+                    scan_params.spatial.roi.size.y,
+                    scan_params.spatial.roi.size.x,
+                    scan_params.data.shape.y,
+                    scan_params.data.shape.x,
+                    scan_params.spatial.roi.angle]
+            scan_param_ids = params.SCAN_PARAMS_YX
+
         attr_units = [scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
@@ -145,7 +168,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                       scan_params.spatial.angular_units]
 
         try:
-            self.param_handler.set_param_list(params.SCAN_PARAMS, vals,
+            self.param_handler.set_param_list(scan_param_ids, vals,
                                               attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
                 self._handle_sending_fake_move()
@@ -325,7 +348,9 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         angular_units = self.param_handler.get_unit(
             params.MicroscopeParameter.SCAN_ANGLE)
 
-        vals = self.param_handler.get_param_list(params.SCAN_PARAMS)
+        scan_param_ids = (params.SCAN_PARAMS_XY if self._set_x_before_y
+                          else params.SCAN_PARAMS_YX)
+        vals = self.param_handler.get_param_list(scan_param_ids)
 
         scan_params = scan_pb2.ScanParameters2d()
         scan_params.spatial.roi.top_left.x = vals[0]
