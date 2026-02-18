@@ -169,21 +169,21 @@ type = 1
 caller = 'SPECTRA'
 
 [spec-pos-x]  # This is the position where a spec *will* be taken
-uuid = '1'
+uuid = 1
 type = 1.0
 caller = 'SPECTRA'
 
 [spec-pos-y]  # This is the position where a spec *will* be taken
-uuid = '2'
+uuid = 2
 type = 1.0
 caller = 'SPECTRA'
 
 [tip-pos-x]  # This is the actual position of the probe
-uuid = '2'
+uuid = 2
 type = 1.0
 caller = 'CHANNEL'
 
 [tip-pos-y]  # This is the actual position of the probe
-uuid = '3'
+uuid = 3
 type = 1.0
 caller = 'CHANNEL'

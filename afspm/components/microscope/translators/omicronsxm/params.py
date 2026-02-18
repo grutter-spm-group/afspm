@@ -64,6 +64,10 @@ class SXMParameterInfo(params.ParameterInfo):
     """Adds caller attribute to ParameterInfo.
 
     We need this in the case of SXM to know what method we are calling.
+
+    NOTE:
+    - In this interface, uuid may either be a str or an int! We explicit
+    this in the overriden ParameterHandler methods, where appropriate.
     """
 
     caller: CallerType  # Indicates 'grouping' this param is in.
@@ -131,20 +135,23 @@ class SXMParameterHandler(params.ParameterHandler):
         for key, val in self.param_infos.items():
             self.uuid_to_caller_map[val.uuid] = val.caller
 
-    def get_param_spm(self, spm_uuid: str) -> Any:
+    def get_param_spm(self, spm_uuid: str | int) -> Any:
         """Override for SPM-specific getter."""
         caller = self.uuid_to_caller_map[spm_uuid]
         # Special case for CHANNEL get calls.
         if caller == CallerType.CHANNEL:
-            spm_uuid = '-' + spm_uuid
+            spm_uuid = -1 * spm_uuid
 
         method_substr = get_getter_substr(caller)
         return self._call_get(method_substr, spm_uuid)
 
-    def _call_get(self, method: str, attr: str) -> Any:
+    def _call_get(self, method: str, attr: str | int) -> Any:
         """Error handling around get call."""
         try:
-            call_str = "a:=" + method + f"('{attr}');\r\nwriteln(a);"
+            if isinstance(attr, str):
+                attr = "'" + attr + "'"
+            call_str = "a:=" + method + f"({attr});\r\nwriteln(a);"
+
             val = self.client.execute_and_return(call_str)
             if val is not None:
                 return val
@@ -163,16 +170,18 @@ class SXMParameterHandler(params.ParameterHandler):
             logger.error(msg)
             raise Exception(msg)
 
-    def set_param_spm(self, spm_uuid: str, spm_val: Any):
+    def set_param_spm(self, spm_uuid: str | int, spm_val: Any):
         """Override for SPM-specific setter."""
         caller = self.uuid_to_caller_map[spm_uuid]
         substr = get_setter_substr(caller)
         self._call_set(substr, spm_uuid, spm_val)
 
-    def _call_set(self, substr: str, attr: str, val: str):
+    def _call_set(self, substr: str, attr: str | int, val: str):
         """Error handling around set call."""
         try:
-            self.client.execute(substr + f"('{attr}',{val});")
+            if isinstance(attr, str):
+                attr = "'" + attr + "'"
+            self.client.execute(substr + f"({attr},{val});")
         except Exception as e:
             msg = f"Error setting scan parameter {attr} to {val}: {e}"
             logger.error(msg)
