@@ -257,8 +257,10 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
         new_rep = replace(rep_part, **rep_part.create_data_dict(tuple_data))
         results.append(new_rep)
 
-        # Update offset for next rep_part
-        offset += struct.calcsize(new_rep.get_format())
+        # Update offset for next rep_part. Here, we use format() rather than
+        # get_format(), because we have already extracted the data. So,
+        # our instance new_rep should have the info needed to output format.
+        offset += struct.calcsize(BIG_ENDIAN + new_rep.format())
 
     logger.trace(f'{repr(results[0])}')
     logger.trace(f'{repr(results[1])}')
