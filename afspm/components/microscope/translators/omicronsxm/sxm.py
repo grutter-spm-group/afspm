@@ -20,12 +20,16 @@ Send DDE Execute command to running program
 copyright recipe-577654-1
 changed by Falk mailbox@anfatec.de
 """
+import logging
 
 from typing import Any, Callable
 from ctypes import POINTER, WINFUNCTYPE, c_char_p, c_void_p, c_int, c_ulong
 from ctypes.wintypes import BOOL, DWORD, LPCWSTR, UINT
 
 import configparser
+
+
+logger = logging.getLogger(__name__)
 
 
 # DECLARE_HANDLE(name) typedef void *name;
@@ -297,14 +301,14 @@ class DDEClient(object):
             return
 
         else:
-            print("Unknown callback %s: %s" % (item, value))  # TODO: Should this throw an exception?
+            logger.error("Unknown callback %s: %s" % (item, value))  # TODO: Should this throw an exception?
 
     def _callback(self, wType, uFmt, hConv, hsz1, hsz2, hDdeData, dwData1,
                   dwData2):
         if wType == XTYP_XACT_COMPLETE:
             pass
         elif wType == XTYP_DISCONNECT:
-            print('disconnect');
+            logger.info('Disconnect');
         elif wType == XTYP_ADVDATA:
             from ctypes import byref, create_string_buffer
 
@@ -317,7 +321,7 @@ class DDEClient(object):
                 DDE.UnaccessData(hDdeData)
             return DDE_FACK
         else:
-            print('callback'+hex(wType));
+            logger.info('Unhandled Callback' + hex(wType));
 
         return 0
 
@@ -354,7 +358,7 @@ class DDEClient(object):
 
         BackStr = self.LastAnswer;
         BackStr = str(BackStr, 'utf-8').split('\r\n')
-        print(BackStr)
+        logger.trace(f'Received answer: {BackStr}')
         if len(BackStr) >= 2:
             NrStr = BackStr[1].replace(',', '.')
             val = float(NrStr)
