@@ -200,7 +200,8 @@ class ParameterMethods:
     getter: Callable[[Any], Any] | None
 
 
-def create_parameter_info(param_dict: dict, key: str) -> ParameterInfo | None:
+def create_parameter_info(param_dict: dict, dict_key: str
+                          ) -> ParameterInfo | None:
     """Create ParameterInfo from a param_dict (from params config).
 
     We will raise a warning if the necessary attributes are not found
@@ -209,7 +210,7 @@ def create_parameter_info(param_dict: dict, key: str) -> ParameterInfo | None:
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
-        key: str of key associated with dict, for logging purposes.
+        dict_key: str of key associated with dict, for logging purposes.
 
     Returns:
         ParameterInfo instance or None (if no vals are provided).
@@ -224,13 +225,13 @@ def create_parameter_info(param_dict: dict, key: str) -> ParameterInfo | None:
 
     # Ensure we at least have a uuid and type
     if param_info.uuid is None or param_info.type is None:
-        logger.warning(f"Parameter {key} provided without 'uuid' or 'type'"
+        logger.warning(f"Parameter {dict_key} provided without 'uuid' or 'type'"
                        " attributes.")
         return None
     return param_info
 
 
-def create_parameter_methods(param_dict: dict, key: str
+def create_parameter_methods(param_dict: dict, dict_key: str
                              ) -> ParameterMethods | None:
     """Create ParameterMethods from a param_dict (from params config).
 
@@ -240,7 +241,7 @@ def create_parameter_methods(param_dict: dict, key: str
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
-        key: str key associated to this dict. Used for logging purposes.
+        dict_key: str key associated to this dict. Used for logging purposes.
 
     Returns:
         ParameterMethods instance or None (if we cannot construct from
@@ -260,7 +261,7 @@ def create_parameter_methods(param_dict: dict, key: str
     param_methods = ParameterMethods(*methods)
     # Validate we have getter and setter
     if not param_methods.getter and not param_methods.setter:
-        logger.warning(f'For parameter {key}, ParameterMethods getter and'
+        logger.warning(f'For parameter {dict_key}, ParameterMethods getter and'
                        ' setter not provided.')
         return None
     # Warning logging.
@@ -268,7 +269,7 @@ def create_parameter_methods(param_dict: dict, key: str
                            else 'getter' if not param_methods.getter
                            else None)
     if no_setter_or_getter:
-        logger.warning(f'For parameter {key}, {no_setter_or_getter} not '
+        logger.warning(f'For parameter {dict_key}, {no_setter_or_getter} not '
                        'provided! Continuing.')
     return ParameterMethods(*methods)
 

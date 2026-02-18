@@ -57,7 +57,7 @@ class NanonisParameterInfo(params.ParameterInfo):
     index: int  # Indicates VARIABLEStruct index for this parameter.
 
 
-def create_param_info(param_dict: dict, key: str
+def create_param_info(param_dict: dict, dict_key: str
                       ) -> NanonisParameterInfo | None:
     """Like params.create_parameter_info, but for NanonisParameterInfo."""
     vals = []
@@ -72,8 +72,8 @@ def create_param_info(param_dict: dict, key: str
     # Ensure we at least have a uuid, type, and index
     if (param_info.uuid is None or param_info.type is None or
             param_info.index is None):
-        logger.warning(f"Parameter {key} provided without 'type', 'uuid', and "
-                       "'index' attributes.")
+        logger.warning(f"Parameter {dict_key} provided without 'type', 'uuid',"
+                       " and 'index' attributes.")
         return None
     return param_info
 
