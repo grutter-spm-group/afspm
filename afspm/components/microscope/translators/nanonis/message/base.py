@@ -239,7 +239,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
         NanonisMessageError if we requested a response and the response
             indicates an error.
     """
-    logger.trace(f'from_bytes: {repr(rep)}')
+    logger.trace(f'from_bytes: {buffer}')
     offset = 0
     rep_parts = [ResponseHeader(), rep, ErrorRep()]
     results = []
