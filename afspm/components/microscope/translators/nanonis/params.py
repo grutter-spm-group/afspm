@@ -277,7 +277,7 @@ def copy_data(copy_to: base.NanonisMessage,
     Returns:
         Instance of copy_to, with data copied from copy_from.
     """
-    copy_data_from_tuple(copy_to, astuple(copy_from))
+    return copy_data_from_tuple(copy_to, astuple(copy_from))
 
 
 def copy_data_from_tuple(copy_to: base.NanonisMessage,
