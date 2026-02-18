@@ -245,7 +245,7 @@ class ScanBufferGetRep(base.NanonisResponse, ScanBufferGet,
 
     def get_format(self, buffer: bytes, offset: int) -> str:
         """Override due to variable channel_indices."""
-        self.num_channels = struct.unpack('i', buffer)
+        self.num_channels = struct.unpack_from('i', buffer, offset)
         return self.format()
 
 
@@ -332,9 +332,9 @@ class ScanPropsGetRep(base.NanonisResponse, ScanPropsGet,
 
     def get_format(self, buffer: bytes, offset: int) -> str:
         """Override due to variable channel_indices."""
-        __, __, __, self.name_size = struct.unpack('IIIi', buffer)
-        __, __, __, self.name_size, __, self.comment_size = struct.unpack(
-            'IIIi%dsi', (self.name_size), buffer)
+        __, __, __, self.name_size = struct.unpack_from('IIIi', buffer, offset)
+        __, __, __, self.name_size, __, self.comment_size = struct.unpack_from(
+            'IIIi%dsi', (self.name_size), buffer, offset)
         return self.format()
 
 
