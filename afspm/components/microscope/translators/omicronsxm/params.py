@@ -3,7 +3,7 @@
 import logging
 
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Any
 
 from ... import params
@@ -69,11 +69,23 @@ class SXMParameterInfo(params.ParameterInfo):
     caller: CallerType  # Indicates 'grouping' this param is in.
 
 
-def create_param_info(param_dict: dict) -> SXMParameterInfo:
+def create_param_info(param_dict: dict, dict_key: str) -> SXMParameterInfo:
     """Like params.create_parameter_info, but for SXM ParameterInfo."""
     vals = []
+    keys = ([f.name for f in fields(params.ParameterInfo)] +
+            [f.name for f in fields(SXMParameterInfo)])
     for key in SXMParameterInfo.__annotations__.keys():
         vals.append(param_dict[key] if key in param_dict else None)
+
+    kwargs = dict(zip(keys, vals))
+    param_info = SXMParameterInfo(**kwargs)
+
+    # Ensure we at least have a uuid, type, and caller
+    if (param_info.uuid is None or param_info.type is None or
+            param_info.caller is None):
+        logger.debug(f"Parameter {dict_key} provided without 'type', 'uuid',"
+                     " and 'caller' attributes.")
+        return None
     return SXMParameterInfo(*vals)
 
 
