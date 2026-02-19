@@ -39,8 +39,20 @@ def request_action(handler: SXMActionHandler, method_name: str,
     Raises:
         actions.ActionError if the request fails for any reason.
     """
+    method_call = method_name
+    if params:
+        method_call += '('
+        for param in params:
+            if isinstance(param, str):
+                method_call += "'" + param + "'"
+            else:
+                method_call += param
+            method_call += ','
+        method_call += ');'
+    logger.trace(f'method_call: {method_call}')
+
     try:
-        success, __ = handler.client.execute(method_name, params)
+        success, __ = handler.client.execute(method_call)
         if success:
             return
         else:
