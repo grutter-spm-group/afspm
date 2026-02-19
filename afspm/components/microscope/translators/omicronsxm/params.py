@@ -489,9 +489,12 @@ def set_res_y(handler: params.ParameterHandler,
     index = diff.index(min(diff))
 
     if diff[index] != 0:
-        logger.warning(f'Fed scan-resolution-y {val} is not one of allowed '
-                       'resolutions. Will set to closest res: '
-                       f'{ALLOWED_RESOLUTIONS[index]}.')
+        msg = (f'Fed scan-resolution-y {val} is not one of allowed. '
+               'Please set a supported resolution from '
+               f'{ALLOWED_RESOLUTIONS}.')
+        logger.error(msg)
+        raise params.ParameterError(msg)
+
     # Strangely, we set the *index* of the allowed resolutions to set,
     # but get the actual resolution...
     handler.set_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y,
