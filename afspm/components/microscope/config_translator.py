@@ -142,19 +142,19 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         the MicroscopeTranslator granularity.
         """
         if self._set_x_before_y:
-            vals = [scan_params.spatial.roi.top_left.x,
-                    scan_params.spatial.roi.top_left.y,
-                    scan_params.spatial.roi.size.x,
+            vals = [scan_params.spatial.roi.size.x,
                     scan_params.spatial.roi.size.y,
+                    scan_params.spatial.roi.top_left.x,
+                    scan_params.spatial.roi.top_left.y,
                     scan_params.data.shape.x,
                     scan_params.data.shape.y,
                     scan_params.spatial.roi.angle]
             scan_param_ids = params.SCAN_PARAMS_XY
         else:
-            vals = [scan_params.spatial.roi.top_left.y,
-                    scan_params.spatial.roi.top_left.x,
-                    scan_params.spatial.roi.size.y,
+            vals = [scan_params.spatial.roi.size.y,
                     scan_params.spatial.roi.size.x,
+                    scan_params.spatial.roi.top_left.y,
+                    scan_params.spatial.roi.top_left.x,
                     scan_params.data.shape.y,
                     scan_params.data.shape.x,
                     scan_params.spatial.roi.angle]
@@ -353,14 +353,20 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         vals = self.param_handler.get_param_list(scan_param_ids)
 
         scan_params = scan_pb2.ScanParameters2d()
-        scan_params.spatial.roi.top_left.x = vals[0]
-        scan_params.spatial.roi.top_left.y = vals[1]
-        scan_params.spatial.roi.size.x = vals[2]
-        scan_params.spatial.roi.size.y = vals[3]
+        if self._set_x_before_y:
+            scan_params.spatial.roi.size.x = vals[0]
+            scan_params.spatial.roi.size.y = vals[1]
+            scan_params.spatial.roi.top_left.x = vals[2]
+            scan_params.spatial.roi.top_left.y = vals[3]
+        else:
+            scan_params.spatial.roi.size.y = vals[0]
+            scan_params.spatial.roi.size.x = vals[1]
+            scan_params.spatial.roi.top_left.y = vals[2]
+            scan_params.spatial.roi.top_left.x = vals[3]
+
         scan_params.spatial.roi.angle = vals[6]
         scan_params.spatial.length_units = length_units
         scan_params.spatial.angular_units = angular_units
-
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(vals[4])
         scan_params.data.shape.y = int(vals[5])

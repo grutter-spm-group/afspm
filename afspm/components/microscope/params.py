@@ -131,17 +131,21 @@ DESCRIPTIONS = {
 }
 
 # ----- Helper lists of Microscope Parameters ----- #
-SCAN_PARAMS_XY = [MicroscopeParameter.SCAN_TOP_LEFT_X,
-                  MicroscopeParameter.SCAN_TOP_LEFT_Y,
-                  MicroscopeParameter.SCAN_SIZE_X,
+# NOTE: size before top-left because we may convert between a top-left and
+# a center definition of an ROI. In either case, the size has to be changed
+# first on any set (because the mapping between coordinate systems depends
+# on the ROI size.).
+SCAN_PARAMS_XY = [MicroscopeParameter.SCAN_SIZE_X,
                   MicroscopeParameter.SCAN_SIZE_Y,
+                  MicroscopeParameter.SCAN_TOP_LEFT_X,
+                  MicroscopeParameter.SCAN_TOP_LEFT_Y,
                   MicroscopeParameter.SCAN_RESOLUTION_X,
                   MicroscopeParameter.SCAN_RESOLUTION_Y,
                   MicroscopeParameter.SCAN_ANGLE]
-SCAN_PARAMS_YX = [MicroscopeParameter.SCAN_TOP_LEFT_Y,
-                  MicroscopeParameter.SCAN_TOP_LEFT_X,
-                  MicroscopeParameter.SCAN_SIZE_Y,
+SCAN_PARAMS_YX = [MicroscopeParameter.SCAN_SIZE_Y,
                   MicroscopeParameter.SCAN_SIZE_X,
+                  MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                  MicroscopeParameter.SCAN_TOP_LEFT_X,
                   MicroscopeParameter.SCAN_RESOLUTION_Y,
                   MicroscopeParameter.SCAN_RESOLUTION_X,
                   MicroscopeParameter.SCAN_ANGLE]
