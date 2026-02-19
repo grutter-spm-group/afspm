@@ -248,12 +248,12 @@ class SXMParam(params.MicroscopeParameterBase):
 # ----- Top-Left Position Methods ----- #
 def center_to_top_left(pos: float, size: float):
     """Go from center -> TL."""
-    return pos + 0.5*size
+    return pos - 0.5*size
 
 
 def top_left_to_center(pos: float, size: float):
     """Go from center -> TL."""
-    return pos - 0.5*size
+    return pos + 0.5*size
 
 
 def get_scan_x(handler: params.ParameterHandler) -> Any:
