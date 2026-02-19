@@ -495,4 +495,4 @@ def set_res_y(handler: params.ParameterHandler,
     # Strangely, we set the *index* of the allowed resolutions to set,
     # but get the actual resolution...
     handler.set_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y,
-                      index, unit)
+                      index, unit, override_methods=True)
