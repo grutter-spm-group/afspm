@@ -40,7 +40,7 @@ def request_action(handler: SXMActionHandler, method_name: str,
         actions.ActionError if the request fails for any reason.
     """
     try:
-        success, __ = handler.client.SendWait(method_name, params)
+        success, __ = handler.client.execute(method_name, params)
         if success:
             return
         else:
