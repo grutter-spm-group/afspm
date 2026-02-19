@@ -46,21 +46,15 @@ def request_action(handler: SXMActionHandler, method_name: str,
             if isinstance(param, str):
                 method_call += "'" + param + "'"
             else:
-                method_call += param
+                method_call += str(param)
             method_call += ','
+        method_call = method_call[0:-1]  # Remove last ,
         method_call += ');'
     logger.trace(f'method_call: {method_call}')
 
     try:
-        success, __ = handler.client.execute(method_call)
-        if success:
-            return
-        else:
-            logger.info('Did not receive response from DDE client for '
-                        f'{method_name}, with {params}.')
-    except actions.ActionError:
-        pass
-
-    msg = f'SXM: Calling {method_name} with args {params} failed.'
-    logger.error(msg)
-    raise actions.ActionError(msg)
+        handler.client.execute(method_call)
+    except Exception as e:
+        msg = f'SXM: Calling {method_name} with args {params} failed: {e}'
+        logger.error(msg)
+        raise actions.ActionError(msg)
