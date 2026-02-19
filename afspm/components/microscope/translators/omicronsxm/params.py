@@ -471,3 +471,28 @@ def set_probe_pos_y(handler: params.ParameterHandler,
 
     handler.set_param(SXMParam.TIP_POS_Y, val, unit)
     handler.set_param(SXMParam.SPEC_POS_Y, val, unit)
+
+
+# Hard-coded allowed resolutions for setting.
+ALLOWED_RESOLUTIONS = [32, 64, 128, 256, 512]
+
+
+def set_res_y(handler: params.ParameterHandler,
+              val: Any, unit: str):
+    """Set scan resolution y-dim.
+
+    The API only seems to allow one of ALLOWED_RESOLUTIONS to be set.
+    Here, we set to the closest resolution and provide a warning if the
+    fed val is not one of these.
+    """
+    diff = [abs(allowed_res - val) for allowed_res in ALLOWED_RESOLUTIONS]
+    index = diff.index(min(diff))
+
+    if diff[index] != 0:
+        logger.warning(f'Fed scan-resolution-y {val} is not one of allowed '
+                       'resolutions. Will set to closest res: '
+                       f'{ALLOWED_RESOLUTIONS[index]}.')
+    # Strangely, we set the *index* of the allowed resolutions to set,
+    # but get the actual resolution...
+    handler.set_param(params.MicroscopeParameter.SCAN_SIZE_Y,
+                      index, unit)
