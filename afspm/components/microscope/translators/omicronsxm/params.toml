@@ -48,7 +48,6 @@ range = [32, 4100]
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_y'
 uuid = 'Pixel'
 type = 1
-range = [32, 4100]
 caller = 'SCAN'
 
 # ----- Feedback Parameters ----- #
