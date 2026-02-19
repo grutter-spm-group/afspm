@@ -250,12 +250,6 @@ class DDEClient(object):
         if not hDdeData:
             raise DDEError("Unable to send command", self._idInst)
         DDE.FreeDataHandle(hDdeData)
-
-        # Loop to flush response. Even though we do not expect returns here,
-        # we do receive a Command structure acknowleging a request was sent
-        # and handled.
-        while self.NotGotAnswer:
-            loop()
         return
 
     def request(self, item, timeout=5000):
@@ -306,8 +300,10 @@ class DDEClient(object):
             self.on_spect_save()
             return
         elif (item.startswith(b'Command')):
-            self.LastAnswer = value
-            self.NotGotAnswer = False
+            value = self._extract_answer(value)
+            if value:
+                self.LastAnswer = value
+                self.NotGotAnswer = False
             return
 
         else:
@@ -354,6 +350,7 @@ class DDEClient(object):
         val = self.config.get(section, item)
         return val
 
+    # TODO: Add timeout for while loop
     def execute_and_return(self, cmd) -> Any | None:
         """Execute a command that returns a val.
 
@@ -362,15 +359,18 @@ class DDEClient(object):
         as a response.
         """
         self.execute(cmd, 1000)
+        while self.NotGotAnswer:
+            loop()   # TODO: Infinite loop. What about if crap happens?
+        return self.LastAnswer
 
-        BackStr = self.LastAnswer
-        BackStr = str(BackStr, 'utf-8').split('\r\n')
-        logger.trace(f'Received answer: {BackStr}')
-        if len(BackStr) >= 2:
-            NrStr = BackStr[1].replace(',', '.')
-            val = float(NrStr)
+    def _extract_answer(answer) -> Any | None:
+        """If empty string, return None."""
+        strs = str(answer, 'utf-8').split('\r\n')
+        if len(strs) >= 2 and strs[1] != '':
+            val = strs[1].replace(',', '.')
+            val = float(val)
             return val
-        return
+        return None
 
     def register_spect_save_callback(self, callback: Callable):
         """Add a callable for when a spectroscopy is saved."""
