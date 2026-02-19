@@ -160,6 +160,11 @@ uuid = 'Scan'
 type = 1
 caller = 'SCAN'
 
+[scan-autosave]
+uuid = 'AUTOSAVE'
+type = 1
+caller = 'SCAN'
+
 [spec-autosave]
 uuid = 'AUTOSAVE'
 type = 1
@@ -170,22 +175,30 @@ uuid = 'Repeat'
 type = 1
 caller = 'SPECTRA'
 
+# NOTE: We cannot get this param, only set!
 [spec-pos-x]  # This is the position where a spec *will* be taken
 uuid = 1
 type = 1.0
 caller = 'SPECTRA'
+unit = 'nm'
 
+# NOTE: We cannot get this param, only set!
 [spec-pos-y]  # This is the position where a spec *will* be taken
 uuid = 2
 type = 1.0
 caller = 'SPECTRA'
+unit = 'nm'
 
+# NOTE: We cannot set this param, only get!
 [tip-pos-x]  # This is the actual position of the probe
 uuid = 2
 type = 1.0
 caller = 'CHANNEL'
+unit = 'nm'
 
+# NOTE: We cannot set this param, only get!
 [tip-pos-y]  # This is the actual position of the probe
 uuid = 3
 type = 1.0
 caller = 'CHANNEL'
+unit = 'nm'

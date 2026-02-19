@@ -228,16 +228,17 @@ class SXMParam(params.MicroscopeParameterBase):
     PIXEL_X_RATIO = 'pixel-x-ratio'
     SPEED_LINES_S = 'speed-lines-s'
     SCAN_STATE = 'scan-state'
+    SCAN_AUTOSAVE = 'scan-autosave'
     SPEC_AUTOSAVE = 'spec-autosave'
     SPEC_REPEAT = 'spec-repeat'
 
     # --- The below are for dealing with probe position --- #
     # Position for running spec.
-    SPEC_POS_X = 'spec-pos-x'
-    SPEC_POS_Y = 'spec-pos-y'
+    SPEC_POS_X = 'spec-pos-x'  # Set only.
+    SPEC_POS_Y = 'spec-pos-y'  # Set only.
     # Actual position of probe.
-    TIP_POS_X = 'tip-pos-x'
-    TIP_POS_Y = 'tip-pos-y'
+    TIP_POS_X = 'tip-pos-x'  # Get only.
+    TIP_POS_Y = 'tip-pos-y'  # Get only.
 
 
 # ---- Special Conversions ----- #
