@@ -189,8 +189,6 @@ class SXMTranslator(ct.ConfigTranslator):
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             if action.action == MicroscopeAction.START_SCAN:
                 self._scope_state = scan_pb2.ScopeState.SS_SCANNING
-            elif action.action == MicroscopeAction.STOP_SCAN:
-                self._scope_state = scan_pb2.ScopeState.SS_FREE
             elif action.action == MicroscopeAction.START_SPEC:
                 self._scope_state = scan_pb2.ScopeState.SS_SPEC
 

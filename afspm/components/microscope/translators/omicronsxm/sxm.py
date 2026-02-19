@@ -289,10 +289,10 @@ class DDEClient(object):
             # Do nothing, we do not appear to hit this.
             return
         elif (value.startswith(b'Scan off')):
-            self.ScanOffCallback()
+            self.on_scan_end_callback()
             return
         elif (item.startswith(b'SaveFileName')):
-            # Do nothing, we determine scanning ends from ScanOffCallback
+            # Do nothing, we determine scanning ends from scan off.
             return
         elif (item.startswith(b'ScanLine')):
             # Do nothing, we don't currently care when ScanLines are sent.
@@ -301,7 +301,9 @@ class DDEClient(object):
             # Do nothing, we don't currently care when the 'mic state' changes.
             return
         elif (item.startswith(b'SpectSave')):
-            self.SpectSave(value)
+            # We determine the spec has ended from it saving (which means
+            # the autosave *must* be on for this to work).
+            self.on_spect_save()
             return
         elif (item.startswith(b'Command')):
             self.LastAnswer = value
@@ -338,7 +340,7 @@ class DDEClient(object):
         if self._scan_end_callback:
             self._scan_end_callback()
 
-    def on_spect_save(self, Value):
+    def on_spect_save(self):
         """Once the spectroscopy ends, trigger callback."""
         if self._spect_save_callback:
             self._spect_save_callback()
