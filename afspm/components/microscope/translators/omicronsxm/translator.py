@@ -74,6 +74,7 @@ class SXMTranslator(ct.ConfigTranslator):
         # Tell parent class that SXM requires setting y before x.
         kwargs[ct.SET_X_BEFORE_Y_KEY] = False
         super().__init__(**kwargs)
+        self._init_scan_settings()
         self._init_spec_settings()
 
     def _init_handlers(self, client: sxm.DDEClient,
@@ -105,6 +106,10 @@ class SXMTranslator(ct.ConfigTranslator):
         and on_scan_spec_end().
         """
         self._scope_state = scan_pb2.ScopeState.SS_FREE
+
+    def _init_scan_settings(self):  # TODO: Can we turn continuous scan OFF?
+        """Set up scan defaults: autosave."""
+        self.param_handler.set_param(params.SXMParam.SCAN_AUTOSAVE, 1)
 
     def _init_spec_settings(self):
         """Set up spec defaults: autosave and do not repeat."""
