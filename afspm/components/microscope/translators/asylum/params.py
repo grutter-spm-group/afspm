@@ -2,6 +2,7 @@
 
 from math import isclose
 import enum
+import math  # for isclose
 import logging
 from typing import Any
 
@@ -243,6 +244,11 @@ def set_scan_size_x(handler: params.ParameterHandler,
     param_info = handler._get_param_info(size_x_uuid)
     desired_val = params._correct_val_for_sending(val, param_info,
                                                   unit)
+
+    if math.isclose(desired_val, 0.0):
+        msg = 'Cannot set scan-size-x due to desired val being 0.'
+        logger.error(msg)
+        raise params.ParameterError(msg)
 
     # Now, must determine the x ratio for this.
     scan_size = handler.get_param(AsylumParam.SCAN_SIZE)

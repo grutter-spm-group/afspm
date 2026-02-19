@@ -3,6 +3,7 @@
 import logging
 
 import enum
+import math  # For isclose
 from dataclasses import dataclass, fields
 from typing import Any
 
@@ -343,6 +344,11 @@ def set_size_x(handler: params.ParameterHandler,
     """
     size_y = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_Y)
 
+    if math.isclose(size_y, 0.0):  # TODO: consider rel_tol?
+        msg = 'Cannot set scan-size-x due to scan-size-y being 0.'
+        logger.error(msg)
+        raise params.ParameterError(msg)
+
     # Ensure within expected ranges!
     gid = params.MicroscopeParameter.SCAN_SIZE_X
     val = params._correct_val_for_sending(
@@ -365,6 +371,11 @@ def set_res_x(handler: params.ParameterHandler,
     before converting to a ratio.
     """
     res_y = handler.get_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y)
+
+    if res_y == 0:
+        msg = 'Cannot set scan-resolution-x due to scan-resolution-y being 0.'
+        logger.error(msg)
+        raise params.ParameterError(msg)
 
     # Ensure within expected ranges!
     gid = params.MicroscopeParameter.SCAN_RESOLUTION_X
