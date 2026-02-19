@@ -509,13 +509,15 @@ class ParameterHandler(metaclass=ABCMeta):
         return val
 
     def set_param(self, generic_param: MicroscopeParameterBase, val: Any,
-                  curr_unit: str = None):
+                  curr_unit: str = None, override_methods: bool = False):
         """Convert a value to appropriate units and set it.
 
         Args:
             generic_param: MicroscopeParameterBase we want to set.
             val: value to set it to, in expected format.
             curr_unit: unit of provided value. optional.
+            override_methods: whether or not we purposefully skip
+                param_methods. Defaults to False.
 
         Raises:
             - ConversionError if the method failed to convert to the
@@ -524,11 +526,12 @@ class ParameterHandler(metaclass=ABCMeta):
                 in the params_config dict.
             - ParameterError if the parameter could not be set.
         """
-        methods = self._get_param_methods(generic_param)
-        if methods and methods.setter:
-            logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
-            methods.setter(self, val, curr_unit)
-            return
+        if not override_methods:
+            methods = self._get_param_methods(generic_param)
+            if methods and methods.setter:
+                logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
+                methods.setter(self, val, curr_unit)
+                return
 
         param_info = self._get_param_info(generic_param)
         if param_info.uuid is None:
