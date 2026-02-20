@@ -363,6 +363,7 @@ class DDEClient(object):
             loop()   # TODO: Infinite loop. What about if crap happens?
         return self.LastAnswer
 
+    @staticmethod
     def _extract_answer(answer) -> Any | None:
         """If empty string, return None."""
         strs = str(answer, 'utf-8').split('\r\n')
