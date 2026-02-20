@@ -301,7 +301,7 @@ class DDEClient(object):
             return
         elif (item.startswith(b'Command')):
             value = self._extract_answer(value)
-            if value:
+            if value is not None:
                 self.LastAnswer = value
                 self.NotGotAnswer = False
             return
