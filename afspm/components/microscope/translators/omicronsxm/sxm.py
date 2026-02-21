@@ -22,6 +22,7 @@ changed by Falk mailbox@anfatec.de
 """
 import logging
 
+import datetime
 from typing import Any, Callable
 from ctypes import POINTER, WINFUNCTYPE, c_char_p, c_void_p, c_int, c_ulong
 from ctypes.wintypes import BOOL, DWORD, LPCWSTR, UINT
@@ -127,6 +128,7 @@ RETURN_TIMEOUT_MS = 1000  # Wait time to receive an error message
 # We modulo our command ID to avoid potential overflow mismatches between
 # the DDE server overflow and our local variable overflow.
 MOD_VAL = 1000
+MILLISECONDS = datetime.timedelta(milliseconds=1)
 
 
 class RequestError(Exception):
@@ -229,7 +231,7 @@ class DDEClient(object):
         self.last_answer = None
         self._scan_end_callback = None
         self._spect_save_callback = None
-        self._command_index = -1
+        self._command_index = None
 
     def __del__(self):
         """Cleanup any active connections."""
@@ -271,7 +273,8 @@ class DDEClient(object):
         DDE.FreeDataHandle(hDdeData)
 
         # Increase command index, as we sent a command.
-        self._command_index += 1
+        if self._command_index is not None:
+            self._command_index += 1
         return
 
     def request(self, item, timeout_ms: int = REQUEST_TIMEOUT_MS):
@@ -322,8 +325,7 @@ class DDEClient(object):
             self.on_spect_save()
             return
         elif (item.startswith(b'Command')):
-            self.last_answer = self._evaluate_response(value,
-                                                       self._command_index)
+            self.last_answer = self._evaluate_response(value)
             return
         else:  # TODO: Should this throw an exception?
             logger.error("Unknown callback %s: %s" % (item, value))
@@ -391,10 +393,10 @@ class DDEClient(object):
             - TimeoutError if we did not receive a response within the wait
                 period.
         """
-        start_dt = create_datetime()
         self._execute(cmd)
         # Wait for response
-        while (create_datetime() - start_dt < wait_ms and
+        start_dt = create_datetime()
+        while ((create_datetime() - start_dt) / MILLISECONDS < wait_ms and
                self.last_answer is not None):
             loop()
         if self.last_answer is None:
@@ -422,16 +424,15 @@ class DDEClient(object):
             - RequestError if we receive an error message as a response.
             - DDEError when a DDE error occurs.
         """
-        start_dt = create_datetime()
         self._execute(cmd)
         # Wait for potential error message. Do not need to check answer
         # as we do not expect one.
-        while create_datetime() - start_dt < wait_ms:
+        start_dt = create_datetime()
+        while (create_datetime() - start_dt) / MILLISECONDS < wait_ms:
             loop()
         return
 
-    @staticmethod
-    def _evaluate_response(answer, command_index: int) -> Any | None:
+    def _evaluate_response(self, answer) -> Any | None:
         """Evalute and extract a potential response.
 
         Responses are fed synchronously and contain the index of the request
@@ -454,14 +455,21 @@ class DDEClient(object):
         """
         strs = str(answer, 'utf-8').split('\r\n')
 
-        if len(str) == 1:
+        if len(strs) == 1:
             logger.trace('Received response with only header. Skipping.')
             return
 
-        received_command_index = strs[0].split(' ')[1]  # Get # from header
+        received_index = strs[0].split(' ')[1]  # Get # from header
         message = strs[1]
 
-        if received_command_index % MOD_VAL == command_index % MOD_VAL:
+        first_command = self._command_index is None
+        indices_match = (not first_command and
+                         received_index % MOD_VAL ==
+                         self._command_index % MOD_VAL)
+
+        if first_command:  # Initialize our counter
+            self._command_index = received_index
+        if indices_match:
             if message == '':
                 return None
             if ERROR_PREFIX in message:
