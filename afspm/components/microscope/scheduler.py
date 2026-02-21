@@ -7,7 +7,6 @@ from .. import component as afspmc
 
 from ...io import common
 from ...io.pubsub import cache as pbc
-from ...io.pubsub.publisher import create_ts
 from ...io.control import router as ctrl_rtr
 
 from ...io.protos.generated import control_pb2
@@ -93,7 +92,7 @@ class MicroscopeScheduler(afspmc.AfspmComponent):
     def _handle_send_control_state(self):
         """Check if a ControlState message needs to be sent (and do if so)."""
         new_control_state = self.router.get_control_state()
-        ts = create_ts()
+        ts = common.create_ts()
 
         if new_control_state != self.control_state:
             logger.debug(f"Sending new control state: {new_control_state}")

@@ -7,7 +7,8 @@ from collections import deque
 
 from afspm.io.pubsub.logic import cache_logic as cl
 from afspm.io.pubsub.logic import pbc_logic as pbc
-from afspm.io.pubsub.publisher import create_message_packet, create_ts
+from afspm.io.pubsub.publisher import create_message_packet
+from afspm.io.common import create_ts
 from afspm.io.protos.generated import scan_pb2
 
 logger = logging.getLogger(__name__)
