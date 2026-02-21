@@ -28,6 +28,8 @@ from ctypes.wintypes import BOOL, DWORD, LPCWSTR, UINT
 
 import configparser
 
+from .....io.common import create_datetime  # For cross-platform datetimes
+
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +115,24 @@ XTYP_SHIFT = 4
 TIMEOUT_ASYNC = 0xFFFFFFFF
 
 
+# Request response error prefix, for checking for request errors.
+ERROR_PREFIX = 'Error'
+# These timeouts are tied to ACKs that the DDE server responded
+COMMAND_TIMEOUT_MS = 5000  # Wait time for DDE communication
+REQUEST_TIMEOUT_MS = 5000  # Wait time for DDE communication
+# These timeouts are times to wait for the server to send an actual response.
+# Curiously, even for a set(), we receive an empty 'actual' response.
+NO_RETURN_TIMEOUT_MS = 100  # Wait time to receive an error message
+RETURN_TIMEOUT_MS = 1000  # Wait time to receive an error message
+# We modulo our command ID to avoid potential overflow mismatches between
+# the DDE server overflow and our local variable overflow.
+MOD_VAL = 1000
+
+
+class RequestError(Exception):
+    """Error tied to a sent requset."""
+
+
 def get_winfunc(libname, funcname, restype=None, argtypes=(), _libcache={}):
     """Retrieve a function from a library, and set the data types."""
     from ctypes import windll
@@ -157,7 +177,7 @@ class DDE(object):
 
 
 class DDEError(RuntimeError):
-    """Exception raise when a DDE errpr occures."""
+    """Exception raise when a DDE error occures."""
 
     def __init__(self, msg, idInst=None):
         """Init our error."""
@@ -206,11 +226,10 @@ class DDEClient(object):
         self.advise('SpectSave')
 
         self.config = configparser.ConfigParser(strict=False)
-        self.NotGotAnswer = False
-        self.LastAnswer = ""
-
+        self.last_answer = None
         self._scan_end_callback = None
         self._spect_save_callback = None
+        self._command_index = -1
 
     def __del__(self):
         """Cleanup any active connections."""
@@ -233,10 +252,10 @@ class DDEClient(object):
                            self._idInst)
         DDE.FreeDataHandle(hDdeData)
 
-    def execute(self, command, timeout=5000):
+    def _execute(self, command, timeout_ms: int = COMMAND_TIMEOUT_MS):
         """Execute a DDE command."""
+        self.last_answer = None
         logger.trace(f'Executing: {command}')
-        self.NotGotAnswer = True
         command = 'begin\r\n  '+command+'\r\nend.\r\n'
         command = bytes(command, 'utf-16')
         command = command.strip(b"\xff")
@@ -245,26 +264,29 @@ class DDEClient(object):
         cbData = DWORD(len(command) + 1)
         # need utf-16 and fmt is ignored? Nov. 16 why?
         hDdeData = DDE.ClientTransaction(pData, cbData, self._hConv, HSZ(),
-                                         CF_TEXT, XTYP_EXECUTE, timeout,
+                                         CF_TEXT, XTYP_EXECUTE, timeout_ms,
                                          LPDWORD())
         if not hDdeData:
             raise DDEError("Unable to send command", self._idInst)
         DDE.FreeDataHandle(hDdeData)
+
+        # Increase command index, as we sent a command.
+        self._command_index += 1
         return
 
-    def request(self, item, timeout=5000):
+    def request(self, item, timeout_ms: int = REQUEST_TIMEOUT_MS):
         """Request data from DDE service."""
         from ctypes import byref
 
         hszItem = DDE.CreateStringHandle(self._idInst, item, 1200)
         hDdeData = DDE.ClientTransaction(LPBYTE(), 0, self._hConv, hszItem,
-                                         CF_TEXT, XTYP_REQUEST, timeout,
+                                         CF_TEXT, XTYP_REQUEST, timeout_ms,
                                          LPDWORD())
         DDE.FreeStringHandle(self._idInst, hszItem)
         if not hDdeData:
             raise DDEError("Unable to request item", self._idInst)
 
-        if timeout != TIMEOUT_ASYNC:
+        if timeout_ms != TIMEOUT_ASYNC:
             pdwSize = DWORD(0)
             pData = DDE.AccessData(hDdeData, byref(pdwSize))
             if not pData:
@@ -300,14 +322,11 @@ class DDEClient(object):
             self.on_spect_save()
             return
         elif (item.startswith(b'Command')):
-            value = self._extract_answer(value)
-            if value is not None:
-                self.LastAnswer = value
-                self.NotGotAnswer = False
+            self.last_answer = self._evaluate_response(value,
+                                                       self._command_index)
             return
-
-        else:
-            logger.error("Unknown callback %s: %s" % (item, value))  # TODO: Should this throw an exception?
+        else:  # TODO: Should this throw an exception?
+            logger.error("Unknown callback %s: %s" % (item, value))
 
     def _callback(self, wType, uFmt, hConv, hsz1, hsz2, hDdeData, dwData1,
                   dwData2):
@@ -350,27 +369,114 @@ class DDEClient(object):
         val = self.config.get(section, item)
         return val
 
-    # TODO: Add timeout for while loop
-    def execute_and_return(self, cmd) -> Any | None:
+    def execute_and_return(self, cmd: str, wait_ms: int = RETURN_TIMEOUT_MS
+                           ) -> Any:
         """Execute a command that returns a val.
 
         The way this is implemented is that the command also prints
         whatever variable it got. The backend here reads what is printed
         as a response.
+
+        Args:
+            cmd: command to be sent.
+            wait_ms: how long we wait for a response. Default is
+                RETURN_TIMEOUT_MS.
+
+        Returns:
+            Received response.
+
+        Raises:
+            - RequestError if we receive an error message as a response.
+            - DDEError when a DDE error occurs.
+            - TimeoutError if we did not receive a response within the wait
+                period.
         """
-        self.execute(cmd, 1000)
-        while self.NotGotAnswer:
-            loop()   # TODO: Infinite loop. What about if crap happens?
-        return self.LastAnswer
+        start_dt = create_datetime()
+        self._execute(cmd)
+        # Wait for response
+        while (create_datetime() - start_dt < wait_ms and
+               self.last_answer is not None):
+            loop()
+        if self.last_answer is None:
+            msg = f'Did not receive response for {cmd}.'
+            logger.error(msg)
+            raise TimeoutError(msg)
+        return self.last_answer
+
+    def execute_no_return(self, cmd: str, wait_ms: int = NO_RETURN_TIMEOUT_MS
+                          ) -> None:
+        """Execute a command that does not expect a return.
+
+        Note that we still wait a minimum time, to ensure an error message
+        is not received.
+
+        Args:
+            cmd: command to be sent.
+            wait_ms: how long we wait for a potential error message. Default is
+                NO_RETURN_TIMEOUT_MS.
+
+        Returns:
+            None.
+
+        Raises:
+            - RequestError if we receive an error message as a response.
+            - DDEError when a DDE error occurs.
+        """
+        start_dt = create_datetime()
+        self._execute(cmd)
+        # Wait for potential error message. Do not need to check answer
+        # as we do not expect one.
+        while create_datetime() - start_dt < wait_ms:
+            loop()
+        return
 
     @staticmethod
-    def _extract_answer(answer) -> Any | None:
-        """If empty string, return None."""
+    def _evaluate_response(answer, command_index: int) -> Any | None:
+        """Evalute and extract a potential response.
+
+        Responses are fed synchronously and contain the index of the request
+        in the header.
+        The response may be:
+        - An empty string, if the request was a set() or action and it
+        succeeded.
+        - A string beginning with 'Error' if an error occurred during the call.
+        - A float or int value, if the request was a get().
+
+        This method will parse the response. For a response that corresponds to
+        the fed command_index, we will:
+        - Raise a RequestError if an error string was received.
+        - If we received a non-empty string, we will return it.
+        - In all other cases, we return None.
+
+        Separately, if we received an error string, we will log a warning. It is
+        possible that an error independent of our request causes the interface to
+        break.
+        """
         strs = str(answer, 'utf-8').split('\r\n')
-        if len(strs) >= 2 and strs[1] != '':
-            val = strs[1].replace(',', '.')
+
+        if len(str) == 1:
+            logger.trace('Received response with only header. Skipping.')
+            return
+
+        received_command_index = strs[0].split(' ')[1]  # Get # from header
+        message = strs[1]
+
+        if received_command_index % MOD_VAL == command_index % MOD_VAL:
+            if message == '':
+                return None
+            if ERROR_PREFIX in message:
+                logger.error(message)
+                raise RequestError(message)
+
+            # Extract response
+            val = message.replace(',', '.')
             val = float(val)
             return val
+        # Separately, warn user if we got an error not related to our latest
+        # response.
+        if ERROR_PREFIX in message:
+            msg = (f'Received error: {message}')
+            logger.warning(msg)
         return None
 
     def register_spect_save_callback(self, callback: Callable):

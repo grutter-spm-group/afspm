@@ -53,7 +53,7 @@ def request_action(handler: SXMActionHandler, method_name: str,
     logger.trace(f'method_call: {method_call}')
 
     try:
-        handler.client.execute(method_call)
+        handler.client.execute_no_return(method_call)
     except Exception as e:
         msg = f'SXM: Calling {method_name} with args {params} failed: {e}'
         logger.error(msg)

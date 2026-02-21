@@ -183,7 +183,7 @@ class SXMParameterHandler(params.ParameterHandler):
         try:
             if isinstance(attr, str):
                 attr = "'" + attr + "'"
-            self.client.execute(substr + f"({attr},{val});")
+            self.client.execute_no_return(substr + f"({attr},{val});")
         except Exception as e:
             msg = f"Error setting scan parameter {attr} to {val}: {e}"
             logger.error(msg)
@@ -192,7 +192,7 @@ class SXMParameterHandler(params.ParameterHandler):
     def _switch_feedback_mode(self, mode: FeedbackMode):
         """Switch to using the appropriate feedback mode."""
         ratio = 0 if mode == FeedbackMode.AFM else 100
-        self.client.execute(f"SendFeedPara('Ratio', {ratio})")
+        self.client.execute_no_return(f"SendFeedPara('Ratio', {ratio})")
         # Change Ki/Kp value for appropriate mode.
         gid = params.MicroscopeParameter.ZCTRL_PGAIN
         info = self._get_param_info(gid)
@@ -205,6 +205,9 @@ class SXMParameterHandler(params.ParameterHandler):
         self.param_infos[gid] = info
 
         self.mode = mode
+
+        # TODO: Need to override on_set_scan_params, b/c the order for
+        # x/y is wrong. You need to set y first and THEN x.
 
 
 class SXMParam(params.MicroscopeParameterBase):
