@@ -191,6 +191,7 @@ class SXMTranslator(ct.ConfigTranslator):
                 self._scope_state = scan_pb2.ScopeState.SS_SCANNING
             elif action.action == MicroscopeAction.START_SPEC:
                 self._scope_state = scan_pb2.ScopeState.SS_SPEC
+        return rep
 
 
 # TODO: Consider pulling client up to translator level if it needs resetting?
