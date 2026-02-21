@@ -58,7 +58,7 @@ START_PERF = time.perf_counter()
 
 def create_datetime():
     """Create datetime for this moment."""
-    return START_DATETIME + timedelta(time.perf_counter() -
+    return START_DATETIME + timedelta(seconds=time.perf_counter() -
                                       START_PERF)
 
 
