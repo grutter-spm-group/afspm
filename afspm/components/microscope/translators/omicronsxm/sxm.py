@@ -459,7 +459,7 @@ class DDEClient(object):
             logger.trace('Received response with only header. Skipping.')
             return
 
-        received_index = int(strs[0].split(' ')[1])  # Get # from header
+        received_index = int(strs[0].split(' ')[2])  # Get # from header
         message = strs[1]
 
         first_command = self._command_index is None
