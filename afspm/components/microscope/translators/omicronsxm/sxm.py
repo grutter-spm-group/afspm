@@ -397,7 +397,7 @@ class DDEClient(object):
         # Wait for response
         start_dt = create_datetime()
         while ((create_datetime() - start_dt) / MILLISECONDS < wait_ms and
-               self.last_answer is not None):
+               self.last_answer is None):
             loop()
         if self.last_answer is None:
             msg = f'Did not receive response for {cmd}.'
