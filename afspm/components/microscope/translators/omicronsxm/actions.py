@@ -3,7 +3,7 @@
 import logging
 
 from ... import actions
-from .sxm import DDEClient
+from . import sxm
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ class SXMActionHandler(actions.ActionHandler):
         client: DDE client, used to communicate with the SXM controller.
     """
 
-    def __init__(self, client: DDEClient, **kwargs):
+    def __init__(self, client: sxm.DDEClient, **kwargs):
         """Init our SXM handler, feeding the DDE Client."""
         if client is None:
             msg = "No client provided, cannot continue!"
@@ -54,7 +54,7 @@ def request_action(handler: SXMActionHandler, method_name: str,
 
     try:
         handler.client.execute_no_return(method_call)
-    except Exception as e:
+    except sxm.RequestError as e:
         msg = f'SXM: Calling {method_name} with args {params} failed: {e}'
         logger.error(msg)
         raise actions.ActionError(msg)

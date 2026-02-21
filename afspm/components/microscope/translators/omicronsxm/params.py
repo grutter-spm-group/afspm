@@ -8,7 +8,7 @@ from dataclasses import dataclass, fields
 from typing import Any
 
 from ... import params
-from .sxm import DDEClient
+from . import sxm
 
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class SXMParameterHandler(params.ParameterHandler):
 
     DEFAULT_MODE = FeedbackMode.AFM
 
-    def __init__(self, client: DDEClient, mode: FeedbackMode = DEFAULT_MODE,
+    def __init__(self, client: sxm.DDEClient, mode: FeedbackMode = DEFAULT_MODE,
                  **kwargs):
         """Override create_parameter_info for our special one.
 
@@ -165,12 +165,10 @@ class SXMParameterHandler(params.ParameterHandler):
                 logger.error(msg)
                 raise Exception(msg)
 
-        except Exception as e:
-            # Or should I simply allow the code to crash if there's an error in
-            # Anfatec's code? TODO
-            msg = f"Error in SXM's Python interface while getting {attr}: {e}"
+        except (sxm.RequestError, TimeoutError) as e:
+            msg = f"Error getting scan parameter {attr}: {e}"
             logger.error(msg)
-            raise Exception(msg)
+            raise params.ParameterError(msg)
 
     def set_param_spm(self, spm_uuid: str | int, spm_val: Any):
         """Override for SPM-specific setter."""
@@ -184,7 +182,7 @@ class SXMParameterHandler(params.ParameterHandler):
             if isinstance(attr, str):
                 attr = "'" + attr + "'"
             self.client.execute_no_return(substr + f"({attr},{val});")
-        except Exception as e:
+        except sxm.RequestError as e:
             msg = f"Error setting scan parameter {attr} to {val}: {e}"
             logger.error(msg)
             raise params.ParameterError(msg)
