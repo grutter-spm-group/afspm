@@ -204,9 +204,6 @@ class SXMParameterHandler(params.ParameterHandler):
 
         self.mode = mode
 
-        # TODO: Need to override on_set_scan_params, b/c the order for
-        # x/y is wrong. You need to set y first and THEN x.
-
 
 class SXMParam(params.MicroscopeParameterBase):
     """SXM-specific parameters, used as 'generic' names in config.
