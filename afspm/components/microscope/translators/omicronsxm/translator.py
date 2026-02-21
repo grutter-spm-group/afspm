@@ -194,7 +194,6 @@ class SXMTranslator(ct.ConfigTranslator):
         return rep
 
 
-# TODO: Consider pulling client up to translator level if it needs resetting?
 def _init_action_handler(client: sxm.DDEClient
                          ) -> actions.SXMActionHandler:
     """Initialize SXM action handler pointing to default config."""
