@@ -118,8 +118,8 @@ TIMEOUT_ASYNC = 0xFFFFFFFF
 # Request response error prefix, for checking for request errors.
 ERROR_PREFIX = 'Error'
 # These timeouts are tied to ACKs that the DDE server responded
-COMMAND_TIMEOUT_MS = 5000  # Wait time for DDE communication
-REQUEST_TIMEOUT_MS = 5000  # Wait time for DDE communication
+COMMAND_TIMEOUT_MS = 250  # Wait time for DDE communication
+REQUEST_TIMEOUT_MS = 250  # Wait time for DDE communication
 # These timeouts are times to wait for the server to send an actual response.
 # Curiously, even for a set(), we receive an empty 'actual' response.
 NO_RETURN_TIMEOUT_MS = 100  # Wait time to receive an error message
