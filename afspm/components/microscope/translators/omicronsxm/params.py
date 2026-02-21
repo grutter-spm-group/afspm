@@ -99,15 +99,25 @@ def validate_parameter(param_info: params.ParameterInfo,
 class SXMParameterHandler(params.ParameterHandler):
     """Implements SXM-specific getter/setter logic for parameter handling.
 
+    Notes:
+    - The probe position set() and get() calls are in different coordinate
+    systems (see readme)! To be consistent, we store a correction ratio in
+    _cs_correction_ratio.
+
     Attributes:
         client: DDE client used to communicate with SXM.
         uuid_to_caller_map: holds the CallerType for a given specific uuid.
         mode: FeedbackMode we are to be running in.
+        cs_correction_ratio: [x, y] indicating correction ratio between
+            get probe position and set probe position. Needed to properly
+            set.
     """
 
     DEFAULT_MODE = FeedbackMode.AFM
+    DEFAULT_CS_CORRECTION_RATIO = [3.964, 3.704]
 
     def __init__(self, client: sxm.DDEClient, mode: FeedbackMode = DEFAULT_MODE,
+                 cs_correction_ratio: list[int] = DEFAULT_CS_CORRECTION_RATIO,
                  **kwargs):
         """Override create_parameter_info for our special one.
 
@@ -118,6 +128,7 @@ class SXMParameterHandler(params.ParameterHandler):
         """
         self.client = client
         self.uuid_to_caller_map = {}
+        self.cs_correction_ratio = cs_correction_ratio
         kwargs['param_info_init'] = create_parameter_info
         kwargs['validate_parameter'] = validate_parameter
         super().__init__(**kwargs)
@@ -430,14 +441,26 @@ def set_scan_speed(handler: params.ParameterHandler,
     handler.set_param(SXMParam.SPEED_LINES_S)
 
 
+# ----- Probe Position Methods ----- #
+def get_to_set_cs(val: float, offset: float, correction_ratio: float) -> float:
+    """Correct from the get CS to set CS."""
+    return val + offset / correction_ratio
+
+
+def set_to_get_cs(val: float, offset: float, correction_ratio: float) -> float:
+    """Correct from the set to get CS."""
+    return val - offset / correction_ratio
+
+
 def get_probe_pos_x(handler: params.ParameterHandler) -> Any:
     """Get Probe Position (X-).
 
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
+
+    Of note: we get via TIP_POS_X and set via SPEC_POS_X.
     """
     return handler.get_param(SXMParam.TIP_POS_X)
-    # TODO: do I need to do any CS conversion? It's in abs pos.
 
 
 def get_probe_pos_y(handler: params.ParameterHandler) -> Any:
@@ -445,9 +468,10 @@ def get_probe_pos_y(handler: params.ParameterHandler) -> Any:
 
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
+
+    Of note: we get via TIP_POS_Y and set via SPEC_POS_Y.
     """
     return handler.get_param(SXMParam.TIP_POS_Y)
-    # TODO: do I need to do any CS conversion? It's in abs pos.
 
 
 def set_probe_pos_x(handler: params.ParameterHandler,
@@ -457,14 +481,17 @@ def set_probe_pos_x(handler: params.ParameterHandler,
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
 
-    For setting, we must set both (a) the spec position, and (b)
-    the probe position.
+    Of note: we get via TIP_POS_X and set via SPEC_POS_X.
     """
+    offset_uuid = SXMParam.CENTER_X,
+    offset = handler.get_param(offset_uuid)
+
     gid = params.MicroscopeParameter.PROBE_POS_X
     val = params._correct_val_for_sending(
         val, handler._get_param_info(gid), unit, gid)
 
-    handler.set_param(SXMParam.TIP_POS_X, val, unit)
+    # Convert to 'set' CS.
+    val = get_to_set_cs(val, offset, handler.cs_correction_ratio[0])
     handler.set_param(SXMParam.SPEC_POS_X, val, unit)
 
 
@@ -474,12 +501,18 @@ def set_probe_pos_y(handler: params.ParameterHandler,
 
     The interface for accessing this is non-standard, this is why
     the custom functions are needed.
+
+    Of note: we get via TIP_POS_Y and set via SPEC_POS_Y.
     """
+    offset_uuid = SXMParam.CENTER_Y,
+    offset = handler.get_param(offset_uuid)
+
     gid = params.MicroscopeParameter.PROBE_POS_Y
     val = params._correct_val_for_sending(
         val, handler._get_param_info(gid), unit, gid)
 
-    handler.set_param(SXMParam.TIP_POS_Y, val, unit)
+    # Convert to 'set' CS.
+    val = get_to_set_cs(val, offset, handler.cs_correction_ratio[1])
     handler.set_param(SXMParam.SPEC_POS_Y, val, unit)
 
 
