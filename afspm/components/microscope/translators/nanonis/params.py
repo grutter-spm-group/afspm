@@ -136,7 +136,9 @@ class NanonisParameterHandler(params.ParameterHandler):
             # Store index information
             self._uuid_to_struct_index_map[val.uuid] = val.index
 
+        # Set up hard-coded parameters
         self._load_status_logic()
+        self._load_spec_setting_logic()
 
     def _load_status_logic(self):
         """Load status Req/Rep logic, which is not in the TOMLs.
@@ -148,6 +150,13 @@ class NanonisParameterHandler(params.ParameterHandler):
             _create_status_reqrep_map_entries())
         self._uuid_to_struct_index_map.update(
             _create_status_struct_index_entries())
+
+    def _load_spec_setting_logic(self):
+        self.param_infos.update(_create_spec_setting_param_info_entries())
+        self._uuid_to_reqrep_set_map.update(
+            _create_spec_setting_reqrep_map_entries())
+        self._uuid_to_struct_index_map.update(
+            _create_spec_setting_struct_index_entries())
 
     # --- Helpers to try/catch KeyErrors --- #
     def _get_getter_req_rep(self, spm_uuid: str) -> base.NanonisReqRep:
@@ -329,7 +338,7 @@ class NanonisParam(params.MicroscopeParameterBase):
     SCAN_CONTINUOUS_SCAN = 'scan-continuous-scan'
     SCAN_AUTO_SAVE = 'scan-auto-save'
 
-    # Spectra startup settings
+    # Spectra startup settings (setters only)
     BIAS_SPEC_AUTO_SAVE = 'bias-spec-auto-save'
     BIAS_SHOW_SAVE_DIALOG = 'bias-spec-save-dialog'
     Z_SPEC_AUTO_SAVE = 'z-spec-auto-save'
@@ -489,6 +498,58 @@ def _create_status_struct_index_entries() -> dict:
     index_map = {}
     for uuid in STATUS_UUIDS:
         index_map[uuid] = 0
+    return index_map
+
+
+# ----- Hard-coded spec autosave properties ----- %
+# The set and get structures for spectroscopy props are quite dissimilar,
+# and in fact the getter does not return the info we want (autosave and
+# save dialog). So, we only have structs defined for the setters and
+# manually add them via methods here.
+
+SPEC_SETTING_GENERIC_IDS = [NanonisParam.BIAS_SPEC_AUTO_SAVE,
+                            NanonisParam.BIAS_SPEC_STATUS,
+                            NanonisParam.Z_SPEC_AUTO_SAVE,
+                            NanonisParam.Z_SPEC_STATUS]
+SPEC_SETTING_UUIDS = [BASE_UUID + 'spectroscopy.BiasSpectraProps',
+                      BASE_UUID + 'spectroscopy.BiasSpectraProps',
+                      BASE_UUID + 'spectroscopy.ZSpectraProps',
+                      BASE_UUID + 'spectroscopy.ZSpectraProps']
+SPEC_SETTING_INDICES = [5, 6, 3, 4]
+
+
+def _create_spec_setting_param_info_entries() -> dict:
+    """Equivalent to _create_status_param_info_entries() for spec setting."""
+    param_info_map = {}
+    for generic_id, uuid in zip(SPEC_SETTING_GENERIC_IDS,
+                                SPEC_SETTING_UUIDS):
+        info = params.ParameterInfo(uuid, unit=None, range=None,
+                                    type=1)  # int for all statuses
+        param_info_map[generic_id] = info
+    return param_info_map
+
+
+def _create_spec_setting_reqrep_map_entries() -> dict:
+    """Equivalent to _create_status_reqrep_map_entries() for spec setting.
+
+    In this case, only setters are added.
+    """
+    reqrep_map = {}
+    for uuid in SPEC_SETTING_UUIDS:
+        # Store get information
+        req = _evaluate_value_str(uuid + base.SET_REQ)()
+        rep = _evaluate_value_str(uuid + base.SET_REP)()
+        reqrep = base.NanonisReqRep(req, rep)
+        reqrep_map[uuid] = reqrep
+    return reqrep_map
+
+
+def _create_spec_setting_struct_index_entries() -> dict:
+    """Equivalent to _create_status_struct_index_entries() for spec setting."""
+    index_map = {}
+    for uuid, index in zip(SPEC_SETTING_UUIDS,
+                           SPEC_SETTING_INDICES):
+        index_map[uuid] = index
     return index_map
 
 

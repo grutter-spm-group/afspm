@@ -45,9 +45,6 @@ class NanonisTranslator(ct.ConfigTranslator):
         _old_spec: the last spec, to send out if it has not changed.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
-
-        _old_setup_props: holds original setup properties, so we may revert to
-            it on closing.
     """
 
     DEFAULT_MODE = spectroscopy.SpectroscopyMode.BIAS
@@ -72,7 +69,6 @@ class NanonisTranslator(ct.ConfigTranslator):
         self._old_scans = []
         self._old_spec_path = None
         self._old_spec = None
-        self._old_setup_props = None
 
         # Default initialization of handler
         kwargs = self._init_handlers(client, param_handler, action_handler,
@@ -83,9 +79,7 @@ class NanonisTranslator(ct.ConfigTranslator):
         super().__init__(**kwargs)
 
         # Store current setup properties and set to our desired ones.
-        self._old_setup_props = self.get_setup_properties()
         self.set_setup_properties(self.DESIRED_SETUP_PROPERTIES)
-
         self.set_spectroscopy_mode(mode)
 
     def _init_handlers(self, client: NanonisClient,
@@ -145,39 +139,6 @@ class NanonisTranslator(ct.ConfigTranslator):
     # Here, we override composite setters / getters to avoid unnecessary
     # get/set calls (look at this issue in params.py).
     # TODO: Consider implementing?
-
-    def get_setup_properties(self) -> params.SetupProperties:
-        """Get the current SetupProperties."""
-        setup_props = params.SetupProperties()
-
-        # Get scan properties
-        scan_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.SCAN_AUTO_SAVE).uuid
-        rep = self.param_handler._get_param_spm_rep(scan_props_uuid)
-        setup_props.scan_auto_save = base.SettingState(rep.auto_save).value
-        setup_props.scan_continuous_scan = base.SettingState(
-            rep.continuous_scan).value
-
-        # Get spec properties
-        z_spec_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.Z_SPEC_AUTO_SAVE).uuid
-        z_rep = self.param_handler._get_param_spm_rep(z_spec_props_uuid)
-
-        bias_spec_props_uuid = self.param_handler._get_param_info(
-            params.NanonisParam.BIAS_SPEC_AUTO_SAVE).uuid
-        bias_rep = self.param_handler._get_param_spm_rep(
-            bias_spec_props_uuid)
-
-        if z_rep.auto_save != bias_rep.auto_save:
-            logger.warning('Get: Z-Spec and Bias-Spec differ in auto-save'
-                           ' setting, storing bias.')
-        if z_rep.show_save_dialog != bias_rep.show_save_dialog:
-            logger.warning('Get: Z-Spec and Bias-Spec differ in auto-save'
-                           ' setting, storing Bias-Spec.')
-        setup_props.spec_auto_save = bias_rep.auto_save
-        setup_props.spec_save_dialog = bias_rep.show_save_dialog
-
-        return setup_props
 
     def set_setup_properties(self, props: params.SetupProperties):
         """Set the current SetupProperties."""

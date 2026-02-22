@@ -167,8 +167,8 @@ class ZSpectraStatusGetRep(ZSpectraStatusGet, ZSpectraStatusStruct):
 
 
 @dataclass
-class SpectraPropsStruct(base.NanonisMessage):
-    """Spectroscopy properties.
+class BiasSpectraPropsSetStruct(base.NanonisMessage):
+    """Bias Spectroscopy properties.
 
     This struct is mainly used to set up auto-saving spectroscopies.
 
@@ -189,11 +189,6 @@ class SpectraPropsStruct(base.NanonisMessage):
         return 'HiHifHH'
 
 
-# Pseudonyms for consistency
-BiasSpectraPropsStruct = SpectraPropsStruct
-ZSpectraPropsStruct = SpectraPropsStruct
-
-
 class BiasSpectraPropsSet(base.NanonisMessage):
     """Bias spectroscopy properties set."""
 
@@ -204,12 +199,32 @@ class BiasSpectraPropsSet(base.NanonisMessage):
 
 
 class BiasSpectraPropsSetReq(base.NanonisRequest, BiasSpectraPropsSet,
-                             BiasSpectraPropsStruct):
+                             BiasSpectraPropsSetStruct):
     """Bias spectroscopy properties set request."""
 
 
 class BiasSpectraPropsSetRep(base.EmptyResponse, BiasSpectraPropsSet):
     """Bias spectroscopy properties set response."""
+
+
+@dataclass
+class ZSpectraPropsSetStruct(base.NanonisMessage):
+    """Z Spectroscopy properties.
+
+    This struct is mainly used to set up auto-saving spectroscopies.
+    """
+
+    backward_sweep: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+    number_of_points: int = base.NO_CHANGE_VAL  # 4 byts, int32
+    # NOTE: number_of_sweeps for ZSpectra diff from bias spectra...
+    number_of_sweeps: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+    auto_save: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+    show_save_dialog: int = base.NO_CHANGE_VAL  # 2 byts, unsigned int16
+    save_all: int = base.NO_CHANGE_VAL  # 2 bytse, unsigned int16
+
+    def format(self) -> str:
+        """Override."""
+        return 'HiHHHH'
 
 
 class ZSpectraPropsSet(base.NanonisMessage):
@@ -222,7 +237,7 @@ class ZSpectraPropsSet(base.NanonisMessage):
 
 
 class ZSpectraPropsSetReq(base.NanonisRequest, ZSpectraPropsSet,
-                          ZSpectraPropsStruct):
+                          ZSpectraPropsSetStruct):
     """Z spectroscopy properties set request."""
 
 
@@ -230,40 +245,45 @@ class ZSpectraPropsSetRep(base.EmptyResponse, ZSpectraPropsSet):
     """Z spectroscopy properties set response."""
 
 
-class BiasSpectraPropsGet(base.NanonisMessage):
-    """Bias spectroscopy properties get."""
+# @dataclass
+# class BiasSpectraPropsGetStruct(base.NanonisMessage):
+#     """BiasSpectraProps get struct."""
 
-    @staticmethod
-    def get_command_name() -> str:
-        """Override."""
-        return 'BiasSpectr.PropsGet'
+#     save_all: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+#     number_of_sweeps: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     backward_sweep: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+#     number_of_points: int = base.NO_CHANGE_VAL  # 4 bytes, int32
 
-
-class BiasSpectraPropsGetReq(base.EmptyRequest, BiasSpectraPropsGet):
-    """Bias spectroscopy properties get request."""
-
-
-class BiasSpectraPropsGetRep(base.NanonisResponse, BiasSpectraPropsGet,
-                             BiasSpectraPropsStruct):
-    """Bias spectroscopy properties set response."""
-
-
-class ZSpectraPropsGet(base.NanonisMessage):
-    """Z spectroscopy properties get."""
-
-    @staticmethod
-    def get_command_name() -> str:
-        """Override."""
-        return 'ZSpectr.PropsGet'
+#     channels_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     number_of_channels: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     channels: list[str] = field(default_factory=list)  # list str
+#     parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     number_of_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     parameters: list[str] = field(default_factory=list)  # list str
+#     fixed_parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     number_of_fixed_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     fixed_parameters: list[str] = field(default_factory=list)  # list str
 
 
-class ZSpectraPropsGetReq(base.EmptyRequest, ZSpectraPropsGet):
-    """Z spectroscopy properties get request."""
+# @dataclass
+# class ZSpectraPropsGetStruct(base.NanonisMessage):
+#     """ZSpectraProps get struct."""
 
+#     backward_sweep: int = base.NO_CHANGE_VAL
+#     number_of_points: int = base.NO_CHANGE_VAL  # 4 byts, int32
 
-class ZSpectraPropsGetRep(base.NanonisResponse, ZSpectraPropsGet,
-                          ZSpectraPropsStruct):
-    """Z spectroscopy properties set response."""
+#     channels_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     number_of_channels: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     channels: list[str] = field(default_factory=list)  # list str
+#     parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     number_of_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     parameters: list[str] = field(default_factory=list)  # list str
+#     fixed_parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     number_of_fixed_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
+#     fixed_parameters: list[str] = field(default_factory=list)  # list str
+
+#     number_of_sweeps: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
+#     save_all: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int 16
 
 
 class SpectroscopyMode(enum.Enum):

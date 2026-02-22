@@ -147,23 +147,3 @@ index = 0
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanProps'
 type = 1
 index = 2
-
-[bias-spec-auto-save]
-uuid = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.BiasSpectraProps'
-type = 1
-index = 5
-
-[bias-spec-save-dialog]
-uuid = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.BiasSpectraProps'
-type = 1
-index = 6
-
-[z-spec-auto-save]
-uuid = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.ZSpectraProps'
-type = 1
-index = 5
-
-[z-spec-save-dialog]
-uuid = 'afspm.components.microscope.translators.nanonis.message.spectroscopy.ZSpectraProps'
-type = 1
-index = 6
