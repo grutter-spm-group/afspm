@@ -115,9 +115,15 @@ XTYP_SHIFT = 4
 
 TIMEOUT_ASYNC = 0xFFFFFFFF
 
+PM_NOREMOVE = 0x0000
+PM_REMOVE = 0x0001
+PM_NOYIELD = 0x0002
+
 
 # Request response error prefix, for checking for request errors.
 ERROR_PREFIX = 'Error'
+# Response to set() call
+SET_RESPONSE = ''
 # These timeouts are tied to ACKs that the DDE server responded
 COMMAND_TIMEOUT_MS = 250  # Wait time for DDE communication
 REQUEST_TIMEOUT_MS = 250  # Wait time for DDE communication
@@ -503,8 +509,8 @@ def loop():
 
     LPMSG = POINTER(MSG)
     LRESULT = c_ulong
-    GetMessage = get_winfunc("user32", "GetMessageW", BOOL, (LPMSG, HWND, UINT,
-                                                             UINT))
+    PeekMessage = get_winfunc("user32", "PeekMessageW", BOOL,
+                              (LPMSG, HWND, UINT, UINT, UINT))
     TranslateMessage = get_winfunc("user32", "TranslateMessage", BOOL,
                                    (LPMSG,))
     DispatchMessage = get_winfunc("user32", "DispatchMessageW", LRESULT,
@@ -512,6 +518,12 @@ def loop():
 
     msg = MSG()
     lpmsg = byref(msg)
-    GetMessage(lpmsg, HWND(), 0, 0)
-    TranslateMessage(lpmsg)
-    DispatchMessage(lpmsg)
+    res = PeekMessage(lpmsg, HWND(), 0, 0, PM_REMOVE)
+    if res > 0:
+        TranslateMessage(lpmsg)
+        DispatchMessage(lpmsg)
+
+
+def time_has_passed(start_dt: datetime.datetime, wait_ms: int) -> bool:
+    """Whether or not wait_ms has passed since start_dt."""
+    return (create_datetime() - start_dt) / MILLISECONDS >= wait_ms
