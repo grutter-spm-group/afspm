@@ -402,10 +402,9 @@ class DDEClient(object):
         self._execute(cmd)
         # Wait for response
         start_dt = create_datetime()
-        while ((create_datetime() - start_dt) / MILLISECONDS < wait_ms and
-               self.last_answer is None):
+        while not self._received_message_or_time_has_passed(start_dt, wait_ms):
             loop()
-        if self.last_answer is None:
+        if self.last_answer in (None, SET_RESPONSE):
             msg = f'Did not receive response for {cmd}.'
             logger.error(msg)
             raise TimeoutError(msg)
@@ -431,12 +430,20 @@ class DDEClient(object):
             - DDEError when a DDE error occurs.
         """
         self._execute(cmd)
-        # Wait for potential error message. Do not need to check answer
-        # as we do not expect one.
         start_dt = create_datetime()
-        while (create_datetime() - start_dt) / MILLISECONDS < wait_ms:
+        while not self._received_message_or_time_has_passed(start_dt, wait_ms):
             loop()
+        # Not checking if we received a message, as some set/action calls take
+        # a long time (e.g. starting a scan or spectroscopy).
+        # The loop exists to catch error messages.
         return
+
+    def _received_message_or_time_passed(self, start_dt: datetime.datetime,
+                                         wait_ms: int) -> bool:
+        """Check if a message was received or sufficient time has passed."""
+        time_passed = time_has_passed(start_dt, wait_ms)
+        message_received = self.last_answer is not None
+        return time_passed or message_received
 
     def _evaluate_response(self, answer) -> Any | None:
         """Evalute and extract a potential response.
@@ -452,12 +459,12 @@ class DDEClient(object):
         This method will parse the response. For a response that corresponds to
         the fed command_index, we will:
         - Raise a RequestError if an error string was received.
-        - If we received a non-empty string, we will return it.
-        - In all other cases, we return None.
+        - Otherwise, we return the received mOtherwise, we return the received
+        message.
 
-        Separately, if we received an error string, we will log a warning. It is
-        possible that an error independent of our request causes the interface to
-        break.
+        Separately, if we received an error string, we will log a warning. It
+        is possible that an error independent of our request causes the
+        interface to break.
         """
         strs = str(answer, 'utf-8').split('\r\n')
 
@@ -476,16 +483,15 @@ class DDEClient(object):
         if first_command:  # Initialize our counter
             self._command_index = received_index
         if first_command or indices_match:
-            if message == '':
-                return None
             if ERROR_PREFIX in message:
                 logger.error(message)
                 raise RequestError(message)
-
-            # Extract response
-            val = message.replace(',', '.')
-            val = float(val)
-            return val
+            elif message == SET_RESPONSE:
+                return message
+            else:  # Get response
+                val = message.replace(',', '.')
+                val = float(val)
+                return val
         # Separately, warn user if we got an error not related to our latest
         # response.
         if ERROR_PREFIX in message:
