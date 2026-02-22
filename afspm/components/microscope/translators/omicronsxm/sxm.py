@@ -328,7 +328,7 @@ class DDEClient(object):
         elif (item.startswith(b'SpectSave')):
             # We determine the spec has ended from it saving (which means
             # the autosave *must* be on for this to work).
-            self.on_spect_save()
+            self.on_spect_save(value)
             return
         elif (item.startswith(b'Command')):
             self.last_answer = self._evaluate_response(value)
@@ -363,10 +363,10 @@ class DDEClient(object):
         if self._scan_end_callback:
             self._scan_end_callback()
 
-    def on_spect_save(self):
+    def on_spect_save(self, filename: str):
         """Once the spectroscopy ends, trigger callback."""
         if self._spect_save_callback:
-            self._spect_save_callback()
+            self._spect_save_callback(filename)
 
     def get_ini_entry(self, section, item):
         """Get current iniFile."""

@@ -48,6 +48,14 @@ class SXMTranslator(ct.ConfigTranslator):
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
         _scope_state: holds the current client.
+        _probe_pos_moving: bool, holds whether we have been moving the probe
+            pos.
+
+        _prior_spec_mode: index for prior spectroscopy mode. Saved for when
+            we need to run a 'fake spec'.
+        _prior_spec_vals: prior spectroscopy mode settings. Saved for when
+            we need to run a 'fake spec'.
+
         _client: SXM client.
     """
 
@@ -64,6 +72,11 @@ class SXMTranslator(ct.ConfigTranslator):
         self._old_spec_path = None
         self._old_spec = None
         self._scope_state = scan_pb2.ScopeState.SS_FREE
+        self._probe_pos_moving = False
+
+        self._prior_spec_mode = None
+        self._prior_spec_vals = None
+
         self._client = client
 
         # Default initialization of handler
@@ -96,16 +109,38 @@ class SXMTranslator(ct.ConfigTranslator):
 
     def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
         """Ensure we detect when scans/specs end, to update scope state."""
-        client.register_spect_save_callback(self._on_scan_spec_end)
-        client.register_scan_end_callback(self._on_scan_spec_end)
+        client.register_spect_save_callback(self._on_spec_end)
+        client.register_scan_end_callback(self._on_scan_end)
 
-    def _on_scan_spec_end(self):
-        """Return scope state to free when scan/spec ends.
+    def _on_scan_end(self):
+        """Return scope state to free when scan ends.
 
         The main scope state logic is handled in on_action_request()
-        and on_scan_spec_end().
+        and on_scan_end().
         """
         self._scope_state = scan_pb2.ScopeState.SS_FREE
+
+    def _on_spec_end(self, filename: str):
+        """Return scope state to free when spec ends.
+
+        The main scope state logic is handled in on_action_request()
+        and on_spec_end().
+
+        On a spectroscopy ending, we call _handle_probe_pos_move() if
+        it was a 'fake' spectroscopy to move the probe.
+        """
+        self._scope_state = scan_pb2.ScopeState.SS_FREE
+        if self._probe_pos_moving:
+            self._delete_fake_spec(filename)
+            self._end_probe_pos_move()
+            self._probe_pos_moving = False
+
+    def _delete_fake_spec(self, filename: str):
+        latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
+                                                self.INI_ITEM_PATH)
+        spec_path = os.path.join(latest_dir, filename)
+        if os.path.isfile(spec_path):
+            os.remove(spec_path)
 
     def _init_scan_settings(self):  # TODO: Can we turn continuous scan OFF?
         """Set up scan defaults: autosave."""
@@ -167,6 +202,9 @@ class SXMTranslator(ct.ConfigTranslator):
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling."""
+        if self._probe_pos_moving:  # If moving, do not check.
+            return self._old_spec
+
         spec_path = self._get_latest_file(spec=True)
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
@@ -192,6 +230,72 @@ class SXMTranslator(ct.ConfigTranslator):
             elif action.action == MicroscopeAction.START_SPEC:
                 self._scope_state = scan_pb2.ScopeState.SS_SPEC
         return rep
+
+    def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
+                         ) -> control_pb2.ControlResponse:
+        """Override for proper pos moving."""
+        rep = super().on_set_probe_pos(probe_position)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            self._start_probe_pos_move()
+            self._probe_pos_moving = True
+        return rep
+
+    # For fake spectroscopy -- probe pos move
+    DZ_SETTING_UUIDS = [params.SXMParam.DZ_DELAY1,
+                        params.SXMParam.DZ_DELAY2,
+                        params.SXMParam.DZ_dz1,
+                        params.SXMParam.DZ_dz1]
+    DZ_FAKE_VALS = [1.0, 1.0, 0.0, 0.0]
+
+    def _start_probe_pos_move(self):
+        """Start a probe movement.
+
+        The SXM controller does not move the probe position on set.
+        In fact, the recommended way to move the probe is to force a
+        spectroscopy!
+
+        This method does that, but we have to do a bunch of homework
+        before actually running the spect:
+        - We store the current spectroscopy mode;
+        - We change to our 'fake spect' mode (D(z)), store the
+        current settings for that mode, and set to our 'fake spect'
+        settings (no z motion, 1 ms steps);
+        - Run spect.
+
+        Note that separately we will delete this fake spect once it
+        finishes. We cannot disable saving because the only way
+        we know a spectroscopy ends is due to it saving.
+        """
+        spec_mode_uuid = params.SXMParam.SPEC_MODE
+        self._prior_spec_mode = self.param_handler.get_param()
+        self.param_handler.set_param(spec_mode_uuid,
+                                     params.SPEC_MODE_DZ_IDX)
+
+        # Get / set D(z) spec settings
+        dz_prior_vals = []
+        for uuid, desired_val in zip(self.DZ_SETTING_UUIDS,
+                                     self.DZ_FAKE_VALS):
+            dz_prior_vals.append(self.param_handler.get_param(uuid))
+            self.param_handler.set_param(uuid, desired_val)
+        self._prior_spec_vals = dz_prior_vals
+
+        # Fake spect
+        self.action_handler.request_action(MicroscopeAction.START_SPEC)
+
+    def _end_probe_pos_move(self):
+        """End a probe pose movement.
+
+        Here, we:
+        - Return to the prior D(z) settings;
+        - Switch to the prior spect mode;
+        """
+        for uuid, prior_val in zip(self.DZ_SETTING_UUIDS,
+                                   self._prior_spec_vals):
+            self.param_handler.set_param(uuid, prior_val)
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE,
+                                     self._prior_spec_mode)
+        self._prior_spec_mode = None
+        self._prior_spec_vals = None
 
 
 def _init_action_handler(client: sxm.DDEClient

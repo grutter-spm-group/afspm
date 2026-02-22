@@ -202,3 +202,28 @@ uuid = 3
 type = 1.0
 caller = 'CHANNEL'
 unit = 'nm'
+
+[spec-mode]
+uuid = 0
+type = 1
+caller = 'SPECTRA'
+
+[dz-delay1]
+uuid = 3
+type = 1
+caller = 'SPECTRA'
+
+[dz-delay2]
+uuid = 4
+type = 1
+caller = 'SPECTRA'
+
+[dz-dz1]
+uuid = 5
+type = 1
+caller = 'SPECTRA'
+
+[dz-dz2]
+uuid = 6
+type = 1
+caller = 'SPECTRA'

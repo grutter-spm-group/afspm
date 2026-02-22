@@ -249,6 +249,13 @@ class SXMParam(params.MicroscopeParameterBase):
     TIP_POS_X = 'tip-pos-x'  # Get only.
     TIP_POS_Y = 'tip-pos-y'  # Get only.
 
+    # --- Spectroscopy settings --- #
+    SPEC_MODE = 'spec-mode'
+    DZ_DELAY1 = 'dz-delay1'  # us
+    DZ_DELAY2 = 'dz-delay2'  # ms
+    DZ_dz1 = 'dz-dz1'  # nm
+    DZ_dz2 = 'dz-dz2'  # nm
+
 
 # ---- Special Conversions ----- #
 # Special conversions due to differences between SXM and our generic model.
