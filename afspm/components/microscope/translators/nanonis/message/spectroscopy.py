@@ -245,47 +245,6 @@ class ZSpectraPropsSetRep(base.EmptyResponse, ZSpectraPropsSet):
     """Z spectroscopy properties set response."""
 
 
-# @dataclass
-# class BiasSpectraPropsGetStruct(base.NanonisMessage):
-#     """BiasSpectraProps get struct."""
-
-#     save_all: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
-#     number_of_sweeps: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     backward_sweep: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
-#     number_of_points: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-
-#     channels_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     number_of_channels: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     channels: list[str] = field(default_factory=list)  # list str
-#     parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     number_of_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     parameters: list[str] = field(default_factory=list)  # list str
-#     fixed_parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     number_of_fixed_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     fixed_parameters: list[str] = field(default_factory=list)  # list str
-
-
-# @dataclass
-# class ZSpectraPropsGetStruct(base.NanonisMessage):
-#     """ZSpectraProps get struct."""
-
-#     backward_sweep: int = base.NO_CHANGE_VAL
-#     number_of_points: int = base.NO_CHANGE_VAL  # 4 byts, int32
-
-#     channels_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     number_of_channels: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     channels: list[str] = field(default_factory=list)  # list str
-#     parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     number_of_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     parameters: list[str] = field(default_factory=list)  # list str
-#     fixed_parameters_size: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     number_of_fixed_parameters: int = base.NO_CHANGE_VAL  # 4 bytes, int32
-#     fixed_parameters: list[str] = field(default_factory=list)  # list str
-
-#     number_of_sweeps: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int16
-#     save_all: int = base.NO_CHANGE_VAL  # 2 bytes, unsigned int 16
-
-
 class SpectroscopyMode(enum.Enum):
     """The spectroscopy mode used, Bias or Z."""
 
