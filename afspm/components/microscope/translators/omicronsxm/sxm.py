@@ -438,8 +438,8 @@ class DDEClient(object):
         # The loop exists to catch error messages.
         return
 
-    def _received_message_or_time_passed(self, start_dt: datetime.datetime,
-                                         wait_ms: int) -> bool:
+    def _received_message_or_time_has_passed(self, start_dt: datetime.datetime,
+                                             wait_ms: int) -> bool:
         """Check if a message was received or sufficient time has passed."""
         time_passed = time_has_passed(start_dt, wait_ms)
         message_received = self.last_answer is not None
