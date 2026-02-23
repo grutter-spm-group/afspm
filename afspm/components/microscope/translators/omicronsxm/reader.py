@@ -10,6 +10,7 @@ However, we noticed that the pifm reader in this package does not
 match the data as it is saved on our system.
 """
 
+import logging
 import os
 import glob
 from dataclasses import dataclass
@@ -17,6 +18,9 @@ from typing import Any
 from types import MappingProxyType  # Immutable dict
 import numpy as np
 from sidpy import sid
+
+
+logger = logging.getLogger(__name__)
 
 
 # ----- Scan Reading Main ----- #
@@ -257,9 +261,9 @@ def _read_scan_data(metadata_path: str,
     scan_infos_dict = _read_scan_infos(metadata_path)
 
     # If they don't match, something wonky is up!
-    print(scan_paths)
-    print(scan_infos_dict.keys())
-    assert scan_base_names == list(scan_infos_dict.keys())
+    if sorted(scan_base_names) != sorted(list(scan_infos_dict.keys())):
+        logger.warning(f'{os.path.basename(metadata_path)}: Mismatch between'
+                       'metadata listed scans and those in dir.')
 
     # Get resolution
     res_x = int(metadata[RES_X])
@@ -272,7 +276,6 @@ def _read_scan_data(metadata_path: str,
                            dtype='i4').astype(float)  # Convert to float
         scan = np.reshape(scan, (res_x, res_y))  # Reshape to 2D shape
         scan = scan * scan_info.scale - scan_info.offset  # y = mx - b
-        #scans_dict[filename] = scan
         scans.append(scan)
     return scans, list(scan_infos_dict.values())
 
