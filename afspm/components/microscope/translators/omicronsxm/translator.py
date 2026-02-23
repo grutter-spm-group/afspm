@@ -188,6 +188,9 @@ class SXMTranslator(ct.ConfigTranslator):
         """
         latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
                                                 self.INI_ITEM_PATH)
+        # Remove double-quotes, as they break os.path.join
+        if latest_dir.startswith('"') and latest_dir.endswith('"'):
+            latest_dir = latest_dir[1:-1]
         ext = reader.SPEC_DATA_EXT if spec else reader.SCAN_METADATA_EXT
         file_form = "*" + ext
         try:
