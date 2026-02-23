@@ -77,16 +77,20 @@ class SXMTranslator(ct.ConfigTranslator):
         self._prior_spec_mode = None
         self._prior_spec_vals = None
 
-        self._client = client
-
         # Default initialization of handler
         kwargs = self._init_handlers(client, param_handler, action_handler,
                                      **kwargs)
+
         # Tell parent class that SXM *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
         # Tell parent class that SXM requires setting y before x.
         kwargs[ct.SET_X_BEFORE_Y_KEY] = False
         super().__init__(**kwargs)
+
+        # Grab client from parameter handler, in case no client was provided
+        # (and it was init'ed in _init_handlers).
+        self._client = self.param_handler.client
+
         self._init_scan_settings()
         self._init_spec_settings()
 
