@@ -161,6 +161,8 @@ class SXMTranslator(ct.ConfigTranslator):
         NOTE: We cannot detect whether the motor is running via SXMRemote.
         Throws a MicroscopeError on failure.
         """
+        if self._probe_pos_moving:  # Avoid SS_SPEC while forcing move.
+            return scan_pb2.ScopeState.SS_MOVING
         return self._scope_state
 
     def _get_latest_file(self, spec: bool) -> str | None:
