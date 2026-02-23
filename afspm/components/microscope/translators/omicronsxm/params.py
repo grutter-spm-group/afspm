@@ -66,12 +66,25 @@ class SXMParameterInfo(params.ParameterInfo):
 
     We need this in the case of SXM to know what method we are calling.
 
-    NOTE:
-    - In this interface, uuid may either be a str or an int! We explicit
-    this in the overriden ParameterHandler methods, where appropriate.
+    In the SXM case, we have two new attributes:
+    - caller: a CallerType indicates the method call (see
+    get_getter_substr and get_setter_substr above).
+    - caller_id: for this method call, our parameter has a given
+    id, which may be a str or int.
+
+    Rather than providing the uuid, this class creates the uuid in its
+    __post_init__() method.
+
+    We have modified the method overrides to clarify this.
     """
 
-    caller: CallerType  # Indicates 'grouping' this param is in.
+    uuid: tuple[CallerType, str | int]
+    caller: CallerType
+    caller_id: str | int
+
+    def __post_init__(self):
+        """Configure uuid."""
+        self.uuid = (self.caller, self.caller_id)
 
 
 def create_parameter_info(param_dict: dict) -> SXMParameterInfo:
@@ -87,17 +100,6 @@ def create_parameter_info(param_dict: dict) -> SXMParameterInfo:
     return param_info
 
 
-def validate_parameter(param_info: params.ParameterInfo,
-                       param_methods: params.ParameterMethods,
-                       uuid: str) -> bool:
-    """Like params.validate_parameter, but for SXMParameterInfo."""
-    param_info_met = None not in [param_info.uuid, param_info.type,
-                                  param_info.caller]
-    param_methods_met = None not in [param_methods.getter,
-                                     param_methods.setter]
-    return param_info_met or param_methods_met
-
-
 class SXMParameterHandler(params.ParameterHandler):
     """Implements SXM-specific getter/setter logic for parameter handling.
 
@@ -108,7 +110,6 @@ class SXMParameterHandler(params.ParameterHandler):
 
     Attributes:
         client: DDE client used to communicate with SXM.
-        uuid_to_caller_map: holds the CallerType for a given specific uuid.
         mode: FeedbackMode we are to be running in.
         cs_correction_ratio: [x, y] indicating correction ratio between
             get probe position and set probe position. Needed to properly
@@ -129,10 +130,8 @@ class SXMParameterHandler(params.ParameterHandler):
                 DEFAULT_MODE.
         """
         self.client = client
-        self.uuid_to_caller_map = {}
         self.cs_correction_ratio = cs_correction_ratio
         kwargs['param_info_init'] = create_parameter_info
-        kwargs['validate_parameter'] = validate_parameter
         super().__init__(**kwargs)
 
         # Asserting some parameters' units are the same. If they're not
@@ -143,22 +142,17 @@ class SXMParameterHandler(params.ParameterHandler):
         self.mode = mode
         self._switch_feedback_mode(mode)
 
-    def _load_config_build_params(self, params_config_path: str):
-        """Override to populate self.uuid_to_caller_map."""
-        super()._load_config_build_params(params_config_path)
-        for key, val in self.param_infos.items():
-            self.uuid_to_caller_map[val.uuid] = val.caller
-
-    def get_param_spm(self, spm_uuid: str | int) -> Any:
+    def get_param_spm(self, spm_uuid: tuple[CallerType, str | int]) -> Any:
         """Override for SPM-specific getter."""
-        caller = self.uuid_to_caller_map[spm_uuid]
+        caller = spm_uuid[0]
+        caller_id = spm_uuid[1]
         # Special case for CHANNEL get calls.
         # Get is negative, Set positive (for mysterious reasons).
         if caller == CallerType.CHANNEL:
-            spm_uuid = -1 * spm_uuid
+            caller_id = -1 * spm_uuid
 
-        method_substr = get_getter_substr(caller)
-        return self._call_get(method_substr, spm_uuid)
+        caller_substr = get_getter_substr(caller)
+        return self._call_get(caller_substr, caller_id)
 
     def _call_get(self, method: str, attr: str | int) -> Any:
         """Error handling around get call."""
@@ -179,15 +173,17 @@ class SXMParameterHandler(params.ParameterHandler):
                 raise Exception(msg)
 
         except (sxm.RequestError, TimeoutError) as e:
-            msg = f"Error getting scan parameter {attr}: {e}"
+            msg = f"Error getting parameter {attr}: {e}"
             logger.error(msg)
             raise params.ParameterError(msg)
 
-    def set_param_spm(self, spm_uuid: str | int, spm_val: Any):
+    def set_param_spm(self, spm_uuid: tuple[CallerType, str | int]
+                      , spm_val: Any):
         """Override for SPM-specific setter."""
-        caller = self.uuid_to_caller_map[spm_uuid]
-        substr = get_setter_substr(caller)
-        self._call_set(substr, spm_uuid, spm_val)
+        caller = spm_uuid[0]
+        caller_id = spm_uuid[1]
+        caller_substr = get_setter_substr(caller)
+        self._call_set(caller_substr, caller_id, spm_val)
 
     def _call_set(self, substr: str, attr: str | int, val: str):
         """Error handling around set call."""

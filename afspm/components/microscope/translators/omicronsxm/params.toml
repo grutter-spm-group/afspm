@@ -15,7 +15,7 @@ setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_y'
 getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_y'
 
 [scan-angle]
-uuid = 'Angle'
+caller_id = 'Angle'
 unit = 'degrees'
 type = 1.0
 range = [-180.0, 180.0]  # Will return in range [0, 360]
@@ -29,7 +29,7 @@ range = [0.0, 1000.0]  # [0, 1000nm]
 type = 1.0
 
 [scan-size-y]
-uuid = 'Range'
+caller_id = 'Range'
 unit = 'nm'
 type = 1.0
 range = [0.0, 1000.0]  # [0, 1000 nm]
@@ -46,13 +46,13 @@ range = [32, 4100]
 # NOTE: Special setter for scan resolution, due to limitation on setting.
 # The API only adds one of 5 resolutions to be set for...mysterious reasons.
 setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_y'
-uuid = 'Pixel'
+caller_id = 'Pixel'
 type = 1
 caller = 'SCAN'
 
 # ----- Feedback Parameters ----- #
 [zctrl-setpoint]
-uuid = 'Ref'
+caller_id = 'Ref'
 # Note: units are pA, but we consider it unitless, because in
 # ZCtrlParameters it is unitless.
 type = 1.0
@@ -60,27 +60,27 @@ range = [0, 1000.0]   # [0, 1000.0] pA
 caller = 'FEEDBACK'
 
 [zctrl-pgain]  # Unitless
-uuid = 'Kp'
+caller_id = 'Kp'
 type = 1.0
 range = [0, 1]   # [0, 1.0]  #  More conservative, we don't change this often.
 caller = 'FEEDBACK'
 
 [zctrl-igain]  # Unitless
-uuid = 'Ki'
+caller_id = 'Ki'
 type = 1.0
 range = [0, 100]   # [0, 100.0]  # Less conservative, we change this often.
 caller = 'FEEDBACK'
 
 # ----- Sample Slope Correction ----- #
 [sample-slope-x]
-uuid = 'SlopeX'
+caller_id = 'SlopeX'
 unit = 'deg'
 type = 1.0
 range = [0, 10.0]   # [0, 10] \deg
 caller = 'SCAN'
 
 [sample-slope-y]
-uuid = 'SlopeY'
+caller_id = 'SlopeY'
 unit = 'deg'
 type = 1.0
 range = [0, 10.0]   # [0, 10] \deg
@@ -113,7 +113,7 @@ range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 
 # ----- Other ----- #
 [tip-bias-voltage]
-uuid = 'Bias'
+caller_id = 'Bias'
 unit = 'mV'
 type = 1.0
 range = [-10e4, 10e4]  # [-10.0, 10.0] V
@@ -125,105 +125,105 @@ caller = 'FEEDBACK'
 # We use this rather than hard-coded values in params.py, because WHY?
 
 [center-x]
-uuid = 'X'
+caller_id = 'X'
 unit = 'nm'
 type = 1.0
 range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 caller = 'SCAN'
 
 [center-y]
-uuid = 'Y'
+caller_id = 'Y'
 unit = 'nm'
 type = 1.0
 range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
 caller = 'SCAN'
 
 [size-x-ratio]
-uuid = 'AspectRatio'
+caller_id = 'AspectRatio'
 # No units
 type = 1.0
 caller = 'SCAN'
 
 [pixel-x-ratio]
-uuid = 'PixelDensity'
+caller_id = 'PixelDensity'
 # No units
 type = 1.0
 caller = 'SCAN'
 
 [speed-lines-s]  # Range check is in scan-speed
-uuid = 'Speed'
+caller_id = 'Speed'
 type = 1
 caller = 'SCAN'
 
 [scan-state]
-uuid = 'Scan'
+caller_id = 'Scan'
 type = 1
 caller = 'SCAN'
 
 [scan-autosave]
-uuid = 'AUTOSAVE'
+caller_id = 'AUTOSAVE'
 type = 1
 caller = 'SCAN'
 
 [spec-autosave]
-uuid = 'AUTOSAVE'
+caller_id = 'AUTOSAVE'
 type = 1
 caller = 'SPECTRA'
 
 [spec-repeat]
-uuid = 'Repeat'
+caller_id = 'Repeat'
 type = 1
 caller = 'SPECTRA'
 
 # NOTE: We cannot get this param, only set!
 [spec-pos-x]  # This is the position where a spec *will* be taken
-uuid = 1
+caller_id = 1
 type = 1.0
 caller = 'SPECTRA'
 unit = 'nm'
 
 # NOTE: We cannot get this param, only set!
 [spec-pos-y]  # This is the position where a spec *will* be taken
-uuid = 2
+caller_id = 2
 type = 1.0
 caller = 'SPECTRA'
 unit = 'nm'
 
 # NOTE: We cannot set this param, only get!
 [tip-pos-x]  # This is the actual position of the probe
-uuid = 2
+caller_id = 2
 type = 1.0
 caller = 'CHANNEL'
 unit = 'nm'
 
 # NOTE: We cannot set this param, only get!
 [tip-pos-y]  # This is the actual position of the probe
-uuid = 3
+caller_id = 3
 type = 1.0
 caller = 'CHANNEL'
 unit = 'nm'
 
 [spec-mode]
-uuid = 0
+caller_id = 0
 type = 1
 caller = 'SPECTRA'
 
 [dz-delay1]
-uuid = 3
+caller_id = 3
 type = 1
 caller = 'SPECTRA'
 
 [dz-delay2]
-uuid = 4
+caller_id = 4
 type = 1
 caller = 'SPECTRA'
 
 [dz-dz1]
-uuid = 5
+caller_id = 5
 type = 1
 caller = 'SPECTRA'
 
 [dz-dz2]
-uuid = 6
+caller_id = 6
 type = 1
 caller = 'SPECTRA'
