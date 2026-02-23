@@ -107,6 +107,12 @@ class SXMTranslator(ct.ConfigTranslator):
             kwargs[ct.ACTION_HANDLER_KEY] = action_handler
         return kwargs
 
+    def _validate_required_actions_exist(self):
+        """Override to allow to run. Throw warning on startup."""
+        logger.warning('SXMTranslator does not support STOP_SCAN or STOP_SPEC!'
+                       ' If API support is added, update actions.toml and'
+                       ' remove this override. Allowing to continue.')
+
     def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
         """Ensure we detect when scans/specs end, to update scope state."""
         client.register_spect_save_callback(self._on_spec_end)
