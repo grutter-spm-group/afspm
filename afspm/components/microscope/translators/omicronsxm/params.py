@@ -84,6 +84,10 @@ class SXMParameterInfo(params.ParameterInfo):
 
     def __post_init__(self):
         """Configure uuid."""
+        self.configure_uuid()
+
+    def configure_uuid(self):
+        """Set up the uuid based on other attributes."""
         self.uuid = (self.caller, self.caller_id)
 
 
@@ -149,7 +153,7 @@ class SXMParameterHandler(params.ParameterHandler):
         # Special case for CHANNEL get calls.
         # Get is negative, Set positive (for mysterious reasons).
         if caller == CallerType.CHANNEL:
-            caller_id = -1 * spm_uuid
+            caller_id = -1 * caller_id
 
         caller_substr = get_getter_substr(caller)
         return self._call_get(caller_substr, caller_id)
@@ -203,12 +207,14 @@ class SXMParameterHandler(params.ParameterHandler):
         # Change Ki/Kp value for appropriate mode.
         gid = params.MicroscopeParameter.ZCTRL_PGAIN
         info = self._get_param_info(gid)
-        info.uuid = 'Kp' if mode == FeedbackMode.AFM else 'Kp2'
+        info.caller_id = 'Kp' if mode == FeedbackMode.AFM else 'Kp2'
+        info.configure_uuid()
         self.param_infos[gid] = info
 
         gid = params.MicroscopeParameter.ZCTRL_IGAIN
         info = self._get_param_info(gid)
-        info.uuid = 'Ki' if mode == FeedbackMode.AFM else 'Ki2'
+        info.caller_id = 'Ki' if mode == FeedbackMode.AFM else 'Ki2'
+        info.configure_uuid()
         self.param_infos[gid] = info
 
         self.mode = mode
