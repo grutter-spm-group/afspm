@@ -351,8 +351,9 @@ def load_scans_from_file(md_path: str
     if datasets:
         scans = []
         for ds in datasets:
-            file_path = os.path.join(os.path.dirname(md_path),
-                                     ds.metadata[reader.MD_SCAN_FILENAME])
+            file_path = os.path.join(
+                os.path.dirname(md_path),
+                ds.original_metadata[reader.MD_SCAN_FILENAME])
             scan = conv.convert_sidpy_to_scan_pb2(ds)
             scan.filename = file_path
             scans.append(scan)
