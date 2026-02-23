@@ -332,29 +332,26 @@ def load_scan_from_file(fname: str,
             saved as variables but are metadata to be switched to metadata.
 
     Returns:
-        loaded scan in scan_pb2 format. None if file is empty or failure
-        loading scan.
+        loaded scan in scan_pb2 format. None if file is empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        ds = read.open_dataset(
-            fname, read_channels_config_path,
-            read_use_physical_units,
-            read_allow_convert_from_metadata,
-            read_simplify_metadata,
-            engine='scipy')
+    ds = read.open_dataset(
+        fname, read_channels_config_path,
+        read_use_physical_units,
+        read_allow_convert_from_metadata,
+        read_simplify_metadata,
+        engine='scipy')
 
-        # Grabbing first data variable, since each channel is
-        # stored in its own file (so each file should have only
-        # one data variable).
-        scan = conv.convert_xarray_to_scan_pb2(
-            ds[list(ds.data_vars)[0]])
-        scan.filename = fname
+    # Grabbing first data variable, since each channel is
+    # stored in its own file (so each file should have only
+    # one data variable).
+    scan = conv.convert_xarray_to_scan_pb2(
+        ds[list(ds.data_vars)[0]])
+    scan.filename = fname
 
-        return scan
-    except Exception:
-        logger.error(f"Could not read scan fname {fname}, "
-                     f"got error.", exc_info=True)
-        return None
+    return scan
 
 
 def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
@@ -367,15 +364,12 @@ def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
         fname: path to spec file.
 
     Returns:
-        Spec1d if loaded properly, None if spec file was empty or exception
-        thrown when reading.
+        Spec1d if loaded properly, None if spec file was empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        df = read.open_spec(fname)
-        spec = convert_dataframe_to_spec1d(df)
-        spec.filename = fname
-        return spec
-    except Exception:
-        logger.error(f"Could not read spec fname {fname}, "
-                     f"got error.", exc_info=True)
-        return None
+    df = read.open_spec(fname)
+    spec = convert_dataframe_to_spec1d(df)
+    spec.filename = fname
+    return spec

@@ -276,17 +276,16 @@ def load_scans_from_file(scan_path: str
 
     Returns:
         loaded scans in scan_pb2 format (one scan per channel). None if
-        dataset is empty or failure loading scan.
+        dataset is empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
     logger.debug(f"Getting datasets from {scan_path} (each dataset"
                  " is a channel).")
-    try:
-        reader = sr.IgorIBWReader(scan_path)
-        # NOTE: Why does Igor reader return dict instead of list?
-        datasets = list(reader.read(verbose=False).values())
-    except Exception as exc:
-        logger.error(f"Failure loading scan at {scan_path}: {exc}")
-        return None
+    reader = sr.IgorIBWReader(scan_path)
+    # NOTE: Why does Igor reader return dict instead of list?
+    datasets = list(reader.read(verbose=False).values())
 
     if datasets:
         scans = []
@@ -323,19 +322,15 @@ def load_spec_from_file(fname: str,
         fname: path to spec file.
 
     Returns:
-        Spec1d if loaded properly, None if spec file was empty or exception
-        thrown when reading.
+        Spec1d if loaded properly, None if spec file was empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        reader = sr.IgorIBWReader(fname)
-        # NOTE: Why does Igor reader return dict instead of list?
-        datasets = list(reader.read(verbose=False).values())
+    reader = sr.IgorIBWReader(fname)
+    # NOTE: Why does Igor reader return dict instead of list?
+    datasets = list(reader.read(verbose=False).values())
 
-        spec = conv.convert_sidpy_to_spec_pb2(datasets)
-        spec.filename = fname
-
-        return spec
-    except Exception:
-        logger.error(f'Could not read spec fname {fname}.'
-                     'Got error.', exc_info=True)
-        return None
+    spec = conv.convert_sidpy_to_spec_pb2(datasets)
+    spec.filename = fname
+    return spec

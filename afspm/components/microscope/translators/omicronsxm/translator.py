@@ -337,14 +337,13 @@ def load_scans_from_file(md_path: str
 
     Returns:
         loaded scans in scan_pb2 format (one scan per channel). None if
-        dataset is empty or failure loading scan.
+        dataset is empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        sxm_reader = reader.SXMScanReader(md_path)
-        datasets = sxm_reader.read()
-    except Exception as exc:
-        logger.error(f"Failure loading scan at {md_path}: {exc}")
-        return None
+    sxm_reader = reader.SXMScanReader(md_path)
+    datasets = sxm_reader.read()
 
     if datasets:
         scans = []
@@ -369,17 +368,14 @@ def load_spec_from_file(fname: str,
         fname: path to spec file.
 
     Returns:
-        Spec1d if loaded properly, None if spec file was empty or exception
-        thrown when reading.
-    """
-    try:
-        sxm_reader = reader.SXMSpecReader(fname)
-        datasets = sxm_reader.read()
+        Spec1d if loaded properly, None if spec file was empty.
 
-        spec = conv.convert_sidpy_to_spec_pb2(datasets)
-        spec.filename = fname
-        return spec
-    except Exception:
-        logger.error(f'Could not read spec fname {fname}.'
-                     'Got error.', exc_info=True)
-        return None
+    Raises:
+        Unknown/unforeseen read error.
+    """
+    sxm_reader = reader.SXMSpecReader(fname)
+    datasets = sxm_reader.read()
+
+    spec = conv.convert_sidpy_to_spec_pb2(datasets)
+    spec.filename = fname
+    return spec
