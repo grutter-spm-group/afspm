@@ -425,7 +425,7 @@ def get_scan_speed(handler: params.ParameterHandler) -> Any:
     we need to consider the scan width.
     """
     size_x = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
-    lines_s = params.get_param(SXMParam.SPEED_LINES_S)
+    lines_s = handler.get_param(SXMParam.SPEED_LINES_S)
     return speed_lines_s_to_metric_s(lines_s, size_x)
 
 
