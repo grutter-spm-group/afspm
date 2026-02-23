@@ -241,7 +241,6 @@ class DDEClient(object):
         self.last_answer = None
         self._scan_end_callback = None
         self._spect_save_callback = None
-        self._command_index = None
 
     def __del__(self):
         """Cleanup any active connections."""
@@ -281,10 +280,6 @@ class DDEClient(object):
         if not hDdeData:
             raise DDEError("Unable to send command", self._idInst)
         DDE.FreeDataHandle(hDdeData)
-
-        # Increase command index, as we sent a command.
-        if self._command_index is not None:
-            self._command_index += 1
         return
 
     def request(self, item, timeout_ms: int = REQUEST_TIMEOUT_MS):
@@ -460,55 +455,49 @@ class DDEClient(object):
     def _evaluate_response(self, answer) -> Any | None:
         """Evalute and extract a potential response.
 
-        Responses are fed synchronously and contain the index of the request
-        in the header.
+        Responses are fed synchronously and contain an index in the header.
+
         The response may be:
         - An empty string, if the request was a set() or action and it
         succeeded.
         - A string beginning with 'Error' if an error occurred during the call.
         - A float or int value, if the request was a get().
 
-        This method will parse the response. For a response that corresponds to
-        the fed command_index, we will:
+        This method will parse the response. For a response we will:
         - Raise a RequestError if an error string was received.
-        - Otherwise, we return the received mOtherwise, we return the received
-        message.
+        - Otherwise, we return the received message.
 
         Separately, if we received an error string, we will log a warning. It
         is possible that an error independent of our request causes the
         interface to break.
+
+        NOTE: previously, we assumed the header index mapped responses to
+        requests in some manner (so one could map requests to responses).
+        After more thorough testing, it appears this is *not* the case:
+        the index provided appears to just be an internal counter that is
+        incremented whenever a request is received, and whenever a response
+        is sent out it uses the current counter value.
+
+        This is...not great. It means that if two commands are sent
+        near each other, the indices might get swapped in the response.
+        Basically, we cannot trust the index as mapping requests to responses.
         """
         strs = str(answer, 'utf-8').split('\r\n')
 
         if len(strs) == 1:
             logger.trace('Received response with only header. Skipping.')
             return
-
-        received_index = int(strs[0].split(' ')[2])  # Get # from header
         message = strs[1]
 
-        first_command = self._command_index is None
-        indices_match = (not first_command and
-                         received_index % MOD_VAL ==
-                         self._command_index % MOD_VAL)
-
-        if first_command:  # Initialize our counter
-            self._command_index = received_index
-        if first_command or indices_match:
-            if ERROR_PREFIX in message:
-                logger.error(message)
-                raise RequestError(message)
-            elif message == SET_RESPONSE:
-                return message
-            else:  # Get response
-                val = message.replace(',', '.')
-                val = float(val)
-                return val
-        # Separately, warn user if we got an error not related to our latest
-        # response.
         if ERROR_PREFIX in message:
-            msg = (f'Received error: {message}')
-            logger.warning(msg)
+            logger.error(message)
+            raise RequestError(message)
+        elif message == SET_RESPONSE:
+            return message
+        else:  # Get response
+            val = message.replace(',', '.')
+            val = float(val)
+            return val
         return None
 
     def register_spect_save_callback(self, callback: Callable):
