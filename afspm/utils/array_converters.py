@@ -16,6 +16,7 @@ import logging
 import xarray as xr
 import numpy as np
 import imageio.v3 as iio
+from ..io.pubsub.logic.pbc_logic import DIVIDER
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import spec_pb2
 from ..io.protos.generated import geometry_pb2
@@ -68,6 +69,9 @@ def convert_scan_pb2_to_xarray(scan: scan_pb2.Scan2d) -> xr.DataArray:
 def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     """Convert protobuf Scan message to xarray Dataset.
 
+    NOTE: We manually remove any DIVIDER substrs in the channel name,
+    as this could cause issues with our io logic.
+
     Args:
         data_array: xarray DataArray instance.
 
@@ -98,7 +102,7 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=da.name,
+                           channel=da.name.replace(DIVIDER, ''),
                            values=da.values.ravel().tolist())
     return scan
 
@@ -146,6 +150,9 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
 def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
     """Convert sidpy Dataset to protobuf Scan message.
 
+    NOTE: We manually remove any DIVIDER substrs in the channel name,
+    as this could cause issues with our io logic.
+
     Args:
         dataset: sidpy Dataset instance.
 
@@ -176,7 +183,7 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
                                             data=data_aspects)
 
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=ds.quantity,
+                           channel=ds.quantity.replace(DIVIDER, ''),
                            values=ds.compute().ravel().tolist())
     return scan
 
