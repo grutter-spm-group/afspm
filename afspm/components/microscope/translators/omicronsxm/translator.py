@@ -185,15 +185,14 @@ class SXMTranslator(ct.ConfigTranslator):
         latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
                                                 self.INI_ITEM_PATH)
         ext = reader.SPEC_DATA_EXT if spec else reader.SCAN_METADATA_EXT
-        ext = "*" + ext
+        file_form = "*" + ext
         try:
-            files = sorted(glob(os.path.join(latest_dir,
-                                             os.path.join(os.sep, ext))),
+            files = sorted(glob(os.path.join(latest_dir, file_form)),
                            key=os.path.getmtime)  # Sorted by access time
         except ValueError:
             # No files currently showing
             return None
-        return files[0]  # Returning newest matching file in scan dir.
+        return files[-1] if files else None  # Get latest
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override polling of scans."""

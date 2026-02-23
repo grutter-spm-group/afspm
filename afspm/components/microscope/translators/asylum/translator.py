@@ -192,8 +192,8 @@ class AsylumTranslator(ct.ConfigTranslator):
     def _get_latest_file(self, prefix: str) -> str | None:
         val = self.param_handler.get_param(params.AsylumParam.IMG_PATH)
         img_path = convert_igor_path_to_python_path(val)
-        images = sorted(glob.glob(img_path + os.sep + prefix + "*"
-                                  + self.IMG_EXT),
+        file_form = prefix + "*" + self.IMG_EXT
+        images = sorted(glob.glob(os.path.join(img_path, file_form)),
                         key=os.path.getmtime)  # Sorted by access time
         return images[-1] if images else None  # Get latest
 

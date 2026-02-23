@@ -104,8 +104,8 @@ class NanonisTranslator(ct.ConfigTranslator):
 
     def _get_latest_file(self, ext: str) -> str | None:
         file_path = self.param_handler.get_param(params.NanonisParam.FILE_PATH)
-        images = sorted(glob.glob(file_path + os.sep + "*"
-                                  + ext),
+        file_form = "*" + ext
+        images = sorted(glob.glob(os.path.join(file_path, file_form)),
                         key=os.path.getmtime)  # Sorted by access time
         return images[-1] if images else None  # Get latest
 
