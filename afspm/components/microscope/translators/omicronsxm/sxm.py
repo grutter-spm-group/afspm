@@ -141,6 +141,10 @@ class RequestError(Exception):
     """Error tied to a sent requset."""
 
 
+class SynchronizationError(Exception):
+    """We received the wrong reply to a request."""
+
+
 def get_winfunc(libname, funcname, restype=None, argtypes=(), _libcache={}):
     """Retrieve a function from a library, and set the data types."""
     from ctypes import windll
@@ -185,7 +189,7 @@ class DDE(object):
 
 
 class DDEError(RuntimeError):
-    """Exception raise when a DDE error occures."""
+    """Exception raise when a DDE error occurs."""
 
     def __init__(self, msg, idInst=None):
         """Init our error."""
@@ -398,16 +402,24 @@ class DDEClient(object):
             - DDEError when a DDE error occurs.
             - TimeoutError if we did not receive a response within the wait
                 period.
+            - SynchronizationError if we received an improper response to our
+                request.
         """
         self._execute(cmd)
         # Wait for response
         start_dt = create_datetime()
         while not self._received_message_or_time_has_passed(start_dt, wait_ms):
             loop()
-        if self.last_answer in (None, SET_RESPONSE):
+        if self.last_answer is None:
             msg = f'Did not receive response for {cmd}.'
             logger.error(msg)
             raise TimeoutError(msg)
+        elif self.last_answer is SET_RESPONSE:
+            msg = ('Received ACK response to get() call. There is likely an '
+                   'action replying synchronously, causing us to miss the '
+                   'reply to our request.')
+            logger.error(msg)
+            raise SynchronizationError(msg)
         return self.last_answer
 
     def execute_no_return(self, cmd: str, wait_ms: int = NO_RETURN_TIMEOUT_MS
