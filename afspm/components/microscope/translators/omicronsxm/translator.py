@@ -55,10 +55,6 @@ class SXMTranslator(ct.ConfigTranslator):
         _prior_spec_vals: prior spectroscopy mode settings. Saved for when
             we need to run a 'fake spec'.
 
-        _swap_scope_state: logic to tell us to change the scope state. Used
-            to swap into/out of SS_SPEC, due to the fact we cannot poll for
-            it. Most of the time, this will be None.
-
         _client: SXM client.
     """
 
@@ -75,8 +71,6 @@ class SXMTranslator(ct.ConfigTranslator):
         self._old_spec_path = None
         self._old_spec = None
         self._probe_pos_moving = False
-
-        self._swap_scope_state = None
 
         self._prior_spec_mode = None
         self._prior_spec_vals = None
@@ -134,7 +128,14 @@ class SXMTranslator(ct.ConfigTranslator):
         On a spectroscopy ending, we call _handle_probe_pos_move() if
         it was a 'fake' spectroscopy to move the probe.
         """
-        self._swap_scope_state = scan_pb2.ScopeState.SS_FREE
+        self.scope_state = scan_pb2.ScopeState.SS_FREE
+
+        # Force update specs and send scope state (setting above
+        # means the logic in _handle_polling_device will not detect
+        # a change, so we have to force it).
+        self._update_specs()
+        self._force_send_scope_state(self.scope_state)
+
         if self._probe_pos_moving:
             self._delete_fake_spec(filename)
             self._end_probe_pos_move()
@@ -193,18 +194,11 @@ class SXMTranslator(ct.ConfigTranslator):
         """Poll the controller for the current scope state.
 
         NOTE:
-        - We have logic to check if some internal logic wants to force a
-        scope state change. This is largely done for SS_SPEC.
         - We cannot detect whether the motor is running via sxm.
         - We cannot detect SS_SPEC via sxm, so we have to have state logic
         in this class.
         Throws a MicroscopeError on failure.
         """
-        if self._swap_scope_state:  # Internal logic wants us to swap state
-            state = self._swap_scope_state
-            self._swap_scope_state = None
-            return state
-
         if self._probe_pos_moving:  # Avoid SS_SPEC while forcing move.
             return scan_pb2.ScopeState.SS_MOVING
         elif self.scope_state is scan_pb2.ScopeState.SS_SPEC:
@@ -289,7 +283,10 @@ class SXMTranslator(ct.ConfigTranslator):
         rep = super().on_action_request(action)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             if action.action == MicroscopeAction.START_SPEC:
-                self._swap_scope_state = scan_pb2.ScopeState.SS_SPEC
+                self.scope_state = scan_pb2.ScopeState.SS_SPEC
+                # Send out message (our polling is disabled for the
+                # duration of SS_SPEC).
+                self._force_send_scope_state(self.scope_state)
         return rep
 
     def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
