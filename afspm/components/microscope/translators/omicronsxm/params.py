@@ -211,7 +211,7 @@ class SXMParam(params.MicroscopeParameterBase):
     We use the 'name' of these parameters as their generic uuid when
     querying them from the params config. So, for example, for CENTER_X,
     we expect:
-        [center_x]
+        [center-x]
         uuid = 'something'
         [...]
     In the config file.
@@ -477,7 +477,7 @@ def set_probe_pos_x(handler: params.ParameterHandler,
 
     Of note: we get via TIP_POS_X and set via SPEC_POS_X.
     """
-    offset_uuid = SXMParam.CENTER_X,
+    offset_uuid = SXMParam.CENTER_X
     offset = handler.get_param(offset_uuid)
 
     gid = params.MicroscopeParameter.PROBE_POS_X
@@ -498,7 +498,7 @@ def set_probe_pos_y(handler: params.ParameterHandler,
 
     Of note: we get via TIP_POS_Y and set via SPEC_POS_Y.
     """
-    offset_uuid = SXMParam.CENTER_Y,
+    offset_uuid = SXMParam.CENTER_Y
     offset = handler.get_param(offset_uuid)
 
     gid = params.MicroscopeParameter.PROBE_POS_Y
