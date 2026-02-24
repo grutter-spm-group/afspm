@@ -154,7 +154,8 @@ class BiasSpectraStatusGetReq(base.EmptyRequest, BiasSpectraStatusGet):
     """Bias spectroscopy status request."""
 
 
-class BiasSpectraStatusGetRep(BiasSpectraStatusGet, BiasSpectraStatusStruct):
+class BiasSpectraStatusGetRep(base.NanonisResponse, BiasSpectraStatusGet,
+                              BiasSpectraStatusStruct):
     """Bias spectroscopy status request."""
 
 
@@ -162,7 +163,8 @@ class ZSpectraStatusGetReq(base.EmptyRequest, ZSpectraStatusGet):
     """Z spectroscopy status request."""
 
 
-class ZSpectraStatusGetRep(ZSpectraStatusGet, ZSpectraStatusStruct):
+class ZSpectraStatusGetRep(base.NanonisResponse, ZSpectraStatusGet,
+                           ZSpectraStatusStruct):
     """Z spectroscopy status request."""
 
 
