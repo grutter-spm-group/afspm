@@ -243,6 +243,8 @@ class SXMTranslator(ct.ConfigTranslator):
         """
         if self.scope_state is not scan_pb2.ScopeState.SS_SPEC:
             super()._handle_polling_device()
+        else:
+            self.client.loop()  # Still check for callbacks
 
     def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
         """Override to skip when not SS_FREE.
