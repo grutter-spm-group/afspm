@@ -101,8 +101,9 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=data_units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
+    channel = da.name.replace(DIVIDER, '') if da.name is not None else None
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=da.name.replace(DIVIDER, ''),
+                           channel=channel,
                            values=da.values.ravel().tolist())
     return scan
 
@@ -182,8 +183,10 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
 
+    channel = (ds.quantity.replace(DIVIDER, '') if ds.quantity is not None
+               else None)
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=ds.quantity.replace(DIVIDER, ''),
+                           channel=channel,
                            values=ds.compute().ravel().tolist())
     return scan
 
