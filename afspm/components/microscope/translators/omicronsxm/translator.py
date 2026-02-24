@@ -229,6 +229,40 @@ class SXMTranslator(ct.ConfigTranslator):
                 self._old_spec = spec
         return self._old_spec
 
+    def _handle_polling_device(self):
+        """Override to not poll while spectroscopy is running.
+
+        We need to do this because the call to start spect does not
+        return until the spectroscopy has finished, and this breaks
+        our sxm client (because at some point, we receive the spect
+        finished response instead of a poll we were doing, causing
+        a crash).
+
+        Not great, pretty ugly. Oh well.
+        """
+        if self.scope_state is not scan_pb2.ScopeState.SS_SPEC:
+            super()._handle_polling_device()
+
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
+        """Override to skip when not SS_FREE.
+
+        We need to do this because our probe position getter returns the
+        actual position of the probe at any point in time. This means
+        that we send many probe position updates during, e.g., a scan.
+
+        The current expectation is that probe pos get will tell us where
+        the probe will be for spectroscopies / tip manipulation operations,
+        and that a set() will result in SS_MOVING until the probe is at this
+        location. In short, while the current behaviour is nice, it is not
+        what our black-box expectations are.
+
+        With this override, we meet our black-box expectations.
+        """
+        if self.scope_state in [scan_pb2.ScopeState.SS_FREE,
+                                scan_pb2.ScopeState.SS_UNDEFINED]:
+            return super().poll_probe_pos()
+        return self.probe_pos
+
     def on_action_request(self, action: control_pb2.ActionMsg
                           ) -> control_pb2.ControlResponse:
         """Override to change state for scan/specs.
