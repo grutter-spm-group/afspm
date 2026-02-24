@@ -211,10 +211,11 @@ class ParameterMethods:
     getter: Callable[[Any], Any] | None
 
 
-def create_parameter_info(param_dict: dict) -> ParameterInfo:
+def create_parameter_info(param_dict: dict,
+                          param_info_class: Callable) -> ParameterInfo:
     """Create ParameterInfo from a param_dict (from params config).
 
-    Instantiates ParameterInfo from provided dict.
+    Instantiates ParameterInfo (or child class) from provided dict.
 
     If you have created additional fields in your ParameterInfo child class,
     you should expand upon this method.
@@ -222,21 +223,26 @@ def create_parameter_info(param_dict: dict) -> ParameterInfo:
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
+        param_info: the imported class, which we can call to construct.
+            Note I have typed this as Callable as I do not know the proper
+            type for an imported class that is not an instance.
 
     Returns:
         ParameterInfo instance or None (if no vals are provided).
     """
     vals = []
-    keys = [f.name for f in fields(ParameterInfo)]
+    keys = [f.name for f in fields(param_info_class)]
     for key in keys:
         vals.append(param_dict[key] if key in param_dict else None)
 
     kwargs = dict(zip(keys, vals))
-    param_info = ParameterInfo(**kwargs)
+    param_info = param_info_class(**kwargs)
     return param_info
 
 
-def create_parameter_methods(param_dict: dict) -> ParameterMethods:
+def create_parameter_methods(param_dict: dict,
+                             param_methods_class: Callable
+                             ) -> ParameterMethods:
     """Create ParameterMethods from a param_dict (from params config).
 
     Attempts to import setter and getter methods for a param dict.
@@ -247,6 +253,9 @@ def create_parameter_methods(param_dict: dict) -> ParameterMethods:
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
+        param_info: the imported class, which we can call to construct.
+            Note I have typed this as Callable as I do not know the proper
+            type for an imported class that is not an instance.
 
     Returns:
         ParameterMethods instance.
@@ -256,13 +265,13 @@ def create_parameter_methods(param_dict: dict) -> ParameterMethods:
             import.
     """
     methods = []
-    keys = [f.name for f in fields(ParameterMethods)]
+    keys = [f.name for f in fields(param_methods_class)]
     for key in keys:
         # Try to import method if in param_dict, else pass None.
         methods.append(import_from_string(param_dict[key])
                        if key in param_dict else None)
 
-    param_methods = ParameterMethods(*methods)
+    param_methods = param_methods_class(*methods)
     return param_methods
 
 
@@ -381,24 +390,24 @@ class ParameterHandler(metaclass=ABCMeta):
             generic_param:ParameterMethods. For a given generic_param, its
             ParameterMethods will only be added if it has both a setter and a
             getter defined.
-        param_info_init: method to call to create a ParameterInfo from
-            the val in the key:val pair of a config file.
-        param_methods_init: method to call to create a ParameterMethods
-            from the val in the key:val pair of a config file.
+        param_info_class: an import of the class we will instantiate in
+            create_parameter_info. Defaults to ParameterInfo.
+        param_methods_class: an import of the class we will instantiate in
+            create_parameter_methods. Defaults to ParameterMethods.
         validate_parameter: method to validate whether we have the minimum
             in either our ParameterInfo or ParameterMethods for a given
             parameter.
     """
 
     def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME,
-                 param_info_init: Callable = create_parameter_info,
-                 param_methods_init: Callable = create_parameter_methods,
+                 param_info_class: Callable = ParameterInfo,
+                 param_methods_class: Callable = ParameterMethods,
                  validate_parameter: Callable = validate_parameter):
         """Init class, loading params config for these purposes."""
         self.param_infos = {}
         self.param_methods = {}
-        self.param_info_init = param_info_init
-        self.param_methods_init = param_methods_init
+        self.param_info_class = param_info_class
+        self.param_methods_class = param_methods_class
         self.validate_parameter = validate_parameter
         self._load_config_build_params(params_config_path)
 
@@ -458,8 +467,9 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for key, val in params_config.items():
             if isinstance(val, dict):
-                param_info = self.param_info_init(val)
-                param_methods = self.param_methods_init(val)
+                param_info = create_parameter_info(val, self.param_info_class)
+                param_methods = create_parameter_methods(
+                    val, self.param_methods_class)
 
                 param_info, param_methods = self.validate_parameter(
                     param_info, param_methods, key)

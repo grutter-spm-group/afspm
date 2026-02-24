@@ -123,15 +123,14 @@ def load_config(config_str: str) -> dict:
 
 class MyParameterHandler(params.ParameterHandler):
 
-    def __init__(self, params_config: dict, vals_dict: dict,
-                 param_info_init: Callable = params.create_parameter_info,
-                 param_methods_init: Callable = params.create_parameter_methods):
+    def __init__(self, params_config: dict, vals_dict: dict):
         """Different from parent in that we feed str rather than file path."""
         self.vals = vals_dict
         self.param_infos = {}
         self.param_methods = {}
-        self.param_info_init = param_info_init
-        self.param_methods_init = param_methods_init
+        self.param_info_class = params.ParameterInfo
+        self.param_methods_class = params.ParameterMethods
+        self.validate_parameter = params.validate_parameter
 
         self._build_param_infos_methods(params_config)
 

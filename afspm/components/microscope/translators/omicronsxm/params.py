@@ -91,19 +91,6 @@ class SXMParameterInfo(params.ParameterInfo):
         self.uuid = (self.caller, self.caller_id)
 
 
-def create_parameter_info(param_dict: dict) -> SXMParameterInfo:
-    """Like params.create_parameter_info, but for SXMParameterInfo."""
-    vals = []
-    keys = ([f.name for f in fields(params.ParameterInfo)] +
-            [f.name for f in fields(SXMParameterInfo)])
-    for key in keys:
-        vals.append(param_dict[key] if key in param_dict else None)
-
-    kwargs = dict(zip(keys, vals))
-    param_info = SXMParameterInfo(**kwargs)
-    return param_info
-
-
 class SXMParameterHandler(params.ParameterHandler):
     """Implements SXM-specific getter/setter logic for parameter handling.
 
@@ -135,7 +122,7 @@ class SXMParameterHandler(params.ParameterHandler):
         """
         self.client = client
         self.cs_correction_ratio = cs_correction_ratio
-        kwargs['param_info_init'] = create_parameter_info
+        kwargs['param_info_class'] = SXMParameterInfo
         super().__init__(**kwargs)
 
         # Asserting some parameters' units are the same. If they're not
