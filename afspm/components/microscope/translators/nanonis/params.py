@@ -72,13 +72,26 @@ def create_parameter_info(param_dict: dict) -> NanonisParameterInfo:
 
 def validate_parameter(param_info: params.ParameterInfo,
                        param_methods: params.ParameterMethods,
-                       uuid: str) -> bool:
-    """Like params.create_parameter_info, but for NanonisParameterInfo."""
-    param_info_met = None not in [param_info.uuid, param_info.type,
-                                  param_info.index]
+                       uuid: str) -> (params.ParameterInfo | None,
+                                      params.ParameterMethods | None):
+    """Like params.create_parameter_info, but for NanonisParameterInfo.
+
+    The difference in logic is that ParameterInfos are accepted on their own
+    if they have uuid, type, and index.
+    """
     param_methods_met = None not in [param_methods.getter,
                                      param_methods.setter]
-    return param_info_met or param_methods_met
+    if not param_methods_met:
+        param_methods = None
+        param_info_met = None not in [param_info.uuid, param_info.type,
+                                      param_info.index]
+    else:
+        param_info_tuple = astuple(param_info)
+        param_info_met = param_info_tuple.count(None) < len(param_info_tuple)
+
+    if not param_info_met:
+        param_info = None
+    return (param_info, param_methods)
 
 
 class NanonisParameterHandler(params.ParameterHandler):

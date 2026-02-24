@@ -15,7 +15,7 @@ class to implement the get_param_spm()/set_param_spm() methods.
 
 import logging
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, astuple
 from enum import Enum
 from typing import Any, Callable
 from abc import ABCMeta, abstractmethod
@@ -268,7 +268,8 @@ def create_parameter_methods(param_dict: dict) -> ParameterMethods:
 
 def validate_parameter(param_info: ParameterInfo,
                        param_methods: ParameterMethods,
-                       uuid: str) -> bool:
+                       uuid: str) -> (ParameterInfo | None,
+                                      ParameterMethods | None):
     """Validate we have enough infor in our param_info or param_methods.
 
     This method allows us to validate that we have sufficient information for
@@ -276,8 +277,13 @@ def validate_parameter(param_info: ParameterInfo,
     ParameterMethods classes instantiated. Our goal is to ensure we have
     enough in either one of them to continue.
 
-    In this base implementation, we expect either ParameterInfo to have both
-    type and uuid defined; or ParameterMethods to have both getter and setter.
+    In this base implementation, we check ParameterInfo for type and uuid; and
+    ParameterMethods for getter and setter. We accept the latter if it has both
+    and the former if either:
+    - we have already accepted ParameterMethods and ParameterInfo is not all
+    None; or
+    - it has type and uuid. We do this to allow additional ParameterInfo data
+    to be used if desired (such as for capping the value range of a parameter).
 
     Note that if you write your own version of this method, you can filter for
     special parameters via the uuid.
@@ -291,12 +297,22 @@ def validate_parameter(param_info: ParameterInfo,
             MicroscopeParameter.value.
 
     Returns:
-        True if we have sufficient info from either, else False.
+        tuple consisting of:
+        - The ParameterInfo or None, if it is not accepted.
+        - The ParameterMethods or None, if it is not accepted.
     """
-    param_info_met = None not in [param_info.uuid, param_info.type]
     param_methods_met = None not in [param_methods.getter,
                                      param_methods.setter]
-    return param_info_met or param_methods_met
+    if not param_methods_met:
+        param_methods = None
+        param_info_met = None not in [param_info.uuid, param_info.type]
+    else:
+        param_info_tuple = astuple(param_info)
+        param_info_met = param_info_tuple.count(None) < len(param_info_tuple)
+
+    if not param_info_met:
+        param_info = None
+    return (param_info, param_methods)
 
 
 # ----- Main handler class ----- #
@@ -442,17 +458,21 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for key, val in params_config.items():
             if isinstance(val, dict):
-                param_methods = self.param_methods_init(val)
                 param_info = self.param_info_init(val)
+                param_methods = self.param_methods_init(val)
 
-                if not self.validate_parameter(param_info, param_methods, key):
+                param_info, param_methods = self.validate_parameter(
+                    param_info, param_methods, key)
+                if [param_info, param_methods].count(None) == 2:
                     msg = (f'Parameter {key} provided without minimum'
                            'ParameterMethods or ParameterInfo attributes.')
                     logger.error(msg)
                     raise ParameterConfigurationError(msg)
 
-                self.param_methods[key] = param_methods
-                self.param_infos[key] = param_info
+                if param_info is not None:
+                    self.param_infos[key] = param_info
+                if param_methods is not None:
+                    self.param_methods[key] = param_methods
 
     def _get_param_info(self, generic_param: MicroscopeParameterBase
                         ) -> ParameterInfo:
