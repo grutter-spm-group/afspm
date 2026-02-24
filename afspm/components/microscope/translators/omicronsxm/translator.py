@@ -325,7 +325,7 @@ class SXMTranslator(ct.ConfigTranslator):
         we know a spectroscopy ends is due to it saving.
         """
         spec_mode_uuid = params.SXMParam.SPEC_MODE
-        self._prior_spec_mode = self.param_handler.get_param()
+        self._prior_spec_mode = self.param_handler.get_param(spec_mode_uuid)
         self.param_handler.set_param(spec_mode_uuid,
                                      params.SPEC_MODE_DZ_IDX)
 
