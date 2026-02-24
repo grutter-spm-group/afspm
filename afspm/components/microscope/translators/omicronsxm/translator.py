@@ -189,16 +189,13 @@ class SXMTranslator(ct.ConfigTranslator):
         in this class.
         Throws a MicroscopeError on failure.
         """
-        # Even though we do not *use* the state in some scenarios, we still
-        # poll. This is mostly for SS_SPEC state, as we need some poll
-        # to detect when the spec has ended (intricacies of the sxm blackbox).
-        state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
         if self._probe_pos_moving:  # Avoid SS_SPEC while forcing move.
             return scan_pb2.ScopeState.SS_MOVING
         elif self.scope_state is scan_pb2.ScopeState.SS_SPEC:
             # No way to poll spec, so ugly hack.
             return scan_pb2.ScopeState.SS_SPEC
         else:
+            state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
             return (scan_pb2.ScopeState.SS_MOVING if state
                     else scan_pb2.ScopeState.SS_FREE)
 
