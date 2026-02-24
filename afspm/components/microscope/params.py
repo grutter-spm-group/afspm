@@ -15,7 +15,7 @@ class to implement the get_param_spm()/set_param_spm() methods.
 
 import logging
 
-from dataclasses import dataclass, field, astuple
+from dataclasses import dataclass, fields, astuple
 from enum import Enum
 from typing import Any, Callable
 from abc import ABCMeta, abstractmethod
