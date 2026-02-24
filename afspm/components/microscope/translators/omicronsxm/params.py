@@ -176,7 +176,7 @@ class SXMParameterHandler(params.ParameterHandler):
                 logger.error(msg)
                 raise Exception(msg)
 
-        except (sxm.RequestError, TimeoutError, sxm.SynchronizationErro) as e:
+        except (sxm.RequestError, TimeoutError, sxm.SynchronizationError) as e:
             msg = f"Error getting parameter {attr}: {e}"
             logger.error(msg)
             raise params.ParameterError(msg)
