@@ -536,9 +536,9 @@ def _create_status_struct_index_entries() -> dict:
 # manually add them via methods here.
 
 SPEC_SETTING_GENERIC_IDS = [NanonisParam.BIAS_SPEC_AUTO_SAVE,
-                            NanonisParam.BIAS_SPEC_STATUS,
+                            NanonisParam.BIAS_SHOW_SAVE_DIALOG,
                             NanonisParam.Z_SPEC_AUTO_SAVE,
-                            NanonisParam.Z_SPEC_STATUS]
+                            NanonisParam.Z_SHOW_SAVE_DIALOG]
 SPEC_SETTING_UUIDS = [BASE_UUID + 'spectroscopy.BiasSpectraProps',
                       BASE_UUID + 'spectroscopy.BiasSpectraProps',
                       BASE_UUID + 'spectroscopy.ZSpectraProps',
