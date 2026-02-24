@@ -116,6 +116,7 @@ MD_POS_UNITS = 'nm'
 
 
 # Mapping of data to units, as this is not stored in the spec file.
+DEFAULT_UNIT = 'A'
 SPEC_NAME_TO_UNIT_MAP = MappingProxyType({
     'time': 's',
     'dz': 'nm',
@@ -140,7 +141,16 @@ def read_spec(spec_path: str) -> [sid.Dataset]:
     raw_md = _extract_raw_spec_metadata(lines)
     md = _parse_useful_spec_metadata(raw_md)
     names, data = _extract_spec_data(lines)
-    units = [SPEC_NAME_TO_UNIT_MAP[name] for name in names]
+
+    units = []
+    for name in names:
+        if name not in SPEC_NAME_TO_UNIT_MAP:
+            logger.warning(f'Unit not found for {name} spectroscopy.'
+                           ' Defaulting to A, but please expand'
+                           ' SPEC_NAME_TO_UNIT_MAP in future.')
+            units.append(UNIT)
+        else:
+            units.append(SPEC_NAME_TO_UNIT_MAP[name])
 
     # Split data along columns
     data_cols = np.moveaxis(data, 1, 0)
