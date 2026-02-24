@@ -63,7 +63,6 @@ class NanonisActionHandler(actions.ActionHandler):
             req_rep = self._guid_to_reqrep_map[guid]
         except KeyError:
             msg = f'Could not find NanonisMessages for {guid}.'
-            logger.error(msg)
             raise actions.ActionConfigurationError(msg)
 
         req = self._guid_to_reqrep_map[guid].req

@@ -45,7 +45,6 @@ class GxsmParameterHandler(params.ParameterHandler):
             return ret
         else:
             msg = f"Get param failed for {spm_uuid}"
-            logger.error(msg)
             raise params.ParameterError(msg)
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):

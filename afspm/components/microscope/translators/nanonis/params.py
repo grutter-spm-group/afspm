@@ -180,7 +180,6 @@ class NanonisParameterHandler(params.ParameterHandler):
             req_rep = self._uuid_to_reqrep_get_map[spm_uuid]
         except KeyError:
             msg = f'Could not find GET NanonisReqRep for {spm_uuid}.'
-            logger.error(msg)
             raise params.ParameterConfigurationError(msg)
         return req_rep
 
@@ -190,7 +189,6 @@ class NanonisParameterHandler(params.ParameterHandler):
             req_rep = self._uuid_to_reqrep_set_map[spm_uuid]
         except KeyError:
             msg = f'Could not find SET NanonisReqRep for {spm_uuid}.'
-            logger.error(msg)
             raise params.ParameterConfigurationError(msg)
         return req_rep
 
@@ -200,7 +198,6 @@ class NanonisParameterHandler(params.ParameterHandler):
             idx = self._uuid_to_struct_index_map[spm_uuid]
         except KeyError:
             msg = f'Could not find Nanonis struct index for {spm_uuid}.'
-            logger.error(msg)
             raise params.ParameterConfigurationError(msg)
         return idx
     # --- End KeyError catching helpers --- #

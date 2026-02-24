@@ -178,7 +178,6 @@ class SXMParameterHandler(params.ParameterHandler):
 
         except (sxm.RequestError, TimeoutError, sxm.SynchronizationError) as e:
             msg = f"Error getting parameter {attr}: {e}"
-            logger.error(msg)
             raise params.ParameterError(msg)
 
     def set_param_spm(self, spm_uuid: tuple[CallerType, str | int]
@@ -197,7 +196,6 @@ class SXMParameterHandler(params.ParameterHandler):
             self.client.execute_no_return(substr + f"({attr},{val});")
         except sxm.RequestError as e:
             msg = f"Error setting scan parameter {attr} to {val}: {e}"
-            logger.error(msg)
             raise params.ParameterError(msg)
 
     def _switch_feedback_mode(self, mode: FeedbackMode):
@@ -367,7 +365,6 @@ def set_size_x(handler: params.ParameterHandler,
 
     if math.isclose(size_y, 0.0):  # TODO: consider rel_tol?
         msg = 'Cannot set scan-size-x due to scan-size-y being 0.'
-        logger.error(msg)
         raise params.ParameterError(msg)
 
     # Ensure within expected ranges!
@@ -395,7 +392,6 @@ def set_res_x(handler: params.ParameterHandler,
 
     if res_y == 0:
         msg = 'Cannot set scan-resolution-x due to scan-resolution-y being 0.'
-        logger.error(msg)
         raise params.ParameterError(msg)
 
     # Ensure within expected ranges!
@@ -546,7 +542,6 @@ def set_res_y(handler: params.ParameterHandler,
         msg = (f'Fed scan-resolution-y {val} is not one of allowed. '
                'Please set a supported resolution from '
                f'{ALLOWED_RESOLUTIONS}.')
-        logger.error(msg)
         raise params.ParameterError(msg)
 
     # Strangely, we set the *index* of the allowed resolutions to set,

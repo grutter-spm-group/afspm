@@ -105,7 +105,6 @@ class AsylumParameterHandler(params.ParameterHandler):
             pass
 
         msg = f"Call method failed for {method_str} with attrs {attrs}."
-        logger.error(msg)
         raise params.ParameterError(msg)
 
     def get_param(self, generic_param: params.MicroscopeParameterBase) -> Any:
@@ -247,7 +246,6 @@ def set_scan_size_x(handler: params.ParameterHandler,
 
     if math.isclose(desired_val, 0.0):
         msg = 'Cannot set scan-size-x due to desired val being 0.'
-        logger.error(msg)
         raise params.ParameterError(msg)
 
     # Now, must determine the x ratio for this.

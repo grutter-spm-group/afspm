@@ -54,5 +54,4 @@ def request_action(handler: AsylumActionHandler, method_name: str,
         pass
 
     msg = f'Asylum: Calling {method_name} with args {params} failed.'
-    logger.error(msg)
     raise actions.ActionError(msg)

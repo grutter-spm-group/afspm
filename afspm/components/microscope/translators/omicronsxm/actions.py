@@ -56,5 +56,4 @@ def request_action(handler: SXMActionHandler, method_name: str,
         handler.client.execute_no_return(method_call)
     except sxm.RequestError as e:
         msg = f'SXM: Calling {method_name} with args {params} failed: {e}'
-        logger.error(msg)
         raise actions.ActionError(msg)
