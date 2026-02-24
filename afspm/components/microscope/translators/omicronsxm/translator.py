@@ -47,7 +47,6 @@ class SXMTranslator(ct.ConfigTranslator):
         _old_spec: the last spec, to send out if it has not changed.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
-        _scope_state: holds the current client.
         _probe_pos_moving: bool, holds whether we have been moving the probe
             pos.
 
@@ -71,7 +70,6 @@ class SXMTranslator(ct.ConfigTranslator):
         self._old_scans = []
         self._old_spec_path = None
         self._old_spec = None
-        self._scope_state = scan_pb2.ScopeState.SS_FREE
         self._probe_pos_moving = False
 
         self._prior_spec_mode = None
@@ -120,15 +118,6 @@ class SXMTranslator(ct.ConfigTranslator):
     def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
         """Ensure we detect when scans/specs end, to update scope state."""
         client.register_spect_save_callback(self._on_spec_end)
-        client.register_scan_end_callback(self._on_scan_end)
-
-    def _on_scan_end(self):
-        """Return scope state to free when scan ends.
-
-        The main scope state logic is handled in on_action_request()
-        and on_scan_end().
-        """
-        self._scope_state = scan_pb2.ScopeState.SS_FREE
 
     def _on_spec_end(self, filename: str):
         """Return scope state to free when spec ends.
@@ -139,7 +128,7 @@ class SXMTranslator(ct.ConfigTranslator):
         On a spectroscopy ending, we call _handle_probe_pos_move() if
         it was a 'fake' spectroscopy to move the probe.
         """
-        self._scope_state = scan_pb2.ScopeState.SS_FREE
+        self.scope_state = scan_pb2.ScopeState.SS_FREE
         if self._probe_pos_moving:
             self._delete_fake_spec(filename)
             self._end_probe_pos_move()
@@ -164,16 +153,6 @@ class SXMTranslator(ct.ConfigTranslator):
     def switch_feedback_mode(self, mode: params.FeedbackMode):
         """Switch to using appropriate feedback mode."""
         self.param_handler._switch_feedback_mode(mode)
-
-    def poll_scope_state(self) -> scan_pb2.ScopeState:
-        """Poll the controller for the current scope state.
-
-        NOTE: We cannot detect whether the motor is running via SXMRemote.
-        Throws a MicroscopeError on failure.
-        """
-        if self._probe_pos_moving:  # Avoid SS_SPEC while forcing move.
-            return scan_pb2.ScopeState.SS_MOVING
-        return self._scope_state
 
     def _get_latest_file(self, spec: bool) -> str | None:
         """Return the filepath for the latest scan/spec.
@@ -200,6 +179,28 @@ class SXMTranslator(ct.ConfigTranslator):
             # No files currently showing
             return None
         return files[-1] if files else None  # Get latest
+
+    def poll_scope_state(self) -> scan_pb2.ScopeState:
+        """Poll the controller for the current scope state.
+
+        NOTE:
+        - We cannot detect whether the motor is running via sxm.
+        - We cannot detect SS_SPEC via sxm, so we have to have state logic
+        in this class.
+        Throws a MicroscopeError on failure.
+        """
+        # Even though we do not *use* the state in some scenarios, we still
+        # poll. This is mostly for SS_SPEC state, as we need some poll
+        # to detect when the spec has ended (intricacies of the sxm blackbox).
+        state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
+        if self._probe_pos_moving:  # Avoid SS_SPEC while forcing move.
+            return scan_pb2.ScopeState.SS_MOVING
+        elif self.scope_state is scan_pb2.ScopeState.SS_SPEC:
+            # No way to poll spec, so ugly hack.
+            return scan_pb2.ScopeState.SS_SPEC
+        else:
+            return (scan_pb2.ScopeState.SS_MOVING if state
+                    else scan_pb2.ScopeState.SS_FREE)
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override polling of scans."""
@@ -265,18 +266,15 @@ class SXMTranslator(ct.ConfigTranslator):
 
     def on_action_request(self, action: control_pb2.ActionMsg
                           ) -> control_pb2.ControlResponse:
-        """Override to change state for scan/specs.
+        """Override to change state for spec.
 
-        Since we can mainly detect when scans/specs *end*, we
-        use successful action requests to handle the 'start' of
-        a scan/spec.
+        There is no way to poll the spec state via the API, so we
+        have to resort to this ugly hack.
         """
         rep = super().on_action_request(action)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
-            if action.action == MicroscopeAction.START_SCAN:
-                self._scope_state = scan_pb2.ScopeState.SS_SCANNING
-            elif action.action == MicroscopeAction.START_SPEC:
-                self._scope_state = scan_pb2.ScopeState.SS_SPEC
+            if action.action == MicroscopeAction.START_SPEC:
+                self.scope_state = scan_pb2.ScopeState.SS_SPEC
         return rep
 
     def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
