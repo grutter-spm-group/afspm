@@ -116,13 +116,42 @@ MD_POS_UNITS = 'nm'
 
 
 # Mapping of data to units, as this is not stored in the spec file.
-DEFAULT_UNIT = 'A'
 SPEC_NAME_TO_UNIT_MAP = MappingProxyType({
     'time': 's',
     'dz': 'nm',
+    'Topo': 'nm',
     'Bias': 'mV',
-    'It_to_PC': 'A'})
-# TODO: Complete me!
+    'x-direction': 'nm',
+    'y-direction': 'nm',
+    'DA1': 'mV',  # NOTE: Could not validate...
+    'Frequency': 'Hz',
+    'Drive': '',
+    'QPlusAmpl': '',
+    'Phase': '',
+    'Lia1X': 'A',
+    'Lia1Y': 'A',
+    'Lia2X': 'A',
+    'Lia2Y': 'A',
+    'Lia3X': 'A',
+    'Lia3Y': 'A',
+    'Lia1R': 'A',
+    'Lia1R': 'A',
+    'Lia2R': 'A',
+    'Lia1Phi': 'deg',  # NOTE: Unclear if this is deg...
+    'Lia1Phi': 'deg',
+    'Lia2Phi': 'deg',
+    'df': 'Hz',
+    'It_ext': 'A',
+    'QPlus_ext': 'mV',
+    'AD1': 'mV',
+    'AD2': 'mV',
+    'InA': 'A',
+    'It_to_PC': 'A',
+    'AD3': 'A',
+    'AD4': 'A',
+    'AD5': 'A',
+    'AD6': 'A',
+    })
 
 
 def read_spec(spec_path: str) -> [sid.Dataset]:
@@ -146,9 +175,9 @@ def read_spec(spec_path: str) -> [sid.Dataset]:
     for name in names:
         if name not in SPEC_NAME_TO_UNIT_MAP:
             logger.warning(f'Unit not found for {name} spectroscopy.'
-                           ' Defaulting to A, but please expand'
+                           ' Setting to None. Please expand'
                            ' SPEC_NAME_TO_UNIT_MAP in future.')
-            units.append(UNIT)
+            units.append(None)
         else:
             units.append(SPEC_NAME_TO_UNIT_MAP[name])
 
