@@ -368,10 +368,10 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         Here are the 3 potential microscope behaviours and how we suggest
         implementing them for your controller:
         1. Microscope does not detect SS_MOVING: in this case, simply use
-        self._handle_sending_fake_move() in on_set_scan_params() and
+        self._force_send_scope_state() in on_set_scan_params() and
         on_set_probe_pos().
         2. Microscope detects SS_MOVING if the ScanParameters2d change: in this
-        case, you should (a) use self._handle_sending_fake_move() in
+        case, you should (a) use self._force_send_scope_state() in
         on_set_scan_params() and on_set_probe_pos(); and (b) in
         poll_scope_state(), return the *prior* scope state (self.scope_state)
         if SS_MOVING is detected. This way, we receive a single SS_MOVING event
@@ -601,17 +601,20 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 else:
                     self.control_server.reply(rep)
 
-    def _handle_sending_fake_move(self):
-        """Send a fake SS_MOVING event (if applicable).
+    def _force_send_scope_state(self, scope_state: scan_pb2.ScopeState):
+        """Send a scope state independent of _handle_polling_device.
+
+        This allows sending a scope state out, overriding the logic in
+        _handle_polling_device() that compares the old scope state with
+        that received from a recent poll.
 
         This method should be used by translators for controllers that do not
         detect the probe moving. To match our expected state machine, we still
         must send an SS_MOVING event, even if the controller does not have a
         way to indicate it.
         """
-        self.scope_state = scan_pb2.ScopeState.SS_MOVING
         scope_state_msg = scan_pb2.ScopeStateMsg(
-            scope_state=self.scope_state)
+            scope_state=scope_state)
         logger.info("New scope state %s, sending out.",
                     common.get_enum_str(scan_pb2.ScopeState,
                                         self.scope_state))
