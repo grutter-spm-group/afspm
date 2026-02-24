@@ -239,12 +239,25 @@ class NanonisParameterHandler(params.ParameterHandler):
         first. This is notably  not the case for *all* parameters. This method
         will return the base request, either (a) via getting the composite
         struct or (b) grabbing from our reqrep map.
+
+        Note also that some parameter setters do not have associated getters.
+        We catch such an exception here and log it. We do not do the same
+        in the main get()/set() calls because we should not be explicitly
+        getting or setting something that (we should know) does not exist.
         """
         set_req = self._get_setter_req_rep(spm_uuid).req
 
+        # If dealing with composite parameter, call get() to obtain initial
+        # vals (so we don't overwrite/change the other parameters when
+        # setting).
         if len(astuple(set_req)) > 1:
-            get_rep = self._get_param_spm_rep(spm_uuid)
-            return copy_data(set_req, get_rep)
+            try:
+                get_rep = self._get_param_spm_rep(spm_uuid)
+                return copy_data(set_req, get_rep)
+            except params.ParameterConfigurationError:
+                logger.debug(f'Not getting initial values for {spm_uuid},'
+                             ' due to GET() not existing.')
+                pass
         return set_req
 
     def _prepare_set_req(self, spm_uuid: str, spm_val: Any
