@@ -196,7 +196,7 @@ class SXMTranslator(ct.ConfigTranslator):
             return scan_pb2.ScopeState.SS_SPEC
         else:
             state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
-            return (scan_pb2.ScopeState.SS_MOVING if state
+            return (scan_pb2.ScopeState.SS_SCANNING if state
                     else scan_pb2.ScopeState.SS_FREE)
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
