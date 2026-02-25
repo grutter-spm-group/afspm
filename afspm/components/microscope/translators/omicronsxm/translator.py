@@ -210,15 +210,9 @@ class SXMTranslator(ct.ConfigTranslator):
         in this class.
         Throws a MicroscopeError on failure.
         """
-        if self._probe_pos_moving:  # Avoid SS_SPEC while forcing move.
-            return scan_pb2.ScopeState.SS_MOVING
-        elif self.scope_state is scan_pb2.ScopeState.SS_SPEC:
-            # No way to poll spec, so ugly hack.
-            return scan_pb2.ScopeState.SS_SPEC
-        else:
-            state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
-            return (scan_pb2.ScopeState.SS_SCANNING if state
-                    else scan_pb2.ScopeState.SS_FREE)
+        state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
+        return (scan_pb2.ScopeState.SS_SCANNING if state
+                else scan_pb2.ScopeState.SS_FREE)
 
     def poll_scans(self) -> [scan_pb2.Scan2d]:
         """Override polling of scans."""
@@ -235,9 +229,6 @@ class SXMTranslator(ct.ConfigTranslator):
 
     def poll_spec(self) -> spec_pb2.Spec1d:
         """Override spec polling."""
-        if self._probe_pos_moving:  # If moving, do not check.
-            return self._old_spec
-
         spec_path = self._get_latest_file(spec=True)
         if (spec_path and not self._old_spec_path or
                 spec_path != self._old_spec_path):
@@ -294,7 +285,7 @@ class SXMTranslator(ct.ConfigTranslator):
         rep = super().on_action_request(action)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             if action.action == MicroscopeAction.START_SPEC:
-                # Polling is disabled for duration of SS_SPEC so send here.
+                # Indicate start of spec (and start disable polling).
                 self._update_scope_state(scan_pb2.ScopeState.SS_SPEC)
         return rep
 
@@ -304,6 +295,10 @@ class SXMTranslator(ct.ConfigTranslator):
         rep = super().on_set_probe_pos(probe_position)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             self._probe_pos_moving = True
+            # Pause all polling for duration of fake spec.
+            # Note we only set the state internally to use the logic,
+            # but do not send out a state change (because this is a fake spec).
+            self.scope_state = scan_pb2.ScopeState.SS_SPEC
             self._start_probe_pos_move()
         return rep
 
