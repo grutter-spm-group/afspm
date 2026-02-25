@@ -129,8 +129,8 @@ COMMAND_TIMEOUT_MS = 1000  # Wait time for DDE communication
 REQUEST_TIMEOUT_MS = 1000  # Wait time for DDE communication
 # These timeouts are times to wait for the server to send an actual response.
 # Curiously, even for a set(), we receive an empty 'actual' response.
-NO_RETURN_TIMEOUT_MS = 100  # Wait time to receive an error message
-RETURN_TIMEOUT_MS = 1000  # Wait time to receive an error message
+NO_RETURN_TIMEOUT_MS = 1000  # Wait time to receive an error message
+RETURN_TIMEOUT_MS = 2000  # Wait time to receive an error message
 # We modulo our command ID to avoid potential overflow mismatches between
 # the DDE server overflow and our local variable overflow.
 MOD_VAL = 1000
