@@ -557,7 +557,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                 scope_state=scope_state)
             logger.info("New scope state %s, sending out.",
                         common.get_enum_str(scan_pb2.ScopeState,
-                                            self.scope_state))
+                                            scope_state))
             self.publisher.send_msg(scope_state_msg)
             self.scope_state = scope_state
 
