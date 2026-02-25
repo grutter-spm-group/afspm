@@ -801,9 +801,6 @@ def test_scan_coords(client, default_control_state,
     rep = client.set_scan_params(modified_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    last_params = assert_and_return_message(sub_scan_params)
-    assert check_equal(last_params, modified_params, float_tolerance)
-
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_MOVING)
     assert_sub_received_proto(sub_scope_state,
@@ -812,6 +809,9 @@ def test_scan_coords(client, default_control_state,
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
+
+    last_params = assert_and_return_message(sub_scan_params)
+    assert check_equal(last_params, modified_params, float_tolerance)
 
     # --- Perform a scan --- #
     # Hack around, make poll short for this.
@@ -887,10 +887,6 @@ def test_spec_coords(client, default_control_state,
     rep = client.set_probe_pos(modified_probe_pos)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    logger.info("We *do not* validate that our subscriber receives these new "
-                "params, as we are setting the same params every time.")
-    sub_probe_pos.poll_and_store()
-
     logger.info('Requested new position. Expect scope state change.')
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_MOVING)
@@ -902,6 +898,10 @@ def test_spec_coords(client, default_control_state,
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
+
+    logger.info("We *do not* validate that our subscriber receives these new "
+                "params, as we are setting the same params every time.")
+    sub_probe_pos.poll_and_store()
 
     # Hack around (make poll short for this).
     tmp_timeout_ms = sub_spec._poll_timeout_ms
