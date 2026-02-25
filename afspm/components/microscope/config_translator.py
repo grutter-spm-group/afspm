@@ -65,7 +65,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     NOTE: implementing poll_scope_state() is a bit particular; please
     review poll_scope_state's pydoc in translator.py. ConfigTranslator uses a
     variable self.detects_moving to determine if it should call
-    self._force_send_scope_state() in on_set_probe_pos() /
+    self._send_scope_state() in on_set_probe_pos() /
     on_set_scan_params(). Use this in accordance with that pydoc's guidance.
 
     Args:
@@ -171,7 +171,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             self.param_handler.set_param_list(scan_param_ids, vals,
                                               attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._force_send_scope_state(scan_pb2.ScopeState.SS_MOVING)
+                self._send_scope_state(scan_pb2.ScopeState.SS_MOVING)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
@@ -213,7 +213,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
                                               vals, attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._force_send_scope_state(scan_pb2.ScopeState.SS_MOVING)
+                self._send_scope_state(scan_pb2.ScopeState.SS_MOVING)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:

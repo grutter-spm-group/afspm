@@ -285,10 +285,8 @@ class SXMTranslator(ct.ConfigTranslator):
         rep = super().on_action_request(action)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
             if action.action == MicroscopeAction.START_SPEC:
-                self.scope_state = scan_pb2.ScopeState.SS_SPEC
-                # Send out message (our polling is disabled for the
-                # duration of SS_SPEC).
-                self._force_send_scope_state(self.scope_state)
+                # Polling is disabled for duration of SS_SPEC so send here.
+                self._update_scope_state(scan_pb2.ScopeState.SS_SPEC)
         return rep
 
     def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
@@ -341,18 +339,16 @@ class SXMTranslator(ct.ConfigTranslator):
         On a spectroscopy ending, we call _handle_probe_pos_move() if
         it was a 'fake' spectroscopy to move the probe.
         """
-        self.scope_state = scan_pb2.ScopeState.SS_FREE
-
-        # Force update specs and send scope state (setting above
-        # means the logic in _handle_polling_device will not detect
-        # a change, so we have to force it).
-        self._update_specs()
-        self._force_send_scope_state(self.scope_state)
+        # Polling is disabled for duration of SS_FREE so send here.
+        self._update_scope_state(scan_pb2.ScopeState.SS_FREE)
 
         if self._probe_pos_moving:
             self._delete_fake_spec(filename)
             self._end_probe_pos_move()
             self._probe_pos_moving = False
+        else:  # If not a fake spec, update our specs!
+            self._update_specs()
+
         # Force one more loop to grab ACK from start_spec() (send after
         # the spec_end callback).
         sxm.loop()
