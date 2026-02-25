@@ -7,10 +7,16 @@ We chose to implement our own Python wrapper to validate that one can use our fr
 
 ## Usage
 
-### Setup
+### TCP Setup
 
 Ensure that the server port used to connect matches one of the 4 connections in the Nanonis interface (System -> Options -> TCP Programming Interface).
 This port corresponds to the input argument 'port' in the NanonisClient (which is a 'client' input argument for the NanonisTranslator).
+
+### Spectroscopy Setup
+
+Before starting your experiment, you must open both the z- and bias-spectroscopy windows.
+This is needed so we can set them up appropriately on startup.
+If not done, you will receive an error log and the translator will crash.
 
 ### Starting Your Experiment
 Start your experiment via your config file in afspm:
