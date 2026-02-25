@@ -37,10 +37,22 @@ class SXMTranslator(ct.ConfigTranslator):
     The local module sxm is our modified version of this interface.
 
     Notes:
-    - In SXM, the spec position and probe position do not need to align
-    *until* a spec is run. To be consistent with our expectations, we set
-    both of these whenever the probe position is set. On a get, we grab
-    from the actual probe position.
+    - In order to move the probe on set_probe_pos(), we have to 'fake' a
+    spectroscopy (this is the suggested way to move the probe). Because of
+    this, we have a _fake_spectroscopy_settings input argument, consisting
+    of the settings for the spectroscopy mode we are using to move. One would
+    expect/want these to be minimally invasive and quick. When this 'fake' spec
+    has finished, we delete it so it does not contaminate our experimental data.
+    - There is no way to poll for the spec state, so we have to use a semi-ugly
+    state machine in here: we switch to SS_SPEC when START_SPEC succeeds, and
+    switch back to SS_FREE when it ends (detected via a spec save callback).
+    - The START_SPEC command is not asynchronous! It returns an ACK once the
+    spec has ended, not once it has started. To avoid this weirdness causing
+    logic issues, we pause polling during SS_SPEC.
+    - The probe position getter gets the *actual* position at any instance in
+    time. This diverges from how the getter works with other translators, where
+    it tells us where we have set it to be. To minimize deviations from other
+    translators, we thus pause poll_probe_pos if we are not free.
 
     Attributes:
         _old_scans: the last scans, to send out if it has not changed.

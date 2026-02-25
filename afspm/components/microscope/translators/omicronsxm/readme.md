@@ -52,7 +52,7 @@ In this CS, the position varies as a function of the scan offset, according to t
 
 where CONSTANT appears different between x- and y-dimensions.
 
-To account for this, the SXMTranslator accepts a tuple `cs_correction_ratio` as an input argument to its constructor.
+To account for this, the SXMParameterHandler accepts a tuple `cs_correction_ratio` as an input argument to its constructor.
 A default calculated for our microscope is provided.
 To calculate for your own microscope: set your probe position to a position with the scan offset (0,0) and with it at a particular offset; subtract the written positions ('Current Position' in the Scripting window) and divide them by the scan offset.
 
@@ -66,10 +66,23 @@ When running the translator, we set the spectroscopy and scan to autosave. We do
 
 In order to move the probe position on setting, we do the following:
 
-- Set spectroscopy autosave to OFF.
-- Store current spectroscopy settings, and change to a short duration preset spectroscopy.
+- Change to our 'fake' spectroscopy mode.
 - Run the spectroscopy.
-- Once the spectroscopy finishes, set autosave to ON.
+- Once the spectroscopy ends, delete the saved file (it was useless data).
+- Return to our true spectroscopy mode.
 
 This appears to be the most straightforward way to do so with the existing API.
-If unusual behavious is seen during probe position setting, this logic may be the source.
+If unusual behaviour is seen during probe position setting, this logic may be the source.
+
+### Setting and Configuring 'Moving' Mode
+
+Since we cannot get the spectroscopy settings, we cannot store the prior settings and revert to them after the move is done.
+The most reasonable option we have found is to allow the user to define from either X(z) or X(U) modes as the 'fake' spectroscopy mode, meaning a mode that will not be used during their experiment.
+On startup, we switch to this mode and set a number of parameters (delays, acquisition time, dz, and bias values) to very short/minimal values.
+The goal is to make it so that said spectroscopy runs quickly and minimally affects the experiment.
+
+## Limitation on External Scripts Running
+
+While the SXMTranslator is running no other DDEClients may send messages to the SXM application via the DDE.
+This is because there does not appear a way to associate a response to a request, and the DDE Server responds to all clients.
+Therefore, we could receive a response from a different client and associate it to our response.
