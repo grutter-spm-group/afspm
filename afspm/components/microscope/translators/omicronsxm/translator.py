@@ -350,10 +350,12 @@ class SXMTranslator(ct.ConfigTranslator):
         self._update_scope_state(scan_pb2.ScopeState.SS_FREE)
 
         if self._probe_pos_moving:
+            logger.trace('Spec save end for fake spec.')
             self._delete_fake_spec(filename)
             self._end_probe_pos_move()
             self._probe_pos_moving = False
         else:  # If not a fake spec, update our specs!
+            logger.trace('Spec save end for true spec. Updating specs.')
             self._update_specs()
 
         # Force one more loop to grab ACK from start_spec() (send after
@@ -376,6 +378,7 @@ class SXMTranslator(ct.ConfigTranslator):
         finishes. We cannot disable saving because the only way
         we know a spectroscopy ends is due to it saving.
         """
+        logger.trace('Starting probe pos move via fake spec.')
         mode = get_spectroscopy_mode(self._fake_spectroscopy_settings)
         self.param_handler.set_param(params.SXMParam.SPEC_MODE,
                                      mode.value)
@@ -387,6 +390,7 @@ class SXMTranslator(ct.ConfigTranslator):
         Here, we:
         - Switch to the prior spect mode.
         """
+        logger.trace('End of fake spec, returning to proper spec mode.')
         self.param_handler.set_param(params.SXMParam.SPEC_MODE,
                                      self._spectroscopy_mode.value)
         self._prior_spec_mode = None
@@ -398,11 +402,12 @@ class SXMTranslator(ct.ConfigTranslator):
         Here, we expect both a .dat file (included here) and a .bmp
         file (an image of the data). We try to delete both.
         """
-
         spec_paths = [filepath, os.path.splitext(filepath)[0] + BMP_EXT]
 
+        logger.trace(f'Spec ended, should delete: {spec_paths}')
         for spec_path in spec_paths:
             if os.path.isfile(spec_path):
+                logger.trace(f'Deleting {spec_path}')
                 os.remove(spec_path)
 
 
