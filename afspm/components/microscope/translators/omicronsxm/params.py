@@ -564,14 +564,14 @@ class SpectroscopyMode(enum.Enum):
 class SpectroscopySettingsHeight():
     """Settings for D(z) spectroscopies."""
 
-    delay_ms: float
-    acquisition_time_ms: float
+    delay_s: float
+    acquisition_time_s: float
     dz1_nm: float
     dz2_nm: float
 
     @classmethod
     def get_uuids(cls) -> list[SXMParam]:
-        """Return uuids as a list"""
+        """Return uuids as a list."""
         return [SXMParam.DZ_U_DELAY,
                 SXMParam.DZ_U_ACQUISITION_TIME,
                 SXMParam.DZ_U_DZ1,
@@ -582,15 +582,15 @@ class SpectroscopySettingsHeight():
 class SpectroscopySettingsBias():
     """Settings for D(U) spectroscopies."""
 
-    delay_ms: float
-    acquisition_time_ms: float
+    delay_s: float
+    acquisition_time_s: float
     dz_nm: float
     bias_start: float
     bias_stop: float
 
     @classmethod
     def get_uuids(cls) -> list[SXMParam]:
-        """Return uuids as a list"""
+        """Return uuids as a list."""
         return [SXMParam.DZ_U_DELAY,
                 SXMParam.DZ_U_ACQUISITION_TIME,
                 SXMParam.DZ_U_DZ1,

@@ -215,33 +215,33 @@ caller = 'SPECTRA'
 # NOTE: We cannot get this param, only set!
 [dz-u-delay]
 caller_id = 3
-type = 1
+type = 1.0
 caller = 'SPECTRA'
 
 # NOTE: We cannot get this param, only set!
 [dz-u-acq-t]
 caller_id = 4
-type = 1
+type = 1.0
 caller = 'SPECTRA'
 
 # NOTE: We cannot get this param, only set!
 [dz-u-dz1]
 caller_id = 5
-type = 1
+type = 1.0
 caller = 'SPECTRA'
 
 # NOTE: We cannot get this param, only set!
 [dz-dz2]
 caller_id = 6
-type = 1
+type = 1.0
 caller = 'SPECTRA'
 
 [u-u-start]
 caller_id = 6
-type = 1
+type = 1.0
 caller = 'SPECTRA'
 
 [u-u-stop]
 caller_id = 7
-type = 1
+type = 1.0
 caller = 'SPECTRA'
