@@ -380,7 +380,7 @@ class SXMTranslator(ct.ConfigTranslator):
         - Switch to the prior spect mode.
         """
         self.param_handler.set_param(params.SXMParam.SPEC_MODE,
-                                     self._spectroscopy_mode)
+                                     self._spectroscopy_mode.value)
         self._prior_spec_mode = None
         self._prior_spec_vals = None
 
