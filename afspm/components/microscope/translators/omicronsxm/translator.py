@@ -304,8 +304,8 @@ class SXMTranslator(ct.ConfigTranslator):
         """Override for proper pos moving."""
         rep = super().on_set_probe_pos(probe_position)
         if rep == control_pb2.ControlResponse.REP_SUCCESS:
-            self._start_probe_pos_move()
             self._probe_pos_moving = True
+            self._start_probe_pos_move()
         return rep
 
     # --- Feedback stuff --- #
