@@ -1,5 +1,6 @@
 """Handles device communication with the Omicron SXM controller."""
 
+import time
 import logging
 import os
 from glob import glob
@@ -88,6 +89,7 @@ class SXMTranslator(ct.ConfigTranslator):
     DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(ONE_MS, ONE_MS, 0.0,
                                                          0.0)
     DEFAULT_FAKE_SPEC_SETTINGS = DEFAULT_FAKE_X_Z
+    FAKE_SPEC_SLEEP_S = 0.5
 
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
@@ -346,8 +348,12 @@ class SXMTranslator(ct.ConfigTranslator):
         On a spectroscopy ending, we call _handle_probe_pos_move() if
         it was a 'fake' spectroscopy to move the probe.
         """
-        # Polling is disabled for duration of SS_FREE so send here.
-        self._update_scope_state(scan_pb2.ScopeState.SS_FREE)
+        # Necessary sleep to allow response to specstart being returned.
+        time.sleep(self.FAKE_SPEC_SLEEP_S)
+
+        # Force one more loop to grab ACK from start_spec() (send after
+        # the spec_end callback).
+        sxm.loop()
 
         if self._probe_pos_moving:
             logger.trace('Spec save end for fake spec.')
@@ -358,9 +364,8 @@ class SXMTranslator(ct.ConfigTranslator):
             logger.trace('Spec save end for true spec. Updating specs.')
             self._update_specs()
 
-        # Force one more loop to grab ACK from start_spec() (send after
-        # the spec_end callback).
-        sxm.loop()
+        # Polling is disabled for duration of SS_FREE so send here.
+        self._update_scope_state(scan_pb2.ScopeState.SS_FREE)
 
     # --- Probe Pos Movement Faking --- #
     def _start_probe_pos_move(self):
