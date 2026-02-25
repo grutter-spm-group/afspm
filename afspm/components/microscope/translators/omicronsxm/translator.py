@@ -32,7 +32,7 @@ BMP_EXT = '.bmp'
 ONE_MS = 0.001
 # The SXM translator does not appear to have a great float tolerance (at
 # least for probe position).
-FLOAT_TOLERANCE = 1e-04
+FLOAT_TOLERANCE = 1e-05
 
 
 class SXMTranslator(ct.ConfigTranslator):
