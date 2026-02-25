@@ -28,6 +28,10 @@ from . import reader
 logger = logging.getLogger(__name__)
 
 
+BMP_EXT = '.bmp'
+ONE_MS = 0.001
+
+
 class SXMTranslator(ct.ConfigTranslator):
     """Handles device communication with the Scienta Omicron SXM controller.
 
@@ -76,9 +80,10 @@ class SXMTranslator(ct.ConfigTranslator):
     INI_ITEM_PATH = 'Path'
 
     DEFAULT_SPEC_MODE = params.SpectroscopyMode.X_U
-    DEFAULT_FAKE_X_U = params.SpectroscopySettingsBias(1.0, 1.0, 0.0, 0.0,
-                                                       0.0)
-    DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(1.0, 1.0, 0.0, 0.0)
+    DEFAULT_FAKE_X_U = params.SpectroscopySettingsBias(ONE_MS, ONE_MS, 0.0,
+                                                       0.0, 0.0)
+    DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(ONE_MS, ONE_MS, 0.0,
+                                                         0.0)
     DEFAULT_FAKE_SPEC_SETTINGS = DEFAULT_FAKE_X_Z
 
     def __init__(self, param_handler: ParameterHandler = None,
