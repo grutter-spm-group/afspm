@@ -309,6 +309,10 @@ class DDEClient(object):
 
     def callback(self, value, item=None):
         """Handle responses to our requests."""
+        logger.trace(f'Callback value: {value}')
+        if item:
+            logger.trace(f'Callback item: {item}')
+
         if (value.startswith(b'Scan on')):
             # Do nothing, we do not appear to hit this.
             return
