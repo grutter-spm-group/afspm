@@ -362,10 +362,15 @@ class DDEClient(object):
         if self._scan_end_callback:
             self._scan_end_callback()
 
-    def on_spect_save(self, filename: str):
-        """Once the spectroscopy ends, trigger callback."""
+    def on_spect_save(self, filepath: str):
+        """Once the spectroscopy ends, trigger callback.
+
+        Note that filepath is a bytes array ending in '\r\n'. We manipulate
+        it to turn it into a reasonable filepath before returning.
+        """
         if self._spect_save_callback:
-            self._spect_save_callback(filename)
+            filepath = filepath.decode('utf-8')[0:-2]  # Remove \r\n
+            self._spect_save_callback(filepath)
 
     def get_ini_entry(self, section, item):
         """Get current iniFile."""

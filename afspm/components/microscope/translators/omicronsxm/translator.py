@@ -389,13 +389,18 @@ class SXMTranslator(ct.ConfigTranslator):
         self._prior_spec_mode = None
         self._prior_spec_vals = None
 
-    def _delete_fake_spec(self, filename: str):
-        """Delete the file we created to move the probe position."""
-        latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
-                                                self.INI_ITEM_PATH)
-        spec_path = os.path.join(latest_dir, filename)
-        if os.path.isfile(spec_path):
-            os.remove(spec_path)
+    def _delete_fake_spec(self, filepath: str):
+        """Delete the file we created to move the probe position.
+
+        Here, we expect both a .dat file (included here) and a .bmp
+        file (an image of the data). We try to delete both.
+        """
+
+        spec_paths = [filepath, os.path.splitext(filepath)[0] + BMP_EXT]
+
+        for spec_path in spec_paths:
+            if os.path.isfile(spec_path):
+                os.remove(spec_path)
 
 
 def _init_action_handler(client: sxm.DDEClient
