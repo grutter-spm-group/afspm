@@ -291,15 +291,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             Response to the request.
         """
         self._handle_action_not_in_actions(action)
-
-        # Store scan_params / probe_pos on action start (for setting
-        # later). NOTE: we must do this *here* (rather than on any
-        # poll) because the user may change things via the microscope
-        # controller UI (separate from our scripts and guardrails).
-        if action.action == actions.MicroscopeAction.START_SCAN:
-            self._latest_scan_params = self.poll_scan_params()
-        elif action.action == actions.MicroscopeAction.START_SPEC:
-            self._latest_probe_pos = self.poll_probe_pos()
+        self._store_info_before_action(action)
 
         try:
             self.action_handler.request_action(action.action)
@@ -309,6 +301,20 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             return control_pb2.ControlResponse.REP_ACTION_ERROR
 
         return control_pb2.ControlResponse.REP_SUCCESS
+
+    def _store_info_before_action(self, action: control_pb2.ActionMsg):
+        """If about to start a scan or spec, store the params/probe pos.
+
+        This is the method which stores parameters before a scan/spec is run,
+        allowing it to be used by ct.correct_scan()/ct.correct_spec() when
+        the file is read. It is used by default because many controllers do
+        not properly store these parameters in their save files (if you can
+        believe it).
+        """
+        if action.action == actions.MicroscopeAction.START_SCAN:
+            self._latest_scan_params = self.poll_scan_params()
+        elif action.action == actions.MicroscopeAction.START_SPEC:
+            self._latest_probe_pos = self.poll_probe_pos()
 
     def on_check_action_support(self, action: control_pb2.ActionMsg
                                 ) -> control_pb2.ControlResponse:
