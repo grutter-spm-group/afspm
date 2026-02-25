@@ -539,8 +539,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             self.spec.timestamp != old_spec.timestamp)
         # Only compare spec data if not the case.
         specs_different = specs_different or both_have_spec and (
-            self.spec.data.values !=
-            old_spec.data.values)  # TODO: Check other values?
+            self.spec.data.values != old_spec.data.values)
+        # TODO: Check other values?
 
         if only_new_has_spec or specs_different:
             send_spec = True
