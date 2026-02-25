@@ -185,7 +185,7 @@ class SXMParameterHandler(params.ParameterHandler):
             msg = f"Error setting scan parameter {attr} to {val}: {e}"
             raise params.ParameterError(msg)
 
-    def _switch_feedback_mode(self, mode: FeedbackMode):
+    def switch_feedback_mode(self, mode: FeedbackMode):
         """Switch to using the appropriate feedback mode."""
         ratio = 0 if mode == FeedbackMode.AFM else 100
         self.client.execute_no_return(f"FeedPara('Ratio', {ratio});")

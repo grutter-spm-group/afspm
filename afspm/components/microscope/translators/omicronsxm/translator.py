@@ -3,9 +3,11 @@
 import logging
 import os
 from glob import glob
+from dataclasses import astuple
 
 from ...params import (ParameterHandler,
-                       DEFAULT_PARAMS_FILENAME)
+                       DEFAULT_PARAMS_FILENAME,
+                       MicroscopeError)
 from ...actions import (ActionHandler,
                         DEFAULT_ACTIONS_FILENAME,
                         MicroscopeAction)
@@ -50,10 +52,10 @@ class SXMTranslator(ct.ConfigTranslator):
         _probe_pos_moving: bool, holds whether we have been moving the probe
             pos.
 
-        _prior_spec_mode: index for prior spectroscopy mode. Saved for when
-            we need to run a 'fake spec'.
-        _prior_spec_vals: prior spectroscopy mode settings. Saved for when
-            we need to run a 'fake spec'.
+        _spectroscopy_mode: mode we want to be in when running spectroscopies.
+        _fake_spectroscopy_settings: settings for our fake spectroscopy, used
+            to move the probe position. Can be either SpectroscopySettingsHeight
+            or SpectroscopySettingsBias.
 
         _client: SXM client.
     """
@@ -61,9 +63,18 @@ class SXMTranslator(ct.ConfigTranslator):
     INI_SECTION_SAVE = 'Save'
     INI_ITEM_PATH = 'Path'
 
+    DEFAULT_SPEC_MODE = params.SpectroscopyMode.X_U
+    DEFAULT_FAKE_X_U = params.SpectroscopySettingsBias(1.0, 1.0, 0.0, 0.0)
+    DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(1.0, 1.0, 0.0, 0.0,
+                                                         0.0)
+    DEFAULT_FAKE_SPEC_SETTINGS = DEFAULT_FAKE_X_Z
+
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
                  client: sxm.DDEClient = None,
+                 spectroscopy_mode: params.SpectroscopyMode = DEFAULT_SPEC_MODE,
+                 fake_spectroscopy_settings: params.SpectroscopySettingsBias |
+                 params.SpectroscopySettingsHeight = DEFAULT_FAKE_SPEC_SETTINGS,
                  **kwargs):
         """Init our translator."""
         self._old_scan_path = None
@@ -72,8 +83,8 @@ class SXMTranslator(ct.ConfigTranslator):
         self._old_spec = None
         self._probe_pos_moving = False
 
-        self._prior_spec_mode = None
-        self._prior_spec_vals = None
+        self._spectroscopy_mode = spectroscopy_mode
+        self._fake_spectroscopy_settings = fake_spectroscopy_settings
 
         # Default initialization of handler
         kwargs = self._init_handlers(client, param_handler, action_handler,
@@ -89,8 +100,10 @@ class SXMTranslator(ct.ConfigTranslator):
         # (and it was init'ed in _init_handlers).
         self._client = self.param_handler.client
 
-        self._init_scan_settings()
-        self._init_spec_settings()
+        # Set up our save settings (spec and scan) and configure our
+        # spectroscopy settings.
+        self._init_save_settings()
+        self._init_spec_settigs()
 
     def _init_handlers(self, client: sxm.DDEClient,
                        param_handler: ParameterHandler,
@@ -115,54 +128,26 @@ class SXMTranslator(ct.ConfigTranslator):
                        ' If API support is added, update actions.toml and'
                        ' remove this override. Allowing to continue.')
 
-    def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
-        """Ensure we detect when scans/specs end, to update scope state."""
-        client.register_spect_save_callback(self._on_spec_end)
-
-    def _on_spec_end(self, filename: str):
-        """Return scope state to free when spec ends.
-
-        The main scope state logic is handled in on_action_request()
-        and on_spec_end().
-
-        On a spectroscopy ending, we call _handle_probe_pos_move() if
-        it was a 'fake' spectroscopy to move the probe.
-        """
-        self.scope_state = scan_pb2.ScopeState.SS_FREE
-
-        # Force update specs and send scope state (setting above
-        # means the logic in _handle_polling_device will not detect
-        # a change, so we have to force it).
-        self._update_specs()
-        self._force_send_scope_state(self.scope_state)
-
-        if self._probe_pos_moving:
-            self._delete_fake_spec(filename)
-            self._end_probe_pos_move()
-            self._probe_pos_moving = False
-        # Force one more loop to grab ACK from start_spec() (send after
-        # the spec_end callback).
-        sxm.loop()
-
-    def _delete_fake_spec(self, filename: str):
-        latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
-                                                self.INI_ITEM_PATH)
-        spec_path = os.path.join(latest_dir, filename)
-        if os.path.isfile(spec_path):
-            os.remove(spec_path)
-
-    def _init_scan_settings(self):  # TODO: Can we turn continuous scan OFF?
-        """Set up scan defaults: autosave."""
+    def _init_scan_settings(self):
+        """Set up scan / spec defaults: autosave and do not repeat."""
         self.param_handler.set_param(params.SXMParam.SCAN_AUTOSAVE, 1)
+        # TODO: Can we turn continuous scan OFF?
 
-    def _init_spec_settings(self):
-        """Set up spec defaults: autosave and do not repeat."""
         self.param_handler.set_param(params.SXMParam.SPEC_AUTOSAVE, 1)
         self.param_handler.set_param(params.SXMParam.SPEC_REPEAT, 0)
 
-    def switch_feedback_mode(self, mode: params.FeedbackMode):
-        """Switch to using appropriate feedback mode."""
-        self.param_handler._switch_feedback_mode(mode)
+    def _init_spec_settings(self):
+        """On startup, set 'fake' spec settings and switch to real spec mode.
+
+        First, we switch to our 'fake' spectroscopy mode and set its parameters
+        according to our 'fake' settings. The goal here is for the 'fake' spec
+        to be a short as possible and minimally invasive on the project.
+
+        Then, we switch to our actual spectroscopy, which we want to be using
+        when calling START_SPEC.
+        """
+        self.set_spectroscopy_settings(self._fake_spectroscopy_settings)
+        self.set_spectroscopy_mode(self._spectroscopy_mode)
 
     def _get_latest_file(self, spec: bool) -> str | None:
         """Return the filepath for the latest scan/spec.
@@ -298,13 +283,64 @@ class SXMTranslator(ct.ConfigTranslator):
             self._probe_pos_moving = True
         return rep
 
-    # For fake spectroscopy -- probe pos move
-    DZ_SETTING_UUIDS = [params.SXMParam.DZ_DELAY1,
-                        params.SXMParam.DZ_DELAY2,
-                        params.SXMParam.DZ_dz1,
-                        params.SXMParam.DZ_dz1]
-    DZ_FAKE_VALS = [1.0, 1.0, 0.0, 0.0]
+    # --- Feedback stuff --- #
+    def switch_feedback_mode(self, mode: params.FeedbackMode):
+        """Switch to using appropriate feedback mode."""
+        self.param_handler.switch_feedback_mode(mode)
 
+    # --- Spectroscopy Setters --- #
+    def set_spectroscopy_mode(self, spec_mode: params.SpectroscopyMode):
+        """Switch spectroscopy to chosen mode."""
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE,
+                                     spec_mode.value)
+
+    def set_spectroscopy_settings(self,
+                                  settings: params.SpectroscopySettingsHeight |
+                                  params.SpectroscopySettingsBias):
+        """Set spectroscopy settings for D(z) or D(U).
+
+        We currently only support setting one of these two modes. Its main use
+        is to configure the 'fake' spectroscopy we use to move the probe pos.
+
+        Note that after setting, we return the spectroscopy mode to
+        self._spectroscopy_mode.
+        """
+        mode = get_spectroscopy_mode(settings)
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE, mode.value)
+        for uuid, val in zip(settings.get_uuids(), astuple(settings)):
+            self.param_handler.set_param(uuid, val)
+
+    # --- Spectroscopy callback --- #
+    def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
+        """Ensure we detect when scans/specs end, to update scope state."""
+        client.register_spect_save_callback(self._on_spec_end)
+
+    def _on_spec_end(self, filename: str):
+        """Return scope state to free when spec ends.
+
+        The main scope state logic is handled in on_action_request()
+        and on_spec_end().
+
+        On a spectroscopy ending, we call _handle_probe_pos_move() if
+        it was a 'fake' spectroscopy to move the probe.
+        """
+        self.scope_state = scan_pb2.ScopeState.SS_FREE
+
+        # Force update specs and send scope state (setting above
+        # means the logic in _handle_polling_device will not detect
+        # a change, so we have to force it).
+        self._update_specs()
+        self._force_send_scope_state(self.scope_state)
+
+        if self._probe_pos_moving:
+            self._delete_fake_spec(filename)
+            self._end_probe_pos_move()
+            self._probe_pos_moving = False
+        # Force one more loop to grab ACK from start_spec() (send after
+        # the spec_end callback).
+        sxm.loop()
+
+    # --- Probe Pos Movement Faking --- #
     def _start_probe_pos_move(self):
         """Start a probe movement.
 
@@ -312,48 +348,37 @@ class SXMTranslator(ct.ConfigTranslator):
         In fact, the recommended way to move the probe is to force a
         spectroscopy!
 
-        This method does that, but we have to do a bunch of homework
-        before actually running the spect:
-        - We store the current spectroscopy mode;
-        - We change to our 'fake spect' mode (D(z)), store the
-        current settings for that mode, and set to our 'fake spect'
-        settings (no z motion, 1 ms steps);
+        This method does that, which means we have to:
+        - We change to our 'fake spect' self._fake_spectroscopy_mode.
         - Run spect.
 
         Note that separately we will delete this fake spect once it
         finishes. We cannot disable saving because the only way
         we know a spectroscopy ends is due to it saving.
         """
-        spec_mode_uuid = params.SXMParam.SPEC_MODE
-        self._prior_spec_mode = self.param_handler.get_param(spec_mode_uuid)
-        self.param_handler.set_param(spec_mode_uuid,
-                                     params.SPEC_MODE_DZ_IDX)
-
-        # Get / set D(z) spec settings
-        dz_prior_vals = []
-        for uuid, desired_val in zip(self.DZ_SETTING_UUIDS,
-                                     self.DZ_FAKE_VALS):
-            dz_prior_vals.append(self.param_handler.get_param(uuid))
-            self.param_handler.set_param(uuid, desired_val)
-        self._prior_spec_vals = dz_prior_vals
-
-        # Fake spect
+        mode = get_spectroscopy_mode(self._fake_spectroscopy_settings)
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE,
+                                     mode.value)
         self.action_handler.request_action(MicroscopeAction.START_SPEC)
 
     def _end_probe_pos_move(self):
         """End a probe pose movement.
 
         Here, we:
-        - Return to the prior D(z) settings;
-        - Switch to the prior spect mode;
+        - Switch to the prior spect mode.
         """
-        for uuid, prior_val in zip(self.DZ_SETTING_UUIDS,
-                                   self._prior_spec_vals):
-            self.param_handler.set_param(uuid, prior_val)
         self.param_handler.set_param(params.SXMParam.SPEC_MODE,
-                                     self._prior_spec_mode)
+                                     self._spectroscopy_mode)
         self._prior_spec_mode = None
         self._prior_spec_vals = None
+
+    def _delete_fake_spec(self, filename: str):
+        """Delete the file we created to move the probe position."""
+        latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
+                                                self.INI_ITEM_PATH)
+        spec_path = os.path.join(latest_dir, filename)
+        if os.path.isfile(spec_path):
+            os.remove(spec_path)
 
 
 def _init_action_handler(client: sxm.DDEClient
@@ -430,3 +455,18 @@ def load_spec_from_file(fname: str,
     spec = conv.convert_sidpy_to_spec_pb2(datasets)
     spec.filename = fname
     return spec
+
+
+def get_spectroscopy_mode(settings: params.SpectroscopySettingsHeight |
+                          params.SpectroscopySettingsBias):
+    """Get the spec mode associated with given settings.
+
+    Note we only support D(z) or D(U) right now.
+    """
+    if isinstance(settings, params.SpectroscopySettingsHeight):
+        mode = params.SpectroscopyMode.X_Z.value
+    elif isinstance(settings, params.SpectroscopySettingsBias):
+        mode = params.SpectroscopyMode.X_Z.value
+    else:
+        msg = 'Unable to set spectroscopy settings for unsupported mode.'
+        raise MicroscopeError(msg)
