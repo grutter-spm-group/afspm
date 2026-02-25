@@ -32,7 +32,7 @@ BMP_EXT = '.bmp'
 ONE_MS = 0.001
 # The SXM translator does not appear to have a great float tolerance (at
 # least for probe position).
-FLOAT_TOLERANCE = 1e-05
+FLOAT_TOLERANCE = 1e-03
 
 
 class SXMTranslator(ct.ConfigTranslator):
@@ -261,9 +261,12 @@ class SXMTranslator(ct.ConfigTranslator):
 
         With this override, we meet our black-box expectations.
         """
+        # TODO: Issue, this cannot get called to store the probe pos
+        # in on_action_request() (because we are alread in SS_SCANNING)?
         if self.scope_state in [scan_pb2.ScopeState.SS_FREE,
                                 scan_pb2.ScopeState.SS_UNDEFINED]:
-            return super().poll_probe_pos()
+            self._latest_probe_pos = super().poll_probe_pos()
+            return self._latest_probe_pos
         return self.probe_pos
 
     def _handle_polling_device(self):
