@@ -4,7 +4,7 @@ import logging
 
 import enum
 import math  # For isclose
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from typing import Any
 
 from ... import params
@@ -227,6 +227,8 @@ class SXMParam(params.MicroscopeParameterBase):
     SPEED_LINES_S = 'speed-lines-s'
     SCAN_STATE = 'scan-state'
     SCAN_AUTOSAVE = 'scan-autosave'
+
+    # NOTE: These are set only
     SPEC_AUTOSAVE = 'spec-autosave'
     SPEC_REPEAT = 'spec-repeat'
 
@@ -239,11 +241,16 @@ class SXMParam(params.MicroscopeParameterBase):
     TIP_POS_Y = 'tip-pos-y'  # Get only.
 
     # --- Spectroscopy settings --- #
+    # NOTE: These are set only
     SPEC_MODE = 'spec-mode'
-    DZ_DELAY1 = 'dz-delay1'  # us
-    DZ_DELAY2 = 'dz-delay2'  # ms
-    DZ_dz1 = 'dz-dz1'  # nm
-    DZ_dz2 = 'dz-dz2'  # nm
+    DZ_U_DELAY = 'dz-u-delay'  # ms
+    DZ_U_ACQUISITION_TIME = 'dz-u-acq-t'  # ms
+    DZ_U_DZ1 = 'dz-u-dz1'  # nm
+
+    DZ_DZ2 = 'dz-dz2'  # nm
+
+    U_U_START = 'u-u-start'  # mV
+    U_U_STOP = 'u-u-stop'  # mV
 
 
 # ---- Special Conversions ----- #
@@ -535,3 +542,57 @@ def set_res_y(handler: params.ParameterHandler,
     # but get the actual resolution...
     handler.set_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y,
                       index, unit, override_methods=True)
+
+
+class SpectroscopyMode(enum.Enum):
+    """Supported spectroscopy modes."""
+
+    # The enum values match the SXM interface setting value.
+    X_Z = 0  # X(z) (Height)
+    X_U = enum.auto()  # X(U) (Bias)
+    X_U_CL = enum.auto()  # X(U) CL
+    X_T_Z_STEP = enum.auto()  # X(t) z-step
+    X_T_Z_STEP_CL = enum.auto()  # X(t) z-step CL
+    X_T_U_STEP = enum.auto()  # X(t) U-step
+    X_T_U_STEP_CL = enum.auto()  # X(t) U-step CL
+    CM_AFM_X_U = enum.auto()  # cmAFM X(U)
+    X_T_NOISE = enum.auto()  # X(t) noise
+    X_X_Y = enum.auto()  # X(x, y)
+
+
+@dataclass
+class SpectroscopySettingsHeight():
+    """Settings for D(z) spectroscopies."""
+
+    delay_ms: float
+    acquisition_time_ms: float
+    dz1_nm: float
+    dz2_nm: float
+
+    @classmethod
+    def get_uuids(cls) -> list[SXMParam]:
+        """Return uuids as a list"""
+        return [SXMParam.DZ_U_DELAY,
+                SXMParam.DZ_U_ACQUISITION_TIME,
+                SXMParam.DZ_U_DZ1,
+                SXMParam.DZ_D2]
+
+
+@dataclass
+class SpectroscopySettingsBias():
+    """Settings for D(U) spectroscopies."""
+
+    delay_ms: float
+    acquisition_time_ms: float
+    dz_nm: float
+    bias_start: float
+    bias_stop: float
+
+    @classmethod
+    def get_uuids(cls) -> list[SXMParam]:
+        """Return uuids as a list"""
+        return [SXMParam.DZ_U_DELAY,
+                SXMParam.DZ_U_ACQUISITION_TIME,
+                SXMParam.DZ_U_DZ1,
+                SXMParam.U_U_START,
+                SXMParam.U_U_STOP]
