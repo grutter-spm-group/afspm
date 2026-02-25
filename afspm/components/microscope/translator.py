@@ -40,6 +40,7 @@ ANGLE_ATTRIB = 'angle'
 PARAM_VALUE_ATTRIB = 'value'
 
 WARNING_SENT_COUNT = 0  # To ensure we don't spam about Scan2d angle issue
+FLOAT_TOLERANCE_KEY = 'float_tolerance'
 
 
 class MicroscopeError(Exception):

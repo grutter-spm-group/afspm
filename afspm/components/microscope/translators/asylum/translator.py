@@ -5,8 +5,9 @@ import logging
 import glob
 import SciFiReaders as sr
 
-from ...params import (ParameterHandler, ParameterNotSupportedError,
-                       ParameterError, MicroscopeParameter,
+from ...translator import FLOAT_TOLERANCE_KEY
+from ...params import (ParameterHandler,
+                       ParameterError,
                        DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler, MicroscopeAction, ActionError,
                         DEFAULT_ACTIONS_FILENAME)
@@ -26,10 +27,9 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
-# The Asylum controller does not appear to have a great float tolerance (at
+# The Asylum translator does not appear to have a great float tolerance (at
 # least for probe position).
 FLOAT_TOLERANCE = 1e-05
-FLOAT_TOLERANCE_KEY = 'float_tolerance'
 
 
 class AsylumTranslator(ct.ConfigTranslator):

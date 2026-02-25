@@ -5,7 +5,7 @@ import os
 from glob import glob
 from dataclasses import astuple
 
-from ...translator import MicroscopeError
+from ...translator import MicroscopeError, FLOAT_TOLERANCE_KEY
 from ...params import (ParameterHandler,
                        DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler,
@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 BMP_EXT = '.bmp'
 ONE_MS = 0.001
+# The SXM translator does not appear to have a great float tolerance (at
+# least for probe position).
+FLOAT_TOLERANCE = 1e-04
 
 
 class SXMTranslator(ct.ConfigTranslator):
@@ -106,6 +109,10 @@ class SXMTranslator(ct.ConfigTranslator):
         # Default initialization of handler
         kwargs = self._init_handlers(client, param_handler, action_handler,
                                      **kwargs)
+
+        # Set hard-coded float tolerance if not provided
+        if FLOAT_TOLERANCE_KEY not in kwargs:
+            kwargs[FLOAT_TOLERANCE_KEY] = FLOAT_TOLERANCE
 
         # Tell parent class that SXM *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
