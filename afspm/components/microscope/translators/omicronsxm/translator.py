@@ -5,9 +5,9 @@ import os
 from glob import glob
 from dataclasses import astuple
 
+from ...translator import MicroscopeError
 from ...params import (ParameterHandler,
-                       DEFAULT_PARAMS_FILENAME,
-                       MicroscopeError)
+                       DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler,
                         DEFAULT_ACTIONS_FILENAME,
                         MicroscopeAction)
@@ -76,9 +76,9 @@ class SXMTranslator(ct.ConfigTranslator):
     INI_ITEM_PATH = 'Path'
 
     DEFAULT_SPEC_MODE = params.SpectroscopyMode.X_U
-    DEFAULT_FAKE_X_U = params.SpectroscopySettingsBias(1.0, 1.0, 0.0, 0.0)
-    DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(1.0, 1.0, 0.0, 0.0,
-                                                         0.0)
+    DEFAULT_FAKE_X_U = params.SpectroscopySettingsBias(1.0, 1.0, 0.0, 0.0,
+                                                       0.0)
+    DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(1.0, 1.0, 0.0, 0.0)
     DEFAULT_FAKE_SPEC_SETTINGS = DEFAULT_FAKE_X_Z
 
     def __init__(self, param_handler: ParameterHandler = None,
@@ -115,7 +115,7 @@ class SXMTranslator(ct.ConfigTranslator):
         # Set up our save settings (spec and scan) and configure our
         # spectroscopy settings.
         self._init_save_settings()
-        self._init_spec_settigs()
+        self._init_spec_settings()
 
     def _init_handlers(self, client: sxm.DDEClient,
                        param_handler: ParameterHandler,
@@ -140,7 +140,7 @@ class SXMTranslator(ct.ConfigTranslator):
                        ' If API support is added, update actions.toml and'
                        ' remove this override. Allowing to continue.')
 
-    def _init_scan_settings(self):
+    def _init_save_settings(self):
         """Set up scan / spec defaults: autosave and do not repeat."""
         self.param_handler.set_param(params.SXMParam.SCAN_AUTOSAVE, 1)
         # TODO: Can we turn continuous scan OFF?
@@ -470,15 +470,16 @@ def load_spec_from_file(fname: str,
 
 
 def get_spectroscopy_mode(settings: params.SpectroscopySettingsHeight |
-                          params.SpectroscopySettingsBias):
+                          params.SpectroscopySettingsBias
+                          ) -> params.SpectroscopyMode:
     """Get the spec mode associated with given settings.
 
     Note we only support D(z) or D(U) right now.
     """
     if isinstance(settings, params.SpectroscopySettingsHeight):
-        mode = params.SpectroscopyMode.X_Z.value
+        return params.SpectroscopyMode.X_Z
     elif isinstance(settings, params.SpectroscopySettingsBias):
-        mode = params.SpectroscopyMode.X_Z.value
+        return params.SpectroscopyMode.X_U
     else:
         msg = 'Unable to set spectroscopy settings for unsupported mode.'
         raise MicroscopeError(msg)

@@ -131,7 +131,7 @@ class SXMParameterHandler(params.ParameterHandler):
                 self.get_unit(params.MicroscopeParameter.SCAN_SIZE_Y))
 
         self.mode = mode
-        self._switch_feedback_mode(mode)
+        self.switch_feedback_mode(mode)
 
     def get_param_spm(self, spm_uuid: tuple[CallerType, str | int]) -> Any:
         """Override for SPM-specific getter."""
@@ -575,7 +575,7 @@ class SpectroscopySettingsHeight():
         return [SXMParam.DZ_U_DELAY,
                 SXMParam.DZ_U_ACQUISITION_TIME,
                 SXMParam.DZ_U_DZ1,
-                SXMParam.DZ_D2]
+                SXMParam.DZ_DZ2]
 
 
 @dataclass
