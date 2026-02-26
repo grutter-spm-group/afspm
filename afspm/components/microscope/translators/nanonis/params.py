@@ -75,7 +75,9 @@ class NanonisParameterInfo(params.ParameterInfo):
 
     def configure_uuid(self):
         """Set up the uuid based on other attributes."""
-        self.uuid = (self.class_name, self.index)
+        uuid = (self.class_name, self.index)
+        if None not in uuid:
+            self.uuid = uuid
 
 
 def validate_parameter(param_info: params.ParameterInfo,
@@ -520,9 +522,9 @@ def _create_spec_setting_param_info_entries() -> dict:
     param_info_map = {}
     for generic_id, class_name in zip(SPEC_SETTING_GENERIC_IDS,
                                       SPEC_SETTING_CLASSES):
-        info = params.SXMParameterInfo(uuid=None, unit=None, range=None,
-                                       class_name=class_name,
-                                       index=1)  # int for all statuses
+        info = params.NanonisParameterInfo(uuid=None, unit=None, range=None,
+                                           class_name=class_name,
+                                           index=1)  # int for all statuses
         param_info_map[generic_id] = info
     return param_info_map
 
