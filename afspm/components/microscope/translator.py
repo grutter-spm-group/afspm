@@ -20,6 +20,7 @@ from google.protobuf.message import Message
 from . import actions
 
 from .. import component as afspmc
+from ...utils import protobuf
 
 from ...io import common
 from ...io.pubsub import publisher as pub
@@ -552,7 +553,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
     def _update_scope_state(self, scope_state: scan_pb2.ScopeState):
         """Send and update scope state if different."""
-        if self.scope_state != scope_state:
+        if not protobuf.check_equal(self.scope_state, scope_state,
+                                    self.float_tolerance):
             scope_state_msg = scan_pb2.ScopeStateMsg(
                 scope_state=scope_state)
             logger.info("New scope state %s, sending out.",
@@ -563,21 +565,24 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
     def _update_scan_params(self, scan_params: scan_pb2.ScanParameters2d):
         """Send and update scan params if different."""
-        if scan_params != self.scan_params:
+        if not protobuf.check_equal(scan_params, self.scan_params,
+                                    self.float_tolerance):
             logger.info("New scan_params, sending out.")
             self.scan_params = scan_params
             self.publisher.send_msg(self.scan_params)
 
     def _update_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters):
         """Send and update zctrl params if different."""
-        if zctrl_params != self.zctrl_params:
+        if not protobuf.check_equal(zctrl_params, self.zctrl_params,
+                                    self.float_tolerance):
             logger.info("New zctrl_params, sending out.")
             self.zctrl_params = zctrl_params
             self.publisher.send_msg(self.zctrl_params)
 
     def _update_probe_pos(self, probe_pos: spec_pb2.ProbePosition):
         """Send and update probe pos if different."""
-        if probe_pos != self.probe_pos:
+        if not protobuf.check_equal(probe_pos, self.probe_pos,
+                                    self.float_tolerance):
             logger.info("New probe position, sending out.")
             self.probe_pos = probe_pos
             self.publisher.send_msg(self.probe_pos)
