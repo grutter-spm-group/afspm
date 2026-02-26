@@ -439,7 +439,7 @@ def set_scan_speed(handler: params.ParameterHandler,
     size_uuid = params.MicroscopeParameter.SCAN_SIZE_X
     size_x = handler.get_param(size_uuid)
     val = speed_metric_s_to_lines_s(val, size_x)
-    handler.set_param(SXMParam.SPEED_LINES_S)
+    handler.set_param(SXMParam.SPEED_LINES_S, val)
 
 
 # ----- Probe Position Methods ----- #
