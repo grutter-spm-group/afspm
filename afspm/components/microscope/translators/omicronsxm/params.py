@@ -397,6 +397,33 @@ def set_res_x(handler: params.ParameterHandler,
     handler.set_param(SXMParam.PIXEL_X_RATIO, val)
 
 
+# Hard-coded allowed resolutions for setting.
+ALLOWED_RESOLUTIONS = [32, 64, 128, 256, 512]
+
+
+def set_res_y(handler: params.ParameterHandler,
+              val: Any, unit: str):
+    """Set scan resolution y-dim.
+
+    The API only seems to allow one of ALLOWED_RESOLUTIONS to be set.
+    Here, we set to the closest resolution and provide a warning if the
+    fed val is not one of these.
+    """
+    diff = [abs(allowed_res - val) for allowed_res in ALLOWED_RESOLUTIONS]
+    index = diff.index(min(diff))
+
+    if diff[index] != 0:
+        msg = (f'Fed scan-resolution-y {val} is not one of allowed. '
+               'Please set a supported resolution from '
+               f'{ALLOWED_RESOLUTIONS}.')
+        raise params.ParameterError(msg)
+
+    # Strangely, we set the *index* of the allowed resolutions to set,
+    # but get the actual resolution...
+    handler.set_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y,
+                      index, unit, override_methods=True)
+
+
 # ----- Scan Speed Methods ----- #
 def speed_lines_s_to_metric_s(lines_s: float, scan_width_metric: float):
     """Go from lines/s to metric/s."""
@@ -515,33 +542,6 @@ def set_probe_pos_y(handler: params.ParameterHandler,
     # Convert to 'set' CS.
     val = get_to_set_cs(val, offset, handler.cs_correction_ratio[1])
     handler.set_param(SXMParam.SPEC_POS_Y, val, unit)
-
-
-# Hard-coded allowed resolutions for setting.
-ALLOWED_RESOLUTIONS = [32, 64, 128, 256, 512]
-
-
-def set_res_y(handler: params.ParameterHandler,
-              val: Any, unit: str):
-    """Set scan resolution y-dim.
-
-    The API only seems to allow one of ALLOWED_RESOLUTIONS to be set.
-    Here, we set to the closest resolution and provide a warning if the
-    fed val is not one of these.
-    """
-    diff = [abs(allowed_res - val) for allowed_res in ALLOWED_RESOLUTIONS]
-    index = diff.index(min(diff))
-
-    if diff[index] != 0:
-        msg = (f'Fed scan-resolution-y {val} is not one of allowed. '
-               'Please set a supported resolution from '
-               f'{ALLOWED_RESOLUTIONS}.')
-        raise params.ParameterError(msg)
-
-    # Strangely, we set the *index* of the allowed resolutions to set,
-    # but get the actual resolution...
-    handler.set_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y,
-                      index, unit, override_methods=True)
 
 
 class SpectroscopyMode(enum.Enum):
