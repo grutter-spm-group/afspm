@@ -34,14 +34,12 @@ index = 3
 # ----- Digital Scan Parameters ----- #
 [scan-resolution-x]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanBuffer'
-unit = 'm'
 range = [16, 8192]  # [1, 8192] pix
 type = 1
 index = 2
 
 [scan-resolution-y]
 uuid = 'afspm.components.microscope.translators.nanonis.message.scan.ScanBuffer'
-unit = 'm'
 range = [1, 8192]  # [1, 8192] pix
 type = 1
 index = 3
