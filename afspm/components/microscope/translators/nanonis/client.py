@@ -103,8 +103,11 @@ def send_request(client: NanonisClient, req: base.NanonisRequest,
         NanonisResponse of type rep that has been populated with received data,
             or None if no rep was provided.
     """
+    logger.trace(f'Sending request: {req}')
+    logger.trace(f'Requesting response: {rep is not None}')
     req_buffer = base.to_bytes(req)
     rep_buffer = client.send_request(req_buffer, rep is not None)
+    logger.trace(f'Received response: {rep}')
 
     if rep:
         if not rep_buffer:
