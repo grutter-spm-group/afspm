@@ -82,8 +82,8 @@ class NanonisParameterInfo(params.ParameterInfo):
 
 def validate_parameter(param_info: params.ParameterInfo,
                        param_methods: params.ParameterMethods,
-                       uuid: str) -> (params.ParameterInfo | None,
-                                      params.ParameterMethods | None):
+                       gid: str) -> (params.ParameterInfo | None,
+                                     params.ParameterMethods | None):
     """Override for NanonisParameterInfo."""
     param_methods_met = None not in [param_methods.getter,
                                      param_methods.setter]

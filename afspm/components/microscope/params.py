@@ -283,8 +283,8 @@ def _all_none(inst: ParameterInfo | ParameterMethods) -> bool:
 
 def validate_parameter(param_info: ParameterInfo,
                        param_methods: ParameterMethods,
-                       uuid: str) -> (ParameterInfo | None,
-                                      ParameterMethods | None):
+                       gid: str) -> (ParameterInfo | None,
+                                     ParameterMethods | None):
     """Validate we have enough infor in our param_info or param_methods.
 
     This method allows us to validate that we have sufficient information for
@@ -298,14 +298,14 @@ def validate_parameter(param_info: ParameterInfo,
     attrs is set to None (as it is, in principle, a None).
 
     Note that if you write your own version of this method, you can filter for
-    special parameters via the uuid.
+    special parameters via the gid.
 
     Args:
         param_info: ParameterInfo that has been instantiated for this
             Parameter.
         param_methods: ParameterMethods that has been instantiated for this
             Parameter.
-        uuid: str associated to our MicroscopeParameter. Equivalent to
+        gid: str associated to our MicroscopeParameter. Equivalent to
             MicroscopeParameter.value.
 
     Returns:
