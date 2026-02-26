@@ -275,6 +275,12 @@ def create_parameter_methods(param_dict: dict,
     return param_methods
 
 
+def _all_none(inst: ParameterInfo | ParameterMethods) -> bool:
+    """Check if inst is all None."""
+    tuple_inst = astuple(inst)
+    return tuple_inst.count(None) == len(tuple_inst)
+
+
 def validate_parameter(param_info: ParameterInfo,
                        param_methods: ParameterMethods,
                        uuid: str) -> (ParameterInfo | None,
@@ -287,12 +293,9 @@ def validate_parameter(param_info: ParameterInfo,
     enough in either one of them to continue.
 
     In this base implementation, we check ParameterInfo for type and uuid; and
-    ParameterMethods for getter and setter. We accept the latter if it has both
-    and the former if either:
-    - we have already accepted ParameterMethods and ParameterInfo is not all
-    None; or
-    - it has type and uuid. We do this to allow additional ParameterInfo data
-    to be used if desired (such as for capping the value range of a parameter).
+    ParameterMethods for getter and setter. If either of the two meets these
+    criteria, we accept *both*. However, either of the two that has all None
+    attrs is set to None (as it is, in principle, a None).
 
     Note that if you write your own version of this method, you can filter for
     special parameters via the uuid.
@@ -312,15 +315,13 @@ def validate_parameter(param_info: ParameterInfo,
     """
     param_methods_met = None not in [param_methods.getter,
                                      param_methods.setter]
-    if not param_methods_met:
-        param_methods = None
-        param_info_met = None not in [param_info.uuid, param_info.type]
-    else:
-        param_info_tuple = astuple(param_info)
-        param_info_met = param_info_tuple.count(None) < len(param_info_tuple)
+    param_info_met = None not in [param_info.uuid, param_info.type]
 
-    if not param_info_met:
-        param_info = None
+    if param_methods_met or param_info_met:
+        if _all_none(param_methods):
+            param_methods = None
+        if _all_none(param_info):
+            param_info = None
     return (param_info, param_methods)
 
 

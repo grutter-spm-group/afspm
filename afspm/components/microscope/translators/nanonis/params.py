@@ -1,7 +1,7 @@
 """Holds Nanonis controller parameters (and other extra logic)."""
 
 import logging
-from dataclasses import dataclass, replace, astuple, fields
+from dataclasses import dataclass, replace, astuple
 from typing import Any
 
 from ... import params
@@ -68,16 +68,14 @@ def validate_parameter(param_info: params.ParameterInfo,
     """
     param_methods_met = None not in [param_methods.getter,
                                      param_methods.setter]
-    if not param_methods_met:
-        param_methods = None
-        param_info_met = None not in [param_info.uuid, param_info.type,
-                                      param_info.index]
-    else:
-        param_info_tuple = astuple(param_info)
-        param_info_met = param_info_tuple.count(None) < len(param_info_tuple)
+    param_info_met = None not in [param_info.uuid, param_info.type,
+                                  param_info.index]
 
-    if not param_info_met:
-        param_info = None
+    if param_methods_met or param_info_met:
+        if params._all_none(param_methods):
+            param_methods = None
+        if params._all_none(param_info):
+            param_info = None
     return (param_info, param_methods)
 
 
