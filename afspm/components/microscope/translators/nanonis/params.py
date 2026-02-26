@@ -103,9 +103,9 @@ class NanonisParameterHandler(params.ParameterHandler):
 
     Attributes:
         _client: TCP client used to communicate with Nanonis.
-        _uuid_to_reqrep_get_map: holds a NanonisReqRep instance
+        _class_name_to_reqrep_get_map: holds a NanonisReqRep instance
             tied to a get call for a given specific uuid.
-        _uuid_to_reqrep_set_map: holds a NanonisReqRep instance
+        _class_name_to_reqrep_set_map: holds a NanonisReqRep instance
             tied to a set call for a given specific uuid.
     """
 
@@ -117,8 +117,8 @@ class NanonisParameterHandler(params.ParameterHandler):
             client: TCP client used to communicate with Nanonis.
         """
         self._client = client
-        self._uuid_to_reqrep_get_map = {}
-        self._uuid_to_reqrep_set_map = {}
+        self._class_name_to_reqrep_get_map = {}
+        self._class_name_to_reqrep_set_map = {}
 
         kwargs['param_info_class'] = NanonisParameterInfo
         kwargs['validate_parameter'] = validate_parameter
@@ -139,13 +139,13 @@ class NanonisParameterHandler(params.ParameterHandler):
             req = _evaluate_value_str(val.class_name + base.GET_REQ)()
             rep = _evaluate_value_str(val.class_name + base.GET_REP)()
             reqrep = base.NanonisReqRep(req, rep)
-            self._uuid_to_reqrep_get_map[val.class_name] = reqrep
+            self._class_name_to_reqrep_get_map[val.class_name] = reqrep
 
             # Store set information
             req = _evaluate_value_str(val.class_name + base.SET_REQ)()
             rep = _evaluate_value_str(val.class_name + base.SET_REP)()
             reqrep = base.NanonisReqRep(req, rep)
-            self._uuid_to_reqrep_set_map[val.class_name] = reqrep
+            self._class_name_to_reqrep_set_map[val.class_name] = reqrep
 
         # Set up hard-coded parameters
         self._load_status_logic()
@@ -157,19 +157,19 @@ class NanonisParameterHandler(params.ParameterHandler):
         These particular message types are get-only.
         """
         self.param_infos.update(_create_status_param_info_entries())
-        self._uuid_to_reqrep_get_map.update(
+        self._class_name_to_reqrep_get_map.update(
             _create_status_reqrep_map_entries())
 
     def _load_spec_setting_logic(self):
         self.param_infos.update(_create_spec_setting_param_info_entries())
-        self._uuid_to_reqrep_set_map.update(
+        self._class_name_to_reqrep_set_map.update(
             _create_spec_setting_reqrep_map_entries())
 
     # --- Helpers to try/catch KeyErrors --- #
     def _get_getter_req_rep(self, class_name: str) -> base.NanonisReqRep:
         """Getter of GET ReqRep with KeyError handling."""
         try:
-            req_rep = self._uuid_to_reqrep_get_map[class_name]
+            req_rep = self._class_name_to_reqrep_get_map[class_name]
         except KeyError:
             msg = f'Could not find GET NanonisReqRep for {class_name}.'
             raise params.ParameterConfigurationError(msg)
@@ -178,7 +178,7 @@ class NanonisParameterHandler(params.ParameterHandler):
     def _get_setter_req_rep(self, class_name: str) -> base.NanonisReqRep:
         """Getter of SET ReqRep with KeyError handling."""
         try:
-            req_rep = self._uuid_to_reqrep_set_map[class_name]
+            req_rep = self._class_name_to_reqrep_set_map[class_name]
         except KeyError:
             msg = f'Could not find SET NanonisReqRep for {class_name}.'
             raise params.ParameterConfigurationError(msg)
@@ -426,13 +426,14 @@ def set_scan_speed(handler: params.ParameterHandler,
     supports a generic 'scan-speed', we set the forward one and maintain
     the pre-existing ratio between forward and backward.
     """
-    uuid = params.MicroscopeParameter.SCAN_SPEED
-    speed_req = handler._obtain_base_set_req(uuid)
+    gid = params.MicroscopeParameter.SCAN_SPEED
+    param_info = handler._get_param_info(gid)
+    class_name = param_info.class_name
+    speed_req = handler._obtain_base_set_req(class_name)
 
     # Range / type handling
-    param_info = handler._get_param_info(uuid)
     val = params._correct_val_for_sending(val, param_info, unit,
-                                          uuid)
+                                          gid)
 
     # Set structure
     speed_req.fwd_speed = val
@@ -442,7 +443,7 @@ def set_scan_speed(handler: params.ParameterHandler,
     speed_req.speed_ratio = 1.0  # fwd/bwd speed should be same
 
     # Send
-    speed_rep = handler._get_setter_req_rep(uuid).rep
+    speed_rep = handler._get_setter_req_rep(class_name).rep
     send_request(handler._client, speed_req, speed_rep)
 
 
@@ -473,8 +474,9 @@ def _create_status_param_info_entries() -> dict:
             NanonisParameterHandler.
     """
     param_info_map = {}
-    for generic_id, uuid in zip(STATUS_GENERIC_IDS, STATUS_CLASSES):
-        info = params.ParameterInfo(uuid, unit=None, range=None,
+    for generic_id, class_name in zip(STATUS_GENERIC_IDS, STATUS_CLASSES):
+        info = NanonisParameterInfo(uuid=None, unit=None, range=None,
+                                    class_name=class_name, index=0,
                                     type=1)  # int for all statuses
         param_info_map[generic_id] = info
     return param_info_map
@@ -487,7 +489,7 @@ def _create_status_reqrep_map_entries() -> dict:
     worth doing explicitly, as these ones do not have setters!
 
     Returns:
-        uuid_to_reqrep_get_map-like dict, which can be joined with the
+        class_name_to_reqrep_get_map-like dict, which can be joined with the
             one in NanonisParameterHandler.
     """
     reqrep_map = {}
@@ -522,9 +524,9 @@ def _create_spec_setting_param_info_entries() -> dict:
     param_info_map = {}
     for generic_id, class_name in zip(SPEC_SETTING_GENERIC_IDS,
                                       SPEC_SETTING_CLASSES):
-        info = params.NanonisParameterInfo(uuid=None, unit=None, range=None,
-                                           class_name=class_name,
-                                           index=1)  # int for all statuses
+        info = NanonisParameterInfo(uuid=None, unit=None, range=None,
+                                    class_name=class_name, index=0,
+                                    type=1)  # int for all statuses
         param_info_map[generic_id] = info
     return param_info_map
 
