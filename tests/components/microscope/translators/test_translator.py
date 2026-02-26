@@ -503,10 +503,6 @@ def setup_faster_scan(config_dict: dict, client: ControlClient,
     """
     logger.info("Check if we provided specific scan parameters "
                 "(so the scan is not super long)")
-    scan_speeds = get_config_scan_speed(config_dict, client)
-    if len(scan_speeds) == 2:  # We received a desired speed, try to set
-        set_scan_speed(client, scan_speeds[1])
-
     desired_phys_size_nm = get_config_phys_size_nm(config_dict)
     desired_data_shape = get_config_data_shape(config_dict)
 
@@ -517,6 +513,11 @@ def setup_faster_scan(config_dict: dict, client: ControlClient,
                                          desired_phys_size_nm,
                                          desired_data_shape)
         scan_paramses.append(desired_params)
+
+    scan_speeds = get_config_scan_speed(config_dict, client)
+    if len(scan_speeds) == 2:  # We received a desired speed, try to set
+        set_scan_speed(client, scan_speeds[1])
+
     return scan_speeds, scan_paramses
 
 
@@ -537,12 +538,12 @@ def revert_original_scan_settings(
     """
     if orig_scan_speed or orig_scan_params:
         logger.info("Reset scan settings to what they were before the test.")
-        if orig_scan_speed:
-            set_scan_speed(client, orig_scan_speed)
         if orig_scan_params:
             set_scan_params(client, orig_scan_params)
             sub_scope_state.poll_and_store()  # Grab an SS_MOVING
             sub_scope_state.poll_and_store()  # Grab an SS_FREE
+        if orig_scan_speed:
+            set_scan_speed(client, orig_scan_speed)
 
 
 def test_run_scan(client, default_control_state,
