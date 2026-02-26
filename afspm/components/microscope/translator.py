@@ -568,6 +568,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if not protobuf.check_equal(scan_params, self.scan_params,
                                     self.float_tolerance):
             logger.info("New scan_params, sending out.")
+            logger.debug(scan_params)
             self.scan_params = scan_params
             self.publisher.send_msg(self.scan_params)
 
@@ -576,6 +577,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if not protobuf.check_equal(zctrl_params, self.zctrl_params,
                                     self.float_tolerance):
             logger.info("New zctrl_params, sending out.")
+            logger.debug(zctrl_params)
             self.zctrl_params = zctrl_params
             self.publisher.send_msg(self.zctrl_params)
 
@@ -584,6 +586,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if not protobuf.check_equal(probe_pos, self.probe_pos,
                                     self.float_tolerance):
             logger.info("New probe position, sending out.")
+            logger.debug(probe_pos)
             self.probe_pos = probe_pos
             self.publisher.send_msg(self.probe_pos)
 
