@@ -253,9 +253,9 @@ class NanonisParameterHandler(params.ParameterHandler):
         idx = self._get_struct_idx(spm_uuid)
         set_req = self._obtain_base_set_req(spm_uuid)
 
-        tuple_data = astuple(set_req)
-        tuple_data[idx] = spm_val
-        return copy_data_from_tuple(set_req, tuple_data)
+        list_data = list(astuple(set_req))
+        list_data[idx] = spm_val
+        return copy_data_from_tuple(set_req, list_data)
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
         """Implement.
