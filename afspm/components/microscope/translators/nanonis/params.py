@@ -275,7 +275,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         # P and I are very clearly linked? Consider changing I-gain
         # in params TOML accordingly...
         """
-        req = self._prepare_set_struct(spm_uuid, spm_val)
+        req = self._prepare_set_req(spm_uuid, spm_val)
         rep = (self._get_setter_req_rep(spm_uuid).rep if req.request_response()
                else None)
         # Not returning (not expected for set)
