@@ -553,8 +553,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
     def _update_scope_state(self, scope_state: scan_pb2.ScopeState):
         """Send and update scope state if different."""
-        if not protobuf.check_equal(self.scope_state, scope_state,
-                                    self.float_tolerance):
+        if self.scope_state != scope_state:
             scope_state_msg = scan_pb2.ScopeStateMsg(
                 scope_state=scope_state)
             logger.info("New scope state %s, sending out.",
