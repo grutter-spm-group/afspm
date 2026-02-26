@@ -17,12 +17,15 @@ logger = logging.getLogger(__name__)
 class NanonisParameterInfo(params.ParameterInfo):
     """Expanding ParameterInfo to be used for Nanonis params.
 
-    Here, we are adding an attribute and modifying one for our needs.
+    Here, we add two new attributes:
+    - class_name: a str indicating the class prefix we will be importing
+    (tied to the req/rep).
+    - index: int indicating the struct index of the parameter of interest.
 
-    uuid (modified):
+    class_name:
     ----
 
-    this now refers to the 'prefix' for the various NanonisMessages
+    This refers to the 'prefix' for the various NanonisMessages
     associated to this call. Each API call is linked to:
     - A VARIABLEStruct NanonisMessage, which is a dataclass containing
     the structure of the buffer we will send/receive.
@@ -40,7 +43,7 @@ class NanonisParameterInfo(params.ParameterInfo):
     will be imported in the same way as the getter/setter, so you should
     include the full path to it.
 
-    index (added):
+    index:
     -----
 
     This is an added parameter. It is to hold the index of the VARIABLEStruct
@@ -52,23 +55,37 @@ class NanonisParameterInfo(params.ParameterInfo):
     If the generic parameter maps to an individual parameter (i.e. not
     a composite), you can likely set index to 0. This is best determined
     by reviewing the associated NanonisMessage.
+
+    uuid:
+    -----
+
+    Rather than providing the uuid, this class creates the uuid in its
+    __post_init__() method.
+
+    We have modified the method overrides to clarify this.
     """
 
+    uuid: tuple[str, int]
+    class_name: str
     index: int  # Indicates VARIABLEStruct index for this parameter.
+
+    def __post_init__(self):
+        """Configure uuid."""
+        self.configure_uuid()
+
+    def configure_uuid(self):
+        """Set up the uuid based on other attributes."""
+        self.uuid = (self.class_name, self.index)
 
 
 def validate_parameter(param_info: params.ParameterInfo,
                        param_methods: params.ParameterMethods,
                        uuid: str) -> (params.ParameterInfo | None,
                                       params.ParameterMethods | None):
-    """Like params.create_parameter_info, but for NanonisParameterInfo.
-
-    The difference in logic is that ParameterInfos are accepted on their own
-    if they have uuid, type, and index.
-    """
+    """Override for NanonisParameterInfo."""
     param_methods_met = None not in [param_methods.getter,
                                      param_methods.setter]
-    param_info_met = None not in [param_info.uuid, param_info.type,
+    param_info_met = None not in [param_info.type, param_info.class_name,
                                   param_info.index]
 
     if param_methods_met or param_info_met:
@@ -88,10 +105,6 @@ class NanonisParameterHandler(params.ParameterHandler):
             tied to a get call for a given specific uuid.
         _uuid_to_reqrep_set_map: holds a NanonisReqRep instance
             tied to a set call for a given specific uuid.
-        _uuid_to_struct_index_map: holds the NanonisMessage's attribute index
-            for a given parameter. (Remember, many parameters are stored in
-            composite structures, so they will be one of many and thus have
-            an index.)
     """
 
     def __init__(self, client: clnt.NanonisClient,
@@ -104,7 +117,6 @@ class NanonisParameterHandler(params.ParameterHandler):
         self._client = client
         self._uuid_to_reqrep_get_map = {}
         self._uuid_to_reqrep_set_map = {}
-        self._uuid_to_struct_index_map = {}
 
         kwargs['param_info_class'] = NanonisParameterInfo
         kwargs['validate_parameter'] = validate_parameter
@@ -122,19 +134,16 @@ class NanonisParameterHandler(params.ParameterHandler):
         # Populate specific_uuid-to-reqrep mappings
         for key, val in self.param_infos.items():
             # Store get information
-            req = _evaluate_value_str(val.uuid + base.GET_REQ)()
-            rep = _evaluate_value_str(val.uuid + base.GET_REP)()
+            req = _evaluate_value_str(val.class_name + base.GET_REQ)()
+            rep = _evaluate_value_str(val.class_name + base.GET_REP)()
             reqrep = base.NanonisReqRep(req, rep)
-            self._uuid_to_reqrep_get_map[val.uuid] = reqrep
+            self._uuid_to_reqrep_get_map[val.class_name] = reqrep
 
             # Store set information
-            req = _evaluate_value_str(val.uuid + base.SET_REQ)()
-            rep = _evaluate_value_str(val.uuid + base.SET_REP)()
+            req = _evaluate_value_str(val.class_name + base.SET_REQ)()
+            rep = _evaluate_value_str(val.class_name + base.SET_REP)()
             reqrep = base.NanonisReqRep(req, rep)
-            self._uuid_to_reqrep_set_map[val.uuid] = reqrep
-
-            # Store index information
-            self._uuid_to_struct_index_map[val.uuid] = val.index
+            self._uuid_to_reqrep_set_map[val.class_name] = reqrep
 
         # Set up hard-coded parameters
         self._load_status_logic()
@@ -148,54 +157,41 @@ class NanonisParameterHandler(params.ParameterHandler):
         self.param_infos.update(_create_status_param_info_entries())
         self._uuid_to_reqrep_get_map.update(
             _create_status_reqrep_map_entries())
-        self._uuid_to_struct_index_map.update(
-            _create_status_struct_index_entries())
 
     def _load_spec_setting_logic(self):
         self.param_infos.update(_create_spec_setting_param_info_entries())
         self._uuid_to_reqrep_set_map.update(
             _create_spec_setting_reqrep_map_entries())
-        self._uuid_to_struct_index_map.update(
-            _create_spec_setting_struct_index_entries())
 
     # --- Helpers to try/catch KeyErrors --- #
-    def _get_getter_req_rep(self, spm_uuid: str) -> base.NanonisReqRep:
+    def _get_getter_req_rep(self, class_name: str) -> base.NanonisReqRep:
         """Getter of GET ReqRep with KeyError handling."""
         try:
-            req_rep = self._uuid_to_reqrep_get_map[spm_uuid]
+            req_rep = self._uuid_to_reqrep_get_map[class_name]
         except KeyError:
-            msg = f'Could not find GET NanonisReqRep for {spm_uuid}.'
+            msg = f'Could not find GET NanonisReqRep for {class_name}.'
             raise params.ParameterConfigurationError(msg)
         return req_rep
 
-    def _get_setter_req_rep(self, spm_uuid: str) -> base.NanonisReqRep:
+    def _get_setter_req_rep(self, class_name: str) -> base.NanonisReqRep:
         """Getter of SET ReqRep with KeyError handling."""
         try:
-            req_rep = self._uuid_to_reqrep_set_map[spm_uuid]
+            req_rep = self._uuid_to_reqrep_set_map[class_name]
         except KeyError:
-            msg = f'Could not find SET NanonisReqRep for {spm_uuid}.'
+            msg = f'Could not find SET NanonisReqRep for {class_name}.'
             raise params.ParameterConfigurationError(msg)
         return req_rep
-
-    def _get_struct_idx(self, spm_uuid: str) -> int:
-        """Getter of NanonisMessage attribute index with KeyError handling."""
-        try:
-            idx = self._uuid_to_struct_index_map[spm_uuid]
-        except KeyError:
-            msg = f'Could not find Nanonis struct index for {spm_uuid}.'
-            raise params.ParameterConfigurationError(msg)
-        return idx
     # --- End KeyError catching helpers --- #
 
-    def _get_param_spm_rep(self, spm_uuid: str
+    def _get_param_spm_rep(self, class_name: str
                            ) -> base.NanonisResponse | None:
         """Like get_param_spm(), but we return the NanonisResponse."""
-        req_rep = self._get_getter_req_rep(spm_uuid)
+        req_rep = self._get_getter_req_rep(class_name)
         req = req_rep.req
         rep = (req_rep.rep if req.request_response() else None)
         return send_request(self._client, req, rep)
 
-    def get_param_spm(self, spm_uuid: str) -> Any:
+    def get_param_spm(self, spm_uuid: tuple[str, int]) -> Any:
         """Implement.
 
         In this implementation, spm_uuid is in fact a str containing
@@ -206,14 +202,16 @@ class NanonisParameterHandler(params.ParameterHandler):
         Note, however, that we *also* need the index of the struct we are
         getting
         """
-        get_rep = self._get_param_spm_rep(spm_uuid)
+        class_name = spm_uuid[0]
+        index = spm_uuid[1]
+        get_rep = self._get_param_spm_rep(class_name)
+
         if get_rep:
-            val_idx = self._uuid_to_struct_index_map[spm_uuid]
-            val = astuple(get_rep)[val_idx]
+            val = astuple(get_rep)[index]
             return val
         return None
 
-    def _obtain_base_set_req(self, spm_uuid: str) -> base.NanonisRequest:
+    def _obtain_base_set_req(self, class_name: str) -> base.NanonisRequest:
         """Obtain base request we will be using to set.
 
         Many of the parameters we wish to set are part of a composite structure
@@ -227,22 +225,22 @@ class NanonisParameterHandler(params.ParameterHandler):
         in the main get()/set() calls because we should not be explicitly
         getting or setting something that (we should know) does not exist.
         """
-        set_req = self._get_setter_req_rep(spm_uuid).req
+        set_req = self._get_setter_req_rep(class_name).req
 
         # If dealing with composite parameter, call get() to obtain initial
         # vals (so we don't overwrite/change the other parameters when
         # setting).
         if len(astuple(set_req)) > 1:
             try:
-                get_rep = self._get_param_spm_rep(spm_uuid)
+                get_rep = self._get_param_spm_rep(class_name)
                 return copy_data(set_req, get_rep)
             except params.ParameterConfigurationError:
-                logger.debug(f'Not getting initial values for {spm_uuid},'
+                logger.debug(f'Not getting initial values for {class_name},'
                              ' due to GET() not existing.')
                 pass
         return set_req
 
-    def _prepare_set_req(self, spm_uuid: str, spm_val: Any
+    def _prepare_set_req(self, class_name: str, index: int, spm_val: Any
                          ) -> base.NanonisMessage:
         """Obtain and populate a NanonisRequest for setting.
 
@@ -250,14 +248,13 @@ class NanonisParameterHandler(params.ParameterHandler):
         modify the appropriate attribute (linked to our parameter of interest).
         The returned structure is ready to be sent out to our setter method.
         """
-        idx = self._get_struct_idx(spm_uuid)
-        set_req = self._obtain_base_set_req(spm_uuid)
+        set_req = self._obtain_base_set_req(class_name)
 
         list_data = list(astuple(set_req))
-        list_data[idx] = spm_val
+        list_data[index] = spm_val
         return copy_data_from_tuple(set_req, list_data)
 
-    def set_param_spm(self, spm_uuid: str, spm_val: Any):
+    def set_param_spm(self, spm_uuid: tuple[str, int], spm_val: Any):
         """Implement.
 
         Because many of the parameters we set are settable via composite
@@ -275,9 +272,12 @@ class NanonisParameterHandler(params.ParameterHandler):
         # P and I are very clearly linked? Consider changing I-gain
         # in params TOML accordingly...
         """
-        req = self._prepare_set_req(spm_uuid, spm_val)
-        rep = (self._get_setter_req_rep(spm_uuid).rep if req.request_response()
-               else None)
+        class_name = spm_uuid[0]
+        index = spm_uuid[1]
+
+        req = self._prepare_set_req(class_name, index, spm_val)
+        rep = (self._get_setter_req_rep(class_name).rep
+               if req.request_response() else None)
         # Not returning (not expected for set)
         send_request(self._client, req, rep)
 
@@ -451,13 +451,13 @@ def set_scan_speed(handler: params.ParameterHandler,
 # hard-coding the logic here.
 
 # Special parameters for get only (ScanAction is needed for actions.py)
-BASE_UUID = 'afspm.components.microscope.translators.nanonis.message.'
+BASE_CLASS = 'afspm.components.microscope.translators.nanonis.message.'
 STATUS_GENERIC_IDS = [NanonisParam.SCAN_STATUS, NanonisParam.BIAS_SPEC_STATUS,
                       NanonisParam.Z_SPEC_STATUS, NanonisParam.FILE_PATH]
-STATUS_UUIDS = [BASE_UUID + 'scan.ScanStatus',
-                BASE_UUID + 'spectroscopy.BiasSpectraStatus',
-                BASE_UUID + 'spectroscopy.ZSpectraStatus',
-                BASE_UUID + 'util.SessionPath']
+STATUS_CLASSES = [BASE_CLASS + 'scan.ScanStatus',
+                  BASE_CLASS + 'spectroscopy.BiasSpectraStatus',
+                  BASE_CLASS + 'spectroscopy.ZSpectraStatus',
+                  BASE_CLASS + 'util.SessionPath']
 
 
 def _create_status_param_info_entries() -> dict:
@@ -471,7 +471,7 @@ def _create_status_param_info_entries() -> dict:
             NanonisParameterHandler.
     """
     param_info_map = {}
-    for generic_id, uuid in zip(STATUS_GENERIC_IDS, STATUS_UUIDS):
+    for generic_id, uuid in zip(STATUS_GENERIC_IDS, STATUS_CLASSES):
         info = params.ParameterInfo(uuid, unit=None, range=None,
                                     type=1)  # int for all statuses
         param_info_map[generic_id] = info
@@ -489,26 +489,13 @@ def _create_status_reqrep_map_entries() -> dict:
             one in NanonisParameterHandler.
     """
     reqrep_map = {}
-    for uuid in STATUS_UUIDS:
+    for class_name in STATUS_CLASSES:
         # Store get information
-        req = _evaluate_value_str(uuid + base.GET_REQ)()
-        rep = _evaluate_value_str(uuid + base.GET_REP)()
+        req = _evaluate_value_str(class_name + base.GET_REQ)()
+        rep = _evaluate_value_str(class_name + base.GET_REP)()
         reqrep = base.NanonisReqRep(req, rep)
-        reqrep_map[uuid] = reqrep
+        reqrep_map[class_name] = reqrep
     return reqrep_map
-
-
-def _create_status_struct_index_entries() -> dict:
-    """Create index entries for our status parameters.
-
-    Returns:
-        uuid_to_struct_index_map-like dict, which can be joined with the one
-            in NanonisParameterHandler.
-    """
-    index_map = {}
-    for uuid in STATUS_UUIDS:
-        index_map[uuid] = 0
-    return index_map
 
 
 # ----- Hard-coded spec autosave properties ----- %
@@ -521,20 +508,21 @@ SPEC_SETTING_GENERIC_IDS = [NanonisParam.BIAS_SPEC_AUTO_SAVE,
                             NanonisParam.BIAS_SHOW_SAVE_DIALOG,
                             NanonisParam.Z_SPEC_AUTO_SAVE,
                             NanonisParam.Z_SHOW_SAVE_DIALOG]
-SPEC_SETTING_UUIDS = [BASE_UUID + 'spectroscopy.BiasSpectraProps',
-                      BASE_UUID + 'spectroscopy.BiasSpectraProps',
-                      BASE_UUID + 'spectroscopy.ZSpectraProps',
-                      BASE_UUID + 'spectroscopy.ZSpectraProps']
+SPEC_SETTING_CLASSES = [BASE_CLASS + 'spectroscopy.BiasSpectraProps',
+                        BASE_CLASS + 'spectroscopy.BiasSpectraProps',
+                        BASE_CLASS + 'spectroscopy.ZSpectraProps',
+                        BASE_CLASS + 'spectroscopy.ZSpectraProps']
 SPEC_SETTING_INDICES = [5, 6, 3, 4]
 
 
 def _create_spec_setting_param_info_entries() -> dict:
     """Equivalent to _create_status_param_info_entries() for spec setting."""
     param_info_map = {}
-    for generic_id, uuid in zip(SPEC_SETTING_GENERIC_IDS,
-                                SPEC_SETTING_UUIDS):
-        info = params.ParameterInfo(uuid, unit=None, range=None,
-                                    type=1)  # int for all statuses
+    for generic_id, class_name in zip(SPEC_SETTING_GENERIC_IDS,
+                                      SPEC_SETTING_CLASSES):
+        info = params.SXMParameterInfo(uuid=None, unit=None, range=None,
+                                       class_name=class_name,
+                                       index=1)  # int for all statuses
         param_info_map[generic_id] = info
     return param_info_map
 
@@ -545,22 +533,13 @@ def _create_spec_setting_reqrep_map_entries() -> dict:
     In this case, only setters are added.
     """
     reqrep_map = {}
-    for uuid in SPEC_SETTING_UUIDS:
+    for class_name in SPEC_SETTING_CLASSES:
         # Store get information
-        req = _evaluate_value_str(uuid + base.SET_REQ)()
-        rep = _evaluate_value_str(uuid + base.SET_REP)()
+        req = _evaluate_value_str(class_name + base.SET_REQ)()
+        rep = _evaluate_value_str(class_name + base.SET_REP)()
         reqrep = base.NanonisReqRep(req, rep)
-        reqrep_map[uuid] = reqrep
+        reqrep_map[class_name] = reqrep
     return reqrep_map
-
-
-def _create_spec_setting_struct_index_entries() -> dict:
-    """Equivalent to _create_status_struct_index_entries() for spec setting."""
-    index_map = {}
-    for uuid, index in zip(SPEC_SETTING_UUIDS,
-                           SPEC_SETTING_INDICES):
-        index_map[uuid] = index
-    return index_map
 
 
 @dataclass
