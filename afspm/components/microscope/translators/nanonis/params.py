@@ -254,7 +254,7 @@ class NanonisParameterHandler(params.ParameterHandler):
 
         list_data = list(astuple(set_req))
         list_data[index] = spm_val
-        return copy_data_from_tuple(list_data, set_req)
+        return copy_data_from_tuple(tuple(list_data), set_req)
 
     def set_param_spm(self, spm_uuid: tuple[str, int], spm_val: Any):
         """Implement.
