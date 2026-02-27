@@ -8,7 +8,7 @@ import SciFiReaders as sr
 
 from ...translator import FLOAT_TOLERANCE_KEY
 from ...params import (ParameterHandler, DEFAULT_PARAMS_FILENAME,
-                       MicroscopeParameter)
+                       MicroscopeParameter, PROBE_POS_PARAMS)
 from ...actions import (ActionHandler, DEFAULT_ACTIONS_FILENAME)
 from ...import config_translator as ct
 from .....utils import array_converters as conv
@@ -225,6 +225,21 @@ class NanonisTranslator(ct.ConfigTranslator):
         self.param_handler.send_request(req_rep.req, req_rep.rep)
         return control_pb2.ControlResponse.REP_SUCCESS
 
+    def on_set_probe_pos(self, probe_pos: spec_pb2.ProbePosition
+                         ) -> control_pb2.ControlResponse:
+        """Override to avoid many get calls."""
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.PROBE_POS_X).class_name
+        req_rep = self.param_handler._get_setter_req_rep(class_name)
+
+        vals = [probe_pos.point.x, probe_pos.point.y]
+        units = [probe_pos.units, probe_pos.units]
+        req_rep.req = self.param_handler.populate_req(
+            req_rep.req, PROBE_POS_PARAMS, vals, units)
+
+        self.param_handler.send_request(req_rep.req, req_rep.rep)
+        return control_pb2.ControlResponse.REP_SUCCESS
+
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Override to avoid many get calls."""
         length_units = self.param_handler.get_unit(
@@ -282,6 +297,22 @@ class NanonisTranslator(ct.ConfigTranslator):
         zctrl_params.proportionalGain = gain_rep.proportional
 
         return zctrl_params
+
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
+        """Override to avoid many get calls."""
+        gid = params.MicroscopeParameter.PROBE_POS_X
+        units = self.param_handler.get_unit(gid)
+        class_name = self.param_handler._get_param_info(gid).class_name
+        req_rep = self.param_handler._get_getter_req_rep(class_name)
+        pos_rep = self.param_handler.send_request(req_rep.req, req_rep.rep)
+
+        # Populate
+        probe_pos_params = spec_pb2.ProbePosition()
+        probe_pos_params.point.x = pos_rep.x
+        probe_pos_params.point.y = pos_rep.y
+        probe_pos_params.units = units
+
+        return probe_pos_params
 
     def set_setup_properties(self, props: params.SetupProperties):
         """Set the current SetupProperties."""
