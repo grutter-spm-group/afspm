@@ -229,8 +229,8 @@ class NanonisMessageError(Exception):
 def _decode_tuple(tuple_data: tuple[Any]) -> tuple[Any]:
     """Decode a received tuple of data."""
     # Extract attributes as list, converting str to utf-8 encoded bytes.
-    list_data = [t.decode('utf-8') if isinstance(t, str) else t
-                 for t in tuple_data]
+    list_data = [t.decode('utf-8') if isinstance(t, bytes | bytearray)
+                 else t for t in tuple_data]
     return tuple(list_data)
 
 
