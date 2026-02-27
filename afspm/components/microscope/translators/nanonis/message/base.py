@@ -226,6 +226,14 @@ class NanonisMessageError(Exception):
     """The parsed response indicates an error."""
 
 
+def _decode_tuple(tuple_data: tuple[Any]) -> tuple[Any]:
+    """Decode a received tuple of data."""
+    # Extract attributes as list, converting str to utf-8 encoded bytes.
+    list_data = [t.decode('utf-8') if isinstance(t, str) else t
+                 for t in tuple_data]
+    return tuple(list_data)
+
+
 def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     """Populate NanonisResponse from bytes array and initialized response.
 
@@ -249,9 +257,7 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
         logger.trace(f'Offset: {offset}, format: {format}')
         tuple_data = struct.unpack_from(format, buffer, offset)
         logger.trace(f'tuple_data: {tuple_data}')
-        # Extract attributes as list, converting str to utf-8 encoded bytes
-        tuple_data = [t.decode('utf-8') if isinstance(t, str) else t
-                      for t in tuple_data]
+        tuple_data = _decode_tuple(tuple_data)
 
         # Update struct with proper values
         new_rep = replace(rep_part, **rep_part.create_data_dict(tuple_data))
@@ -277,6 +283,24 @@ def from_bytes(buffer: bytes, rep: NanonisResponse) -> NanonisResponse:
     return inst
 
 
+def _encode_tuple(req: NanonisRequest) -> tuple[Any]:
+    """Encode data from a request into a tuple of data.
+
+    Importantly, we have to concatenate iterable items (tuples, lists),
+    because our bytes packing takes a single, 1D tuple.
+    """
+    # Extract attributes as list, converting str to utf-8 encoded bytes
+    data = []
+    for t in astuple(req):
+        if isinstance(t, str):
+            data.append(t.encode('utf-8'))
+        elif isinstance(t, list) or isinstance(t, tuple):
+            data = data + list(t)  # concatenate
+        else:
+            data.append(t)
+    return tuple(data)
+
+
 def to_bytes(req: NanonisRequest) -> bytes:
     """Create bytes array from NanonisRequest."""
     logger.trace(f'to_bytes: {repr(req)}')
@@ -290,9 +314,8 @@ def to_bytes(req: NanonisRequest) -> bytes:
             (req_header, req),
             (0, struct.calcsize(req_header.format()))):
         format = this_req.get_format()
-        # Extract attributes as list, converting str to utf-8 encoded bytes
-        data = [t.encode('utf-8') if isinstance(t, str) else t
-                for t in astuple(this_req)]
+        data = _encode_tuple(this_req)
+
         logger.trace(f'this_req: {repr(this_req)}')
         logger.trace(f'offset: {offset}, format: {repr(format)}')
         logger.trace(f'Data: {data}')
