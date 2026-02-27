@@ -302,6 +302,28 @@ class NanonisTranslator(ct.ConfigTranslator):
         return zctrl_params
 
     def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
+        """Override to avoid calls and over-polling.
+
+        We need to do this because our probe position getter returns the
+        actual position of the probe at any point in time. This means
+        that we send many probe position updates during, e.g., a scan.
+
+        The current expectation is that probe pos get will tell us where
+        the probe will be for spectroscopies / tip manipulation operations,
+        and that a set() will result in SS_MOVING until the probe is at this
+        location. In short, while the current behaviour is nice, it is not
+        what our black-box expectations are.
+
+        With this override, we meet our black-box expectations.
+
+        Note that _poll_probe_pos() does the actual composite polling.
+        """
+        if self.scope_state in [scan_pb2.ScopeState.SS_FREE,
+                                scan_pb2.ScopeState.SS_UNDEFINED]:
+            return self._poll_probe_pos()
+        return self.probe_pos
+
+    def _poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
         """Override to avoid many get calls."""
         gid = MicroscopeParameter.PROBE_POS_X
         units = self.param_handler.get_unit(gid)
