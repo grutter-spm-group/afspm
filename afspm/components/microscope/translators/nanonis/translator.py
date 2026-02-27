@@ -182,11 +182,11 @@ class NanonisTranslator(ct.ConfigTranslator):
             req_rep.req, self.PHYSICAL_SCAN_PARAMS, vals, units)
         self.param_handler.send_request(req_rep.req, req_rep.rep)
 
-        # Populate and send resolution (this requires a get due to
-        # channels data in Nanonis struct)
+        # Populate and send resolution
         class_name = self.param_handler._get_param_info(
             MicroscopeParameter.SCAN_RESOLUTION_X).class_name
         req_rep = self.param_handler._get_setter_req_rep(class_name)
+        # This requires a get due to channels data in Nanonis struct)
         req_rep.req = self.param_handler._obtain_base_set_req(class_name)
         vals = [scan_params.data.shape.x,
                 scan_params.data.shape.y]
