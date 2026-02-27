@@ -471,7 +471,8 @@ def set_scan_speed(handler: params.ParameterHandler,
     speed_req.fwd_speed = val
     speed_req.bwd_speed = val
     # TODO: Test is const should be LINEAR_SPEED or NO_CHANGE.
-    speed_req.keep_parameter_constant = scan.ScanSpeedConstant.LINEAR_SPEED
+    speed_req.keep_parameter_constant = (
+        scan.ScanSpeedConstant.LINEAR_SPEED.value)
     speed_req.speed_ratio = 1.0  # fwd/bwd speed should be same
 
     # Send
