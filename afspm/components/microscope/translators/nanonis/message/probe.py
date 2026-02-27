@@ -1,6 +1,6 @@
 """Probe positioning message structures."""
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Any
 
 from . import base
@@ -59,7 +59,7 @@ class XYPosSetReq(base.NanonisRequest, XYPosSet,
         as the parent method will fail.
         """
         tuple_data = tuple_data + (1,)  # Default wait_end_of_move
-        return super().create_data_dict(tuple_data)
+        return dict(zip([f.name for f in fields(cls)], tuple_data))
 
 
 class XYPosSetRep(base.EmptyResponse, XYPosSet):
