@@ -191,7 +191,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         req_rep = self._get_getter_req_rep(class_name)
         req = req_rep.req
         rep = (req_rep.rep if req.request_response() else None)
-        return send_request(self._client, req, rep)
+        return self.send_request(req, rep)
 
     def get_param_spm(self, spm_uuid: tuple[str, int]) -> Any:
         """Implement.
@@ -280,8 +280,40 @@ class NanonisParameterHandler(params.ParameterHandler):
         req = self._prepare_set_req(class_name, index, spm_val)
         rep = (self._get_setter_req_rep(class_name).rep
                if req.request_response() else None)
-        # Not returning (not expected for set)
-        send_request(self._client, req, rep)
+        self.send_request(req, rep)
+
+    def send_request(self, req: base.NanonisRequest,
+                     rep: base.NanonisResponse
+                     ) -> base.NanonisResponse | None:
+        """Given a filled out req, send out."""
+        return send_request(self._client, req, rep)
+
+    def populate_req(self, req: base.NanonisRequest,
+                     gids: list[params.MicroscopeParameter],
+                     vals: list[Any], units: list[str]) -> base.NanonisRequest:
+        """Fill a request with the provided values.
+
+        This will populate the vals associated with gids into the provided
+        request. We use _correct_val_for_sending() to ensure each value is
+        properly set.
+
+        Args:
+            req: NanonisRequest we are populating.
+            gids: generic ids for each value in vals.
+            vals: vals we are setting.
+            units: units of each value in vals.
+        """
+        param_infos = [self._get_param_info(gid) for gid in gids]
+        indices = [self.param_handler._get_param_info(gid).index
+                   for gid in gids]
+        new_vals = [params._correct_val_for_sending(val, param_info, unit, gid)
+                    for val, gid, unit, param_info in zip(vals, gids, units,
+                                                          param_infos)]
+
+        list_data = astuple(req)
+        for index, val in zip(new_vals, indices):
+            list_data[index] = val
+        return copy_data_from_tuple(tuple(list_data), req)
 
 
 def copy_data(copy_from: base.NanonisMessage,
@@ -445,7 +477,7 @@ def set_scan_speed(handler: params.ParameterHandler,
 
     # Send
     speed_rep = handler._get_setter_req_rep(class_name).rep
-    send_request(handler._client, speed_req, speed_rep)
+    handler.send_request(speed_req, speed_rep)
 
 
 # ----- Hard-coded status logic ----- #

@@ -155,7 +155,7 @@ class NanonisTranslator(ct.ConfigTranslator):
         scan_req.continuous_scan = props.scan_continuous_scan
         scan_req.auto_save = props.scan_auto_save
         scan_rep = self.param_handler._get_setter_req_rep(class_name).rep
-        params.send_request(self.param_handler._client, scan_req, scan_rep)
+        self.param_handler.send_request(scan_req, scan_rep)
 
         # Prep spec properties
         class_name = self.param_handler._get_param_info(
@@ -164,7 +164,7 @@ class NanonisTranslator(ct.ConfigTranslator):
         z_req.auto_save = props.spec_auto_save
         z_req.show_save_dialog = props.spec_save_dialog
         z_rep = self.param_handler._get_setter_req_rep(class_name).rep
-        params.send_request(self.param_handler._client, z_req, z_rep)
+        self.param_handler.send_request(z_req, z_rep)
 
         class_name = self.param_handler._get_param_info(
             params.NanonisParam.BIAS_SPEC_AUTO_SAVE).class_name
@@ -172,7 +172,7 @@ class NanonisTranslator(ct.ConfigTranslator):
         bias_req.auto_save = props.spec_auto_save
         bias_req.show_save_dialog = props.spec_save_dialog
         bias_rep = self.param_handler._get_setter_req_rep(class_name).rep
-        params.send_request(self.param_handler._client, bias_req, bias_rep)
+        self.param_handler.send_request(bias_req, bias_rep)
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Implement."""
