@@ -5,7 +5,6 @@ method = 'afspm.components.microscope.translators.nanonis.actions.scan_action'
 action = 0  # Start
 type = 'PASS_ARGS'
 pass_self = true
-# TODO create this method
 
 [stop-scan]
 method = 'afspm.components.microscope.translators.nanonis.actions.scan_action'
@@ -18,7 +17,6 @@ method = 'afspm.components.microscope.translators.nanonis.actions.spec_action'
 action = 0  # Start
 type = 'PASS_ARGS'
 pass_self = true
-# TODO: Create this method.
 
 [stop-spec]
 method = 'afspm.components.microscope.translators.nanonis.actions.spec_action'
