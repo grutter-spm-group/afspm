@@ -30,15 +30,10 @@ class ScanDirection(Enum):
 
 @dataclass
 class ScanActionStruct(base.NanonisMessage):
-    """Scan Action struct.
-
-    NOTE:
-    - We default to non-sensical attribute values to ensure we are properly
-    parsing get() calls.
-    """
+    """Scan Action struct."""
 
     action: int = -1  # 2 bytes, unsigned int16
-    direction: int = -1  # 4 bytes, unsigned int32
+    direction: int = base.DEF_INT  # 4 bytes, unsigned int32
 
     def format(self) -> str:
         """Override."""
