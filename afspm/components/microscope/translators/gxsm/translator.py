@@ -9,19 +9,15 @@ from afspm.components.microscope.params import (ParameterHandler,
                                                 DEFAULT_PARAMS_FILENAME)
 from afspm.components.microscope.actions import (ActionHandler,
                                                  DEFAULT_ACTIONS_FILENAME)
-from afspm.components.microscope.translator import (
-    get_file_modification_datetime)
 from afspm.components.microscope import config_translator as ct
 from afspm.utils import array_converters as conv
 
 from afspm.io.protos.generated import scan_pb2
 from afspm.io.protos.generated import spec_pb2
-from afspm.io.protos.generated import geometry_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read
-from gxsmread.spec import (KEY_PROBE_POS_X, KEY_PROBE_POS_Y,
-                           KEY_PROBE_POS_UNITS, KEY_UNITS)
+from gxsmread.spec import KEY_UNITS
 
 from . import params
 from . import actions
@@ -30,11 +26,6 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
-# Attributes from the read scan file (differs from params.toml, which
-# contains UUIDs for getting/setting parameters).
-SCAN_ATTRIB_ANGLE = 'alpha'
-# Hardcoded, even though it is also in params.toml. For loading scan.
-SCAN_ANGLE_UNIT = 'degrees'
 SPEC_EXT_SEARCH = '*.vpdata'
 
 
@@ -60,6 +51,9 @@ class GxsmTranslator(ct.ConfigTranslator):
         last_scan_fname: Holds last filename to minimize loading files
             unnecessarily (basic cache check).
         old_scans: Holds last scans for cache purposes.
+        last_spec_fname: Holds last filename to minimize loading files
+            unecessarily (basic cache check).
+        old_spec: Holds last spec for cache purposes.
     """
 
     STATE_RUNNING_THRESH = 0
@@ -212,11 +206,7 @@ class GxsmTranslator(ct.ConfigTranslator):
         return fnames
 
     def _load_scan(self, fname: str) -> scan_pb2.Scan2d | None:
-        """Try to load a scan from a given filename (None on error).
-
-        We also correct the scan here, to ensure the scan params and timestamp
-        are set properly.
-        """
+        """Try to load a scan from a given filename (None on error)."""
         scan = load_scan_from_file(
             fname, self.read_channels_config_path,
             self.read_use_physical_units,
@@ -256,13 +246,9 @@ class GxsmTranslator(ct.ConfigTranslator):
 def convert_dataframe_to_spec1d(df: pd.DataFrame) -> spec_pb2.Spec1d:
     """Convert pandas DataFrame to spec_pb2.Spec1d.
 
-    NOTE: This does *not* contain the proper ProbePosition! The user must
-    modify the ProbePosition to its appropriate value after calling this.
+    NOTE: Even though this does appear to have probe pos info, we are
+    not populating it and instead using correct_spec().
     """
-    point_2d = geometry_pb2.Point2d(x=float(df.attrs[KEY_PROBE_POS_X]),
-                                    y=float(df.attrs[KEY_PROBE_POS_Y]))
-    probe_pos = spec_pb2.ProbePosition(point=point_2d,
-                                       units=df.attrs[KEY_PROBE_POS_UNITS])
     units_dict = df.attrs[KEY_UNITS]
     names = list(units_dict.keys())
     units = list(units_dict.values())
@@ -329,6 +315,10 @@ def load_scan_from_file(fname: str,
                         ) -> scan_pb2.Scan2d | None:
     """Load gxsm scan, filling in info possible from file only.
 
+    NOTE: We follow the suggestions of config_translator and use correct_scan()
+    in the calling method (avoids any coordinate system differences).
+    We still need to set the filename, however.
+
     Args:
         fname: path to the scan.
         read_channels_config_path: path to config file for configuring loading
@@ -342,54 +332,44 @@ def load_scan_from_file(fname: str,
             saved as variables but are metadata to be switched to metadata.
 
     Returns:
-        loaded scan in scan_pb2 format. None if file is empty or failure
-        loading scan.
+        loaded scan in scan_pb2 format. None if file is empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        ds = read.open_dataset(
-            fname, read_channels_config_path,
-            read_use_physical_units,
-            read_allow_convert_from_metadata,
-            read_simplify_metadata,
-            engine='scipy')
+    ds = read.open_dataset(
+        fname, read_channels_config_path,
+        read_use_physical_units,
+        read_allow_convert_from_metadata,
+        read_simplify_metadata,
+        engine='scipy')
 
-        # Grabbing first data variable, since each channel is
-        # stored in its own file (so each file should have only
-        # one data variable).
-        scan = conv.convert_xarray_to_scan_pb2(
-            ds[list(ds.data_vars)[0]])
+    # Grabbing first data variable, since each channel is
+    # stored in its own file (so each file should have only
+    # one data variable).
+    scan = conv.convert_xarray_to_scan_pb2(
+        ds[list(ds.data_vars)[0]])
+    scan.filename = fname
 
-        # Set ROI angle, timestamp, filename
-        scan.params.spatial.roi.angle = ds.attrs[SCAN_ATTRIB_ANGLE]
-        scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
-
-        ts = get_file_modification_datetime(fname)
-        scan.timestamp.FromDatetime(ts)
-        scan.filename = fname
-
-        return scan
-    except Exception:
-        logger.error(f"Could not read scan fname {fname}, "
-                     f"got error.", exc_info=True)
-        return None
+    return scan
 
 
 def load_spec_from_file(fname: str) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
 
+    NOTE: We follow the suggestions of config_translator and use correct_spec()
+    in the calling method (avoids any coordinate system differences).
+
     Args:
         fname: path to spec file.
 
     Returns:
-        Spec1d if loaded properly, None if spec file was empty or exception
-        thrown when reading.
+        Spec1d if loaded properly, None if spec file was empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        df = read.open_spec(fname)
-        spec = convert_dataframe_to_spec1d(df)
-        spec.filename = fname
-        return spec
-    except Exception:
-        logger.error(f"Could not read spec fname {fname}, "
-                     f"got error.", exc_info=True)
-        return None
+    df = read.open_spec(fname)
+    spec = convert_dataframe_to_spec1d(df)
+    spec.filename = fname
+    return spec

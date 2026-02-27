@@ -20,6 +20,7 @@ from google.protobuf.message import Message
 from . import actions
 
 from .. import component as afspmc
+from ...utils import protobuf
 
 from ...io import common
 from ...io.pubsub import publisher as pub
@@ -40,6 +41,7 @@ ANGLE_ATTRIB = 'angle'
 PARAM_VALUE_ATTRIB = 'value'
 
 WARNING_SENT_COUNT = 0  # To ensure we don't spam about Scan2d angle issue
+FLOAT_TOLERANCE_KEY = 'float_tolerance'
 
 
 class MicroscopeError(Exception):
@@ -368,10 +370,10 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         Here are the 3 potential microscope behaviours and how we suggest
         implementing them for your controller:
         1. Microscope does not detect SS_MOVING: in this case, simply use
-        self._handle_sending_fake_move() in on_set_scan_params() and
+        self._send_scope_state() in on_set_scan_params() and
         on_set_probe_pos().
         2. Microscope detects SS_MOVING if the ScanParameters2d change: in this
-        case, you should (a) use self._handle_sending_fake_move() in
+        case, you should (a) use self._send_scope_state() in
         on_set_scan_params() and on_set_probe_pos(); and (b) in
         poll_scope_state(), return the *prior* scope state (self.scope_state)
         if SS_MOVING is detected. This way, we receive a single SS_MOVING event
@@ -461,49 +463,31 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         differently: any client should get all other changes *before* the
         state change.
         """
-        old_scope_state = copy.deepcopy(self.scope_state)
-        self.scope_state = self.poll_scope_state()
+        scope_state = self.poll_scope_state()
 
         # If we were interrupted, skip the scope state update for one iteration.
         if self._was_interrupted:
-            self.scope_state = old_scope_state
+            scope_state = self.scope_state
             self._was_interrupted = False
 
-        if (old_scope_state == scan_pb2.ScopeState.SS_SCANNING and
-                self.scope_state != scan_pb2.ScopeState.SS_SCANNING):
+        # Update scan/spec when scan/spec ends
+        if (self.scope_state == scan_pb2.ScopeState.SS_SCANNING and
+                scope_state != scan_pb2.ScopeState.SS_SCANNING):
             self._update_scans()
-
-        if (old_scope_state == scan_pb2.ScopeState.SS_SPEC and
-                self.scope_state != scan_pb2.ScopeState.SS_SPEC):
+        if (self.scope_state == scan_pb2.ScopeState.SS_SPEC and
+                scope_state != scan_pb2.ScopeState.SS_SPEC):
             self._update_specs()
 
-        # Handle on non-scope-state parameters
-        old_scan_params = copy.deepcopy(self.scan_params)
-        self.scan_params = self.poll_scan_params()
-        if old_scan_params != self.scan_params:
-            logger.info("New scan_params, sending out.")
-            self.publisher.send_msg(self.scan_params)
-
-        old_zctrl_params = copy.deepcopy(self.zctrl_params)
-        self.zctrl_params = self.poll_zctrl_params()
-        if old_zctrl_params != self.zctrl_params:
-            logger.info("New zctrl_params, sending out.")
-            self.publisher.send_msg(self.zctrl_params)
-
-        old_probe_pos = copy.deepcopy(self.probe_pos)
-        self.probe_pos = self.poll_probe_pos()
-        if old_probe_pos != self.probe_pos:
-            logger.info("New probe position, sending out.")
-            self.publisher.send_msg(self.probe_pos)
+        # Handle non-scope-state parameters
+        scan_params = self.poll_scan_params()
+        self._update_scan_params(scan_params)
+        zctrl_params = self.poll_zctrl_params()
+        self._update_zctrl_params(zctrl_params)
+        probe_pos = self.poll_probe_pos()
+        self._update_probe_pos(probe_pos)
 
         # scope state changes sent *last*!
-        if old_scope_state != self.scope_state:
-            logger.info("New scope state %s, sending out.",
-                        common.get_enum_str(scan_pb2.ScopeState,
-                                            self.scope_state))
-            scope_state_msg = scan_pb2.ScopeStateMsg(
-                scope_state=self.scope_state)
-            self.publisher.send_msg(scope_state_msg)
+        self._update_scope_state(scope_state)
 
     def _update_scans(self):
         old_scans = copy.deepcopy(self.scans)
@@ -557,8 +541,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             self.spec.timestamp != old_spec.timestamp)
         # Only compare spec data if not the case.
         specs_different = specs_different or both_have_spec and (
-            self.spec.data.values !=
-            old_spec.data.values)  # TODO: Check other values?
+            self.spec.data.values != old_spec.data.values)
+        # TODO: Check other values?
 
         if only_new_has_spec or specs_different:
             send_spec = True
@@ -566,6 +550,44 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
         if send_spec:
             logger.info("New spec, sending out.")
             self.publisher.send_msg(self.spec)
+
+    def _update_scope_state(self, scope_state: scan_pb2.ScopeState):
+        """Send and update scope state if different."""
+        if self.scope_state != scope_state:
+            scope_state_msg = scan_pb2.ScopeStateMsg(
+                scope_state=scope_state)
+            logger.info("New scope state %s, sending out.",
+                        common.get_enum_str(scan_pb2.ScopeState,
+                                            scope_state))
+            self.publisher.send_msg(scope_state_msg)
+            self.scope_state = scope_state
+
+    def _update_scan_params(self, scan_params: scan_pb2.ScanParameters2d):
+        """Send and update scan params if different."""
+        if not protobuf.check_equal(scan_params, self.scan_params,
+                                    self.float_tolerance):
+            logger.info("New scan_params, sending out.")
+            logger.debug(scan_params)
+            self.scan_params = scan_params
+            self.publisher.send_msg(self.scan_params)
+
+    def _update_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters):
+        """Send and update zctrl params if different."""
+        if not protobuf.check_equal(zctrl_params, self.zctrl_params,
+                                    self.float_tolerance):
+            logger.info("New zctrl_params, sending out.")
+            logger.debug(zctrl_params)
+            self.zctrl_params = zctrl_params
+            self.publisher.send_msg(self.zctrl_params)
+
+    def _update_probe_pos(self, probe_pos: spec_pb2.ProbePosition):
+        """Send and update probe pos if different."""
+        if not protobuf.check_equal(probe_pos, self.probe_pos,
+                                    self.float_tolerance):
+            logger.info("New probe position, sending out.")
+            logger.debug(probe_pos)
+            self.probe_pos = probe_pos
+            self.publisher.send_msg(self.probe_pos)
 
     def _handle_incoming_requests(self):
         """Poll control_server for requests and responds to them."""
@@ -600,22 +622,6 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                     self.control_server.reply(rep[0], rep[1])
                 else:
                     self.control_server.reply(rep)
-
-    def _handle_sending_fake_move(self):
-        """Send a fake SS_MOVING event (if applicable).
-
-        This method should be used by translators for controllers that do not
-        detect the probe moving. To match our expected state machine, we still
-        must send an SS_MOVING event, even if the controller does not have a
-        way to indicate it.
-        """
-        self.scope_state = scan_pb2.ScopeState.SS_MOVING
-        scope_state_msg = scan_pb2.ScopeStateMsg(
-            scope_state=self.scope_state)
-        logger.info("New scope state %s, sending out.",
-                    common.get_enum_str(scan_pb2.ScopeState,
-                                        self.scope_state))
-        self.publisher.send_msg(scope_state_msg)
 
     def run_per_loop(self):
         """Where we monitor for requests and publish results."""

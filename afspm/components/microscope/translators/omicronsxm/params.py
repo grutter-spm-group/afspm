@@ -1,479 +1,619 @@
-"""Holds Omicron controller parameters and logic to set and get them.
+"""Holds Omicron SXM controller parameters (and other extra logic)."""
 
-NOTE: ScanPara() expects a string but GetScanPara() returns a float.
-    TODO period at the end of docstring title?
-    TODO put dashes back in notes, etc. 
-    TODO remove plus signs in strings
-"""
+import logging
 
 import enum
-import logging
+import math  # For isclose
+from dataclasses import dataclass
 from typing import Any
-from types import MappingProxyType  # Immutable dict
 
-from afspm.components.microscope import params
-from afspm.utils import units
+from ... import params
+from . import sxm
 
-from ...io.protos.generated import scan_pb2
-from afspm.io.protos.generated import feedback_pb2
-
-from SXMRemote import DDEClient
 
 logger = logging.getLogger(__name__)
 
 
-# ----- Omicron Params ----- #
-class OmicronParameter(str, enum.Emum):  # TODO why not "OmicronParameterS"?
-    """Omicron internal parameters.
+class CallerType(str, enum.Enum):
+    """The caller type, used to determine the get/set function name."""
 
-    NOTE: Omicron keeps track of the scan region using the coordinates of the
-    center of the scanning region instead of the top-left as the rest of AFSPM
-    does. This is remedied by calculating the position of the center of the ROI
-    from the position of the top left and the size of the region, given by the 
-    user.
+    SCAN = 'SCAN'
+    FEEDBACK = 'FEEDBACK'
+    SPECTRA = 'SPECTRA'
+    CHANNEL = 'CHANNEL'
 
-    Also NOTE: Omicron only takes square scans. Therefore, if the given x- and
-    y- dimensions and resolution are not equal, we take the greatest of the two
-    and log a warning indicating we did so. 
+
+class FeedbackMode(enum.Enum):
+    """The feedback mode used, STM or AFM."""
+
+    STM = enum.auto()
+    AFM = enum.auto()
+
+
+def get_getter_substr(caller: CallerType) -> str:
+    """Get the setter substring for a given CallerType."""
+    match caller:
+        case CallerType.SCAN:
+            return 'GetScanPara'
+        case CallerType.FEEDBACK:
+            return 'GetFeedPara'  # TODO: Validate!
+        case CallerType.SPECTRA:
+            return 'GetSpectPara'
+        case CallerType.CHANNEL:
+            return 'GetChannel'
+        case _:
+            raise ValueError(f'{caller} is an unsupported CallerType.')
+
+
+def get_setter_substr(caller: CallerType) -> str:
+    """Get the setter substring for a given CallerType."""
+    match caller:
+        case CallerType.SCAN:
+            return 'ScanPara'
+        case CallerType.FEEDBACK:
+            return 'FeedPara'
+        case CallerType.SPECTRA:
+            return 'SpectPara'
+        case CallerType.CHANNEL:
+            return 'SetChannel'
+        case _:
+            raise ValueError(f'{caller} is an unsupported CallerType.')
+
+
+@dataclass
+class SXMParameterInfo(params.ParameterInfo):
+    """Adds caller attribute to ParameterInfo.
+
+    We need this in the case of SXM to know what method we are calling.
+
+    In the SXM case, we have two new attributes:
+    - caller: a CallerType indicates the method call (see
+    get_getter_substr and get_setter_substr above).
+    - caller_id: for this method call, our parameter has a given
+    id, which may be a str or int.
+
+    Rather than providing the uuid, this class creates the uuid in its
+    __post_init__() method.
+
+    We have modified the method overrides to clarify this.
     """
 
-    # Physical scan parameters
-    TL_X = "X"  # NOTE: X-coordinate of the center, not top left
-    TL_Y = "Y"  # idem
-    SZ_X = "Range"  # x-dimension of scan region.
-    SZ_Y = "Range"  # y-dimension of scan region
+    uuid: tuple[CallerType, str | int]
+    caller: CallerType
+    caller_id: str | int
 
-    # Digital scan parameters
-    RES_X = "Pixel"  # x-resolution
-    RES_Y = "Pixel"  # y-resolution. Same as for x because scans are square
+    def __post_init__(self):
+        """Configure uuid."""
+        self.configure_uuid()
 
-    # Feedback parameters
-    CP = "Kp"   # proportional gain of main feedback loop.
-    CI = "Ki"   # integral gain of main feedback loop.
-
-    # Other
-    # TODO SCAN_SPEED_UNITS_S?
+    def configure_uuid(self):
+        """Set up the uuid based on other attributes."""
+        uuid = (self.caller, self.caller_id)
+        if None not in uuid:
+            self.uuid = uuid
 
 
-class OmicronParameterUnit(str, enum.Enum):
-    """Units for the Omicron parameters.
+def validate_parameter(param_info: params.ParameterInfo,
+                       param_methods: params.ParameterMethods,
+                       gid: str) -> (params.ParameterInfo | None,
+                                     params.ParameterMethods | None):
+    """Override for SXMParameterInfo."""
+    param_methods_met = None not in [param_methods.getter,
+                                     param_methods.setter]
+    param_info_met = None not in [param_info.type, param_info.caller,
+                                  param_info.caller_id]
 
-    Name: unit name in Omicron terminology.
-    Value: expected physical unit.
+    if param_methods_met or param_info_met:
+        if params._all_none(param_methods):
+            param_methods = None
+        if params._all_none(param_info):
+            param_info = None
+    return (param_info, param_methods)
+
+
+class SXMParameterHandler(params.ParameterHandler):
+    """Implements SXM-specific getter/setter logic for parameter handling.
+
+    Notes:
+    - The probe position set() and get() calls are in different coordinate
+    systems (see readme)! To be consistent, we store a correction ratio in
+    _cs_correction_ratio.
+
+    Attributes:
+        client: DDE client used to communicate with SXM.
+        mode: FeedbackMode we are to be running in.
+        cs_correction_ratio: [x, y] indicating correction ratio between
+            get probe position and set probe position. Needed to properly
+            set.
     """
 
-    # Physical scan parameters
-    X = "nm"
-    Y = "nm"
-    Range = "nm"
+    DEFAULT_MODE = FeedbackMode.AFM
+    DEFAULT_CS_CORRECTION_RATIO = [3.964, 3.704]
 
-    # Digital scan parameters
-    Pixel = None
+    def __init__(self, client: sxm.DDEClient, mode: FeedbackMode = DEFAULT_MODE,
+                 cs_correction_ratio: list[int] = DEFAULT_CS_CORRECTION_RATIO,
+                 **kwargs):
+        """Override create_parameter_info for our special one.
 
-    # Feedback parameters
-    Kp = None
-    Ki = None
+        Args:
+            client: DDE client used to communicate with SXM.
+            mode: FeedbackMode we are to be running in. Defaults to
+                DEFAULT_MODE.
+        """
+        self.client = client
+        self.cs_correction_ratio = cs_correction_ratio
+        kwargs['param_info_class'] = SXMParameterInfo
+        kwargs['validate_parameter'] = validate_parameter
+        super().__init__(**kwargs)
 
-# TODO? class OmicronChannelIds(enum.Enum):
+        # Asserting some parameters' units are the same. If they're not
+        # we cannot predict what some of our calls will do!
+        assert (self.get_unit(SXMParam.CENTER_Y) ==
+                self.get_unit(params.MicroscopeParameter.SCAN_SIZE_Y))
+
+        self.mode = mode
+        self.switch_feedback_mode(mode)
+
+    def get_param_spm(self, spm_uuid: tuple[CallerType, str | int]) -> Any:
+        """Override for SPM-specific getter."""
+        caller = spm_uuid[0]
+        caller_id = spm_uuid[1]
+        # Special case for CHANNEL get calls.
+        # Get is negative, Set positive (for mysterious reasons).
+        if caller == CallerType.CHANNEL:
+            caller_id = -1 * caller_id
+
+        caller_substr = get_getter_substr(caller)
+        return self._call_get(caller_substr, caller_id)
+
+    def _call_get(self, method: str, attr: str | int) -> Any:
+        """Error handling around get call."""
+        try:
+            if isinstance(attr, str):
+                attr = "'" + attr + "'"
+            call_str = "a:=" + method + f"({attr});\r\nwriteln(a);"
+
+            val = self.client.execute_and_return(call_str)
+            if val is not None:
+                return val
+            else:
+                msg = (f"Getting {attr} returned None. This happens when "
+                       "the request sent to the SXM controller is not "
+                       "recognized. Verify that the parameter requested is "
+                       "spelled correctly and exists.")
+                logger.error(msg)
+                raise Exception(msg)
+
+        except (sxm.RequestError, TimeoutError, sxm.SynchronizationError) as e:
+            msg = f"Error getting parameter {attr}: {e}"
+            raise params.ParameterError(msg)
+
+    def set_param_spm(self, spm_uuid: tuple[CallerType, str | int]
+                      , spm_val: Any):
+        """Override for SPM-specific setter."""
+        caller = spm_uuid[0]
+        caller_id = spm_uuid[1]
+        caller_substr = get_setter_substr(caller)
+        self._call_set(caller_substr, caller_id, spm_val)
+
+    def _call_set(self, substr: str, attr: str | int, val: str):
+        """Error handling around set call."""
+        try:
+            if isinstance(attr, str):
+                attr = "'" + attr + "'"
+            self.client.execute_no_return(substr + f"({attr},{val});")
+        except sxm.RequestError as e:
+            msg = f"Error setting scan parameter {attr} to {val}: {e}"
+            raise params.ParameterError(msg)
+
+    def switch_feedback_mode(self, mode: FeedbackMode):
+        """Switch to using the appropriate feedback mode."""
+        ratio = 0 if mode == FeedbackMode.AFM else 100
+        self.client.execute_no_return(f"FeedPara('Ratio', {ratio});")
+        # Change Ki/Kp value for appropriate mode.
+        gid = params.MicroscopeParameter.ZCTRL_PGAIN
+        info = self._get_param_info(gid)
+        info.caller_id = 'Kp' if mode == FeedbackMode.AFM else 'Kp2'
+        info.configure_uuid()
+        self.param_infos[gid] = info
+
+        gid = params.MicroscopeParameter.ZCTRL_IGAIN
+        info = self._get_param_info(gid)
+        info.caller_id = 'Ki' if mode == FeedbackMode.AFM else 'Ki2'
+        info.configure_uuid()
+        self.param_infos[gid] = info
+
+        self.mode = mode
 
 
-# TODO finish this
-PARAM_METHOD_MAP = MappingProxyType({
-#    params.MicroscopeParameter.SCAN_SPEED: # insert scan speed method here
-})
+class SXMParam(params.MicroscopeParameterBase):
+    """SXM-specific parameters, used as 'generic' names in config.
 
-# ----- Lists of scan and feedback parameters ----- #
-# Omicron classifies parameters as "Scan Parameters" or "Feedback Parameters",
-# and we use a different function to set/get the two categories. To that end,
-# we keep lists here of the two categories. Also, we note the parameter used to
-# start/stop a scan here, to access it in controller.on_start/stop_scan.
+    We use the 'name' of these parameters as their generic uuid when
+    querying them from the params config. So, for example, for CENTER_X,
+    we expect:
+        [center-x]
+        uuid = 'something'
+        [...]
+    In the config file.
 
-# TODO make these from OmicronParameter (all but last 2 are scan param),
-# last 2 are feedback
-SCAN_PARAM = ["X", "Y", "Range", "Pixel"]
-FEEDBACK_PARAM = ["Enable", "Ki", "Kp"]
-ON_OFF_PARAM = ["Scan"]
-
-# It's also useful to have a list of the afspm parameters
-AFSPM_PARAMS = [e.name for e in OmicronParameter]
-
-# The Anfatec controller only supports some specific resolution values.
-# It expects to receive the index of the pixel count (1-indexed) in this list
-# rather than the actual value.
-# Note: the Anfatec can scan at a resolution of 1024 pixels, but the python
-# interface does not support setting it to that value. To scan at 1024, 
-# the resolution must then have been set previously, manually.
-
-# TODO can't currently scan at 1024:
-# we would need to set it manually and never touch again, but we currently
-# require ScanParameters2d messages to have values for every param. therefore,
-# the translator will try to set to something else.
-# To support this, we would need an edge case where if resolution == 1024,
-# we don't try to set the resolution (do nothing)
-ANFATEC_RESOLUTION = [32, 64, 128, 256, 512]
-
-
-# ----- Getters / Setters ----- #
-def _set_scan_param(client: DDEClient, attr: str, val: Any) -> None:
-    """Set the given scan parameter (not feedback parameter) to given value.
-
-    NOTES:
-        - Conversions to Omicron units (nm) must have previously been done.
-        - SXMRemote does not handle exceptions if fed a bad parameter name /
-        value. Therefore, it is important that "attr" is correct, e.g. by
-        taking it from the list of parameter names above.
-
-    Args:
-        client: The DDE client connected to the Omicron controller.
-        attr: name of attribute, in Omicron terminology.
-        val: value to set.
-
-    Raises:
-        ParameterError if setting fails
+    Note that the caller is crucial, as that allows us to know how to call
+    the appropriate get/set method.
     """
-    try:
-        client.SendWait(f"ScanPara('{attr}',{val});")
-    except Exception as e:
-        msg = f"Error setting scan parameter {attr} to {val}: {e}"
-        logger.error(msg)
+
+    CENTER_X = 'center-x'
+    CENTER_Y = 'center-y'
+    SIZE_X_RATIO = 'size-x-ratio'
+    PIXEL_X_RATIO = 'pixel-x-ratio'
+    SPEED_LINES_S = 'speed-lines-s'
+    SCAN_STATE = 'scan-state'
+    SCAN_AUTOSAVE = 'scan-autosave'
+
+    # NOTE: These are set only
+    SPEC_AUTOSAVE = 'spec-autosave'
+    SPEC_REPEAT = 'spec-repeat'
+
+    # --- The below are for dealing with probe position --- #
+    # Position for running spec.
+    SPEC_POS_X = 'spec-pos-x'  # Set only.
+    SPEC_POS_Y = 'spec-pos-y'  # Set only.
+    # Actual position of probe.
+    TIP_POS_X = 'tip-pos-x'  # Get only.
+    TIP_POS_Y = 'tip-pos-y'  # Get only.
+
+    # --- Spectroscopy settings --- #
+    # NOTE: These are set only
+    SPEC_MODE = 'spec-mode'
+    DZ_U_DELAY = 'dz-u-delay'  # ms
+    DZ_U_ACQUISITION_TIME = 'dz-u-acq-t'  # ms
+    DZ_U_DZ1 = 'dz-u-dz1'  # nm
+
+    DZ_DZ2 = 'dz-dz2'  # nm
+
+    U_U_START = 'u-u-start'  # mV
+    U_U_STOP = 'u-u-stop'  # mV
+
+
+# ---- Special Conversions ----- #
+# Special conversions due to differences between SXM and our generic model.
+# Note that we do not do unit conversions for data within params.toml here;
+# rather, we check at __init__ of the ParameterHandler.
+
+
+# ----- Top-Left Position Methods ----- #
+def center_to_top_left(pos: float, size: float):
+    """Go from center -> TL."""
+    return pos - 0.5*size
+
+
+def top_left_to_center(pos: float, size: float):
+    """Go from center -> TL."""
+    return pos + 0.5*size
+
+
+def get_scan_x(handler: params.ParameterHandler) -> Any:
+    """Get top-left x-position of scan.
+
+    The SXM stores the center position, so we need to add half of
+    (width/height) to what we receive.
+    """
+    generic_ids = [SXMParam.CENTER_X,
+                   params.MicroscopeParameter.SCAN_SIZE_X]
+    vals = handler.get_param_list(generic_ids)
+    return center_to_top_left(vals[0], vals[1])
+
+
+def get_scan_y(handler: params.ParameterHandler) -> Any:
+    """Get top-left y-position of scan.
+
+    The SXM stores the center position, so we need to add half of
+    (width/height) to what we receive.
+    """
+    generic_ids = [SXMParam.CENTER_Y,
+                   params.MicroscopeParameter.SCAN_SIZE_Y]
+    vals = handler.get_param_list(generic_ids)
+    return center_to_top_left(vals[0], vals[1])
+
+
+def set_scan_x(handler: params.ParameterHandler,
+               val: Any, unit: str):
+    """Set top-left x-position of scan.
+
+    The SXM stores the center position, so we need to subtract half of
+    (width/height) to what we receive.
+    """
+    size = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
+    pos = top_left_to_center(val, size)
+    handler.set_param(SXMParam.CENTER_X, pos, unit)
+
+
+def set_scan_y(handler: params.ParameterHandler,
+               val: Any, unit: str):
+    """Set top-left y-position of scan.
+
+    The SXM stores the center position, so we need to subtract half of
+    (width/height) to what we receive.
+    """
+    size = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_Y)
+    pos = top_left_to_center(val, size)
+    handler.set_param(SXMParam.CENTER_Y, pos, unit)
+
+
+# ----- Size / Resolution Methods ----- #
+def get_size_x(handler: params.ParameterHandler) -> Any:
+    """Get the size of the X-dimension.
+
+    In SXM, the Y-dimension is stored and an aspect ratio is stored to
+    convert this to the X-dimension. Thus, we do this operation here.
+    """
+    generic_ids = [SXMParam.SIZE_X_RATIO,
+                   params.MicroscopeParameter.SCAN_SIZE_Y]
+    vals = handler.get_param_list(generic_ids)
+    return vals[0] * vals[1]
+
+
+def get_res_x(handler: params.ParameterHandler) -> Any:
+    """Get the resolution of the X-dimension.
+
+    In SXM, the Y-dimension is stored and an aspect ratio is stored to
+    convert this to the X-dimension. Thus, we do this operation here.
+    """
+    generic_ids = [SXMParam.PIXEL_X_RATIO,
+                   params.MicroscopeParameter.SCAN_RESOLUTION_Y]
+    vals = handler.get_param_list(generic_ids)
+    return vals[0] * vals[1]
+
+
+def set_size_x(handler: params.ParameterHandler,
+               val: Any, unit: str):
+    """Set the size of the X-dimension.
+
+    In SXM, the Y-dimension is stored and an aspect ratio is stored to
+    convert this to the X-dimension. Thus, we do this operation here.
+
+    NOTE: We are manually using _correct_val_for_sending() here, because
+    the stored data is an aspect ratio and thus the range checking
+    is less clear. Thus, we ensure it is within SCAN_SIZE_X ranges
+    before converting to a ratio.
+    """
+    size_y = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_Y)
+
+    if math.isclose(size_y, 0.0):  # TODO: consider rel_tol?
+        msg = 'Cannot set scan-size-x due to scan-size-y being 0.'
         raise params.ParameterError(msg)
 
+    # Ensure within expected ranges!
+    gid = params.MicroscopeParameter.SCAN_SIZE_X
+    val = params._correct_val_for_sending(
+        val, handler._get_param_info(gid), unit, gid)
 
-def _set_feedback_param(client: DDEClient, attr: str, val: Any) -> None:
-    """Set a feedback / ZCtlr parameter in the same way as set_scan_param().
+    val = val / size_y
+    handler.set_param(SXMParam.SIZE_X_RATIO, val)
 
-    This function is separate because a different command is
-    required by the Omicron controller to set feedback parameters.
-    TODO change like above
-    NOTE: SXMRemote does not handle exceptions if fed a bad parameter name / 
-    value.
 
-    Args:
-        client: The DDE client connected to the Omicron controller. 
-        attr: name of attribute, in Omicron terminology.
-        val: value to set.
+def set_res_x(handler: params.ParameterHandler,
+              val: Any, unit: str):
+    """Set the resolution of the X-dimension.
 
-    Raises:
-        ParameterError if setting fails
+    In SXM, the Y-dimension is stored and an aspect ratio is stored to
+    convert this to the X-dimension. Thus, we do this operation here.
+
+    NOTE: We are manually using _correct_val_for_sending() here, because
+    the stored data is an aspect ratio and thus the range checking
+    is less clear. Thus, we ensure it is within SCAN_RESOLUTION_X ranges
+    before converting to a ratio.
     """
-    try:
-        client.SendWait(f"FeedPara('{attr}',{val});")
-    except Exception as e:
-        msg = f"Error setting ZCtrl parameter {attr} to {val}: {e}"
-        logger.error(msg)
+    res_y = handler.get_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y)
+
+    if res_y == 0:
+        msg = 'Cannot set scan-resolution-x due to scan-resolution-y being 0.'
         raise params.ParameterError(msg)
 
+    # Ensure within expected ranges!
+    gid = params.MicroscopeParameter.SCAN_RESOLUTION_X
+    val = params._correct_val_for_sending(
+        val, handler._get_param_info(gid), unit, gid)
 
-def set_param(client: DDEClient, attr: str, val: Any) -> None:
-    """Set the specified parameter to the provided value.
+    val = val / res_y
+    handler.set_param(SXMParam.PIXEL_X_RATIO, val)
 
-    Args:
-        client: The DDE client connected to the Omicron controller. 
-        attr: name of attribute, in Omicron terminology.
-        val: value to set, in Omicron units
 
-    Raises:
-        ParameterError if setting fails
-        ValueError if attr is not recognized (i.e. it isn't in one of the
-        following lists: SCAN_PARAM, ON_OFF_PARAM, FEEDBACK_PARAM)
+# Hard-coded allowed resolutions for setting.
+ALLOWED_RESOLUTIONS = [32, 64, 128, 256, 512]
+
+
+def set_res_y(handler: params.ParameterHandler,
+              val: Any, unit: str):
+    """Set scan resolution y-dim.
+
+    The API only seems to allow one of ALLOWED_RESOLUTIONS to be set.
+    Here, we set to the closest resolution and provide a warning if the
+    fed val is not one of these.
     """
-    # because there is no way of telling whether the command to SXMRemote is
-    # successful, we ensure here that the parameter name exists
-    if attr in SCAN_PARAM or attr in ON_OFF_PARAM: 
-        return _set_scan_param(client, attr, val)
-    elif attr in FEEDBACK_PARAM:
-        return _set_feedback_param(client, attr, val)
-    else:
-        msg = f"Invalid parameter: {attr}."
-        logger.error(msg)
-        raise ValueError(msg)
+    diff = [abs(allowed_res - val) for allowed_res in ALLOWED_RESOLUTIONS]
+    index = diff.index(min(diff))
 
-
-def _get_scan_param(client: DDEClient, attr: str) -> float:
-    """ Gets the specified scan parameter's value from the Omicron controller.
-
-    TODO: I'm not very consistent in my naming of "Anfatec's Python interface"
-    vs "SXMRemote"
-    Args:
-        client: The DDE client connected to the Omicron controller. 
-        attr: name of the attribute as a string. case-sensitive, no spaces.
-
-    Returns:
-        parameter value as a float. For boolean parameters: true = 1.0, 
-        false = 0.0.
-
-    Raises:
-        Exception (TODO create a type?) if:
-            An error is encountered while making the request to the Anfatec 
-            Python interface ("SXMRemote")
-            SXMRemote returns null as the parameter value
-    """
-    try:
-        val = client.GetScanPara(f"\'{attr}\'")  # TODO is it necessary to escape the quotes?
-        if val is not None:
-            return val
-        else:
-            # TODO make nice string here 
-            msg = (f"Getting {attr} returned None. This happens when the " +
-                   "request sent to the Anfatec controller is not " +
-                   "recognized. Verify that the parameter requested is " +
-                   "spelled correctly and exists.")
-            logger.error(msg)
-            raise Exception(msg)  # TODO: Generally, do not raise generic exceptions!
-
-    except Exception as e:
-        # Or should I simply allow the code to crash if SXMRemote raises an
-        # Exception? TODO
-        msg = (f"SXMRemote raised exception when getting {attr}" +
-               f"(Warning, exception may be unclear): {e}")
-        logger.error(msg)
-        raise e
-
-
-def _get_feedback_param(client: DDEClient, attr: str) -> float:
-    """Get the provided feedback parameter's value from the Omicron controller.
-
-    Args:
-        client: The DDE client connected to the Omicron controller.
-        attr: name of the attribute as a string. case-sensitive, no spaces.
-
-    Returns:
-        Parameter value as a float.
-        For boolean parameters: true = 1.0, false = 0.0
-
-    Raises:
-        Exception (TODO create a type?) if:
-            An error is encountered while making the request to the Anfatec
-            Python interface ("SXMRemote")
-            SXMRemote returns null as the parameter value
-    """
-    try:
-        val = client.GetFeedbackPara(f"\'{attr}\'")
-        if val is not None:
-            return val
-        else:
-            # TODO make nice string here 
-            msg = (f"Getting {attr} returned None. This happens when the " +
-                   "request sent to the Anfatec controller is not recognized." +
-                   " Verify that the parameter requested is spelled correctly " +
-                   "and exists.")
-            logger.error(msg)
-            raise Exception(msg)
-
-    except Exception as e:
-        # Or should I simply allow the code to crash if there's an error in 
-        # Anfatec's code? TODO
-        msg = f"Error in Anfatec's Python interface while getting {attr}: {e}"
-        logger.error(msg)
-        raise Exception(msg)
-
-
-def get_param(client: DDEClient, attr: str) -> float:
-    """Get the given feedback parameter's value.
-
-    Args:
-        client: The DDE client connected to the Omicron controller.
-        attr: name of the attribute as a string. case-sensitive, no spaces.
-
-    Returns:
-        parameter value as a float.
-        for boolean parameters: true = 1.0, false = 0.0
-
-    Raises:
-    Exception (TODO create a type?) if:
-        An error is encountered while making the request to the Anfatec
-        Python interface ("SXMRemote")
-        SXMRemote returns null as the parameter value.
-    """
-    if attr in SCAN_PARAM or attr in ON_OFF_PARAM:
-        return _get_scan_param(client, attr)
-    elif attr in FEEDBACK_PARAM: 
-        return _get_feedback_param(client, attr)
-    else:
-        msg = ("Parameter not supported. Verify spelling. To add support for"
-               "a parameter, add its name to one of the lists in "
-               "component.microscope.translators.omicron.params.py")
-        logger.error(msg)
-        raise ValueError(msg)
-
-
-# ----- Set / Get logic ----- #
-def set_pb2_scan_params(client: DDEClient, message: scan_pb2.ScanParameters2d
-                        ) -> None:
-    """Set all scan params to values contained in a ScanParameters2d message.
-
-    Behaviour:
-        Converts the values of the message to omicron units and sets the
-        parameters to the converted values.
-        If the user provides X- and Y- dimensions or resolutions that
-        are not equal, the value is set to the greater of the two, as
-        Omicron scans a square area, and a warning is logged.
-
-    Args:
-        client: the DDE client connected to the Omicron controller
-        message: the ScanParameters2d message containing the
-        parameter values to be set, and their current units.
-
-    NOTE: The user is required to send values for all the parameters in
-    order to calculate the position of the center of the scan region,
-    which is required by the Omicron controller.
-
-    Raises:
-        ConversionError if the conversion fails (could be due to a bad
-        unit/value being given)
-        NParameterError if an invalid parameter value is given
-        ValueError is an invalid parameter name is given
-    """
-    # unpack message TODO should there be a common method in utils for this?
-    # could make util return 3 lists: attr: str name, values, units
-    # TODO what happens here if message is incomplete -> try to access missing
-    # value?
-
-    vals = [message.spatial.roi.top_left.x,
-            message.spatial.roi.top_left.y,
-            message.spatial.roi.size.x,
-            message.spatial.roi.size.y,
-            message.data.shape.x,
-            message.data.shape.y]
-
-    given_units = [message.spatial.length_units,
-                   message.spatial.length_units,
-                   message.spatial.length_units,
-                   message.spatial.length_units,
-                   None, None]
-
-    # Convert values to omicron units    TODO can use units.convert_list
-    vals_converted = []
-    for index, val in enumerate(vals):
-        # TODO here use uuid from the new util method
-        # WARNING: this assumes the lists order matches the order in 
-        # OmicronParameter.
-        # if error look here, could be wrong syntax
-        omicron_equivalent = OmicronParameter[AFSPM_PARAMS[index]].name
-        converted = units.convert(val, given_units[index], 
-                                  OmicronParameterUnit[omicron_equivalent])
-        vals_converted.append(converted)
-
-    # TODO: See if you can switch to this rather than vals-converted (hard to read)
-    # x, y, w, h, pix_x, pix_y = vals_converted # BUT DIFFERENT NAMES!
-
-    # Get "Range" as the greatest of the X and Y dimensions
-    dimensions = [vals_converted[2], vals_converted[3]]
-    if dimensions[0] != dimensions[1]:
-        logger.warning("X and Y dimensions are not equal. Taking the largest "+
-                       "of the two as the side length of the square scan area")
-    range = max(dimensions)
-
-    # Get "Pixel" the same way
-    resolution = [vals_converted[4], vals_converted[5]]
-    if resolution[0] != resolution[1]:
-        logger.warning("X- and Y-resolution are not equal. Taking the largest"+
-                       "of the two.")
-    pixel = max(resolution)
-    try:
-        pixel = ANFATEC_RESOLUTION.index(pixel) + 1
-    except ValueError:
-        msg = ("Tried to set the resolution to an unsupported value.\n" +
-               f"Supported values: {ANFATEC_RESOLUTION}")
-        logger.error(msg)
+    if diff[index] != 0:
+        msg = (f'Fed scan-resolution-y {val} is not one of allowed. '
+               'Please set a supported resolution from '
+               f'{ALLOWED_RESOLUTIONS}.')
         raise params.ParameterError(msg)
 
-    # center x and y
-    # TODO do something (error, warning?) if x and y obtained like this are
-    # outside the supported range?
-    if vals_converted[0] and vals_converted[2]:
-        x = vals_converted[0] + 0.5 * vals_converted[2]
-    if vals_converted[1] and vals_converted[3]:
-        y = vals_converted[1] - 0.5 * vals_converted[3]
-
-    # Set values
-    for (attr, val) in zip(SCAN_PARAM, [x, y, range, pixel]):
-        set_param(client, attr, val)
-    # TODO could call instead _set_scan_param(), any difference?
+    # Strangely, we set the *index* of the allowed resolutions to set,
+    # but get the actual resolution...
+    handler.set_param(params.MicroscopeParameter.SCAN_RESOLUTION_Y,
+                      index, unit, override_methods=True)
 
 
-def set_pb2_feedback_params(client: DDEClient,
-                            message: feedback_pb2.ZCtrlParameters) -> None:
-    """Set all feedback params to values contained in ZCtrlParameters message.
+# ----- Scan Speed Methods ----- #
+def speed_lines_s_to_metric_s(lines_s: float, scan_width_metric: float):
+    """Go from lines/s to metric/s."""
+    return lines_s * scan_width_metric
 
-    Args:
-        client: the DDE client connected to the Omicron controller
-        message: the ZCtrlParameters message containing the
-        parameter values to be set.
 
-    Raises:
-        ParameterError if an invalid parameter value is given
-        ValueError is an invalid parameter name is given
+def speed_metric_s_to_lines_s(metric_s: float, scan_width_metric: float):
+    """Go from metric/s to lines/s ."""
+    return metric_s / scan_width_metric
+
+
+def get_scan_speed(handler: params.ParameterHandler) -> Any:
+    """Get scan speed in metric units / s.
+
+    The scan speed is stored in SXM in lines / s, i.e. Hz. To convert,
+    we need to consider the scan width.
     """
-    for val, attr in zip([float(message.feedbackOn), message.integralGain,
-                          message.proportionalGain],
-                         FEEDBACK_PARAM):
-        # there are no units for feedback parameters, so no conversion needed
-        set_param(client, attr, val)
+    size_x = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
+    lines_s = handler.get_param(SXMParam.SPEED_LINES_S)
+    return speed_lines_s_to_metric_s(lines_s, size_x)
 
 
-def get_all_scan_params(client: DDEClient) -> list[float]:
-    """Get the value of all scan parameters as floats.
+def set_scan_speed(handler: params.ParameterHandler,
+                   val: Any, unit: str):
+    """Set the scan speed.
 
-    Behaviour:
-        Returns the current value of all scan parameters in Omicron units
-        (nm).
-        The value of Pixel is returned as a pixel count, not as the index
-        that is used to set it. Note that This value later needs to be
-        converted to int to conform with the format of ScanParameters2d
-            TODO? convert to int here and returna  list of float and int?
+    The scan speed is stored in SXM in lines / s, i.e. Hz. To convert,
+    we need to consider the scan width.
 
-    Arguments:
-        client: the DDE client connected to the Omicron controller
-
-    Returns:
-        The list of parameter values in Omicron units, in the order they
-        are stored in ScanParameter, as floats
-
-    Raises:
-        Exception (TODO create a type?) if:
-        An error is encountered while making the request to the Anfatec
-        Python interface ("SXMRemote")
-        SXMRemote returns null as the parameter value
+    NOTE: We are manually using _correct_val_for_sending() here, because
+    the stored data is in lines/s and thus the range checking
+    is less clear. Thus, we ensure it is within SCAN_SPEED ranges
+    before converting to a ratio.
     """
-    vals = []
-    for param in SCAN_PARAM:
-        vals.append(get_param(client, param))
+    # Ensure within expected ranges!
+    gid = params.MicroscopeParameter.SCAN_SPEED
+    val = params._correct_val_for_sending(
+        val, handler._get_param_info(gid), unit, gid)
 
-    # the Anfatec controller returns the coordinates of the middle of the scan
-    # area. we need to convert them to the top-left coords to conform to the
-    # AFSPM convention
-    vals[0] -= 0.5 * vals[2]
-    vals[1] -= 0.5 * vals[2]
-
-    # normally, Anfatec controller returns pixel value as pixels (not the weird
-    # index value). if this is not the case, convert from index to pixels here:
-    # vals[3] = ANFATEC_RESOLUTION[vals[3] - 1]
-
-    return vals
+    size_uuid = params.MicroscopeParameter.SCAN_SIZE_X
+    size_x = handler.get_param(size_uuid)
+    val = speed_metric_s_to_lines_s(val, size_x)
+    handler.set_param(SXMParam.SPEED_LINES_S, val)
 
 
-def get_all_feedback_params(client: DDEClient) -> list[float]:
-    """Get the value of every feedback/ZCtrl parameter as floats.
+# ----- Probe Position Methods ----- #
+def get_to_set_cs(val: float, offset: float, correction_ratio: float) -> float:
+    """Correct from the get CS to set CS."""
+    return val + offset / correction_ratio
 
-    Arguments:
-        client: the DDE client connected to the Omicron controller
 
-    Returns:
-        The list of parameter values, unitless, in the order they
-        are stored in FeedbackParameter, as floats
+def set_to_get_cs(val: float, offset: float, correction_ratio: float) -> float:
+    """Correct from the set to get CS."""
+    return val - offset / correction_ratio
 
-    Note: 'Enable' need to be converted to bool before being sent as part of
-    a ZCtrlParameter message (we currently do so in controller.py)
 
-    Raises:
-        Exception (TODO create a type?) if:
-            An error is encountered while making the request to the Anfatec
-            Python interface ("SXMRemote")
-            SXMRemote returns null as the parameter value
+def get_probe_pos_x(handler: params.ParameterHandler) -> Any:
+    """Get Probe Position (X-).
+
+    The interface for accessing this is non-standard, this is why
+    the custom functions are needed.
+
+    Of note: we get via TIP_POS_X and set via SPEC_POS_X.
     """
-    param_values = []
-    for param in FEEDBACK_PARAM:
-        param_values.append(get_param(client, param))
+    return handler.get_param(SXMParam.TIP_POS_X)
 
-    return param_values
+
+def get_probe_pos_y(handler: params.ParameterHandler) -> Any:
+    """Get Probe Position (Y-).
+
+    The interface for accessing this is non-standard, this is why
+    the custom functions are needed.
+
+    Of note: we get via TIP_POS_Y and set via SPEC_POS_Y.
+    """
+    return handler.get_param(SXMParam.TIP_POS_Y)
+
+
+def set_probe_pos_x(handler: params.ParameterHandler,
+                    val: Any, unit: str):
+    """Set Probe Position (X-).
+
+    The interface for accessing this is non-standard, this is why
+    the custom functions are needed.
+
+    Of note: we get via TIP_POS_X and set via SPEC_POS_X.
+    """
+    offset_uuid = SXMParam.CENTER_X
+    offset = handler.get_param(offset_uuid)
+
+    gid = params.MicroscopeParameter.PROBE_POS_X
+    val = params._correct_val_for_sending(
+        val, handler._get_param_info(gid), unit, gid)
+
+    # Convert to 'set' CS.
+    val = get_to_set_cs(val, offset, handler.cs_correction_ratio[0])
+    handler.set_param(SXMParam.SPEC_POS_X, val, unit)
+
+
+def set_probe_pos_y(handler: params.ParameterHandler,
+                    val: Any, unit: str):
+    """Set Probe Position (Y-).
+
+    The interface for accessing this is non-standard, this is why
+    the custom functions are needed.
+
+    Of note: we get via TIP_POS_Y and set via SPEC_POS_Y.
+    """
+    offset_uuid = SXMParam.CENTER_Y
+    offset = handler.get_param(offset_uuid)
+
+    gid = params.MicroscopeParameter.PROBE_POS_Y
+    val = params._correct_val_for_sending(
+        val, handler._get_param_info(gid), unit, gid)
+
+    # Convert to 'set' CS.
+    val = get_to_set_cs(val, offset, handler.cs_correction_ratio[1])
+    handler.set_param(SXMParam.SPEC_POS_Y, val, unit)
+
+
+class SpectroscopyMode(enum.Enum):
+    """Supported spectroscopy modes."""
+
+    # The enum values match the SXM interface setting value.
+    X_Z = 0  # X(z) (Height)
+    X_U = enum.auto()  # X(U) (Bias)
+    X_U_CL = enum.auto()  # X(U) CL
+    X_T_Z_STEP = enum.auto()  # X(t) z-step
+    X_T_Z_STEP_CL = enum.auto()  # X(t) z-step CL
+    X_T_U_STEP = enum.auto()  # X(t) U-step
+    X_T_U_STEP_CL = enum.auto()  # X(t) U-step CL
+    CM_AFM_X_U = enum.auto()  # cmAFM X(U)
+    X_T_NOISE = enum.auto()  # X(t) noise
+    X_X_Y = enum.auto()  # X(x, y)
+
+
+@dataclass
+class SpectroscopySettingsHeight():
+    """Settings for D(z) spectroscopies."""
+
+    delay_s: float
+    acquisition_time_s: float
+    dz1_nm: float
+    dz2_nm: float
+
+    @classmethod
+    def get_uuids(cls) -> list[SXMParam]:
+        """Return uuids as a list."""
+        return [SXMParam.DZ_U_DELAY,
+                SXMParam.DZ_U_ACQUISITION_TIME,
+                SXMParam.DZ_U_DZ1,
+                SXMParam.DZ_DZ2]
+
+
+@dataclass
+class SpectroscopySettingsBias():
+    """Settings for D(U) spectroscopies."""
+
+    delay_s: float
+    acquisition_time_s: float
+    dz_nm: float
+    bias_start: float
+    bias_stop: float
+
+    @classmethod
+    def get_uuids(cls) -> list[SXMParam]:
+        """Return uuids as a list."""
+        return [SXMParam.DZ_U_DELAY,
+                SXMParam.DZ_U_ACQUISITION_TIME,
+                SXMParam.DZ_U_DZ1,
+                SXMParam.U_U_START,
+                SXMParam.U_U_STOP]

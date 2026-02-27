@@ -1,214 +1,503 @@
 """Handles device communication with the Omicron SXM controller."""
-"""TODO:
-        naming: OmicronSXM
-        title for doscstring
-        nice strings for msg
-        add space between # and comment
-        implement changing scan speed
-        how much info to give when raising MicroscopeError?
-        be consistent between 'Omicron' and 'Anfatec'
-        remove plus signs in string concatenation
 
-    TODO later: refactor methods in params.py to cach and print exceptions,
-    then return true or false for success.
-
-    NOTE: maybe a bit of a design mistake: I originally had the setters return
-    a bool indicating success/failure, but changed them to return None. So now
-    instead of doing if set(): return pb.controlresponse.success, I have to 
-    catch and print exceptions to detect failure. Might need to change it back
-    to returning bools
-
-    NOTE: We constantly reset the DDE object here, because of a found bug in
-    SXMRemote. If/when fixed, consider cleaning this up!
-"""
-
+import time
 import logging
+import os
+from glob import glob
+from dataclasses import astuple
 
-from afspm.components.microscope.translator import (
-    MicroscopeTranslator, MicroscopeError, get_file_modification_datetime)
-from afspm.utils.array_converters import convert_sidpy_to_scan_pb2
+from ...translator import MicroscopeError, FLOAT_TOLERANCE_KEY
+from ...params import (ParameterHandler,
+                       DEFAULT_PARAMS_FILENAME)
+from ...actions import (ActionHandler,
+                        DEFAULT_ACTIONS_FILENAME,
+                        MicroscopeAction)
+from ... import config_translator as ct
 
-from afspm.components.microscope.translators.omicron.params import (
-    OmicronParameter, OmicronParameterUnit, set_param, get_param,
-    set_pb2_scan_params,    set_pb2_feedback_params, get_all_scan_params,
-    get_all_feedback_params, PARAM_METHOD_MAP)
-from afspm.components.microscope.translators.omicron.scan import (get_latest_scan_metadata_path)
+from .....utils import array_converters as conv
 
-from SciFiReaders.readers.microscopy.spm.afm import pifm
+from .....io.protos.generated import scan_pb2
+from .....io.protos.generated import spec_pb2
+from .....io.protos.generated import control_pb2
 
-from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import control_pb2
-from afspm.io.protos.generated import feedback_pb2
+from . import params
+from . import actions
+from . import sxm
+from . import reader
+
 
 logger = logging.getLogger(__name__)
 
-# The directory containing SXMRemote must be added to pythonpath of venv
-# TODO do this ourselves with the poetry setup files?
-# say this in readme
-try:
-    import SXMRemote
-except ModuleNotFoundError as e:
-    logger.error("SXMRemote not found, make sure to add it to your PythonPath:"
-                 '\n\t Export PYHTONPATH = < PathToSXMRemote >:$PYTHONPATH"')
-    raise e
 
-class OmicronSXMTranslator(MicroscopeTranslator):
-    """Handles device communication with the Omicron SXM controller
+BMP_EXT = '.bmp'
+ONE_MS = 0.001
+# The SXM translator does not appear to have a great float tolerance (at
+# least for probe position).
+FLOAT_TOLERANCE = 1e-03
 
-    Note: we encountered difficulties working with the methods provided by
-    Anfatec to read the latest scan, so we request the directory where scans
-    are saved via the constructor to find the latest one ourselves.
+
+class SXMTranslator(ct.ConfigTranslator):
+    """Handles device communication with the Scienta Omicron SXM controller.
+
+    Omicron Research SXM allows communication with the controller software
+    via DDE, a Windows inter-process communication interface.
+    They also provide (on top of this) a Python interface.
+    The local module sxm is our modified version of this interface.
+
+    Notes:
+    - In order to move the probe on set_probe_pos(), we have to 'fake' a
+    spectroscopy (this is the suggested way to move the probe). Because of
+    this, we have a _fake_spectroscopy_settings input argument, consisting
+    of the settings for the spectroscopy mode we are using to move. One would
+    expect/want these to be minimally invasive and quick. When this 'fake' spec
+    has finished, we delete it so it does not contaminate our experimental data.
+    - There is no way to poll for the spec state, so we have to use a semi-ugly
+    state machine in here: we switch to SS_SPEC when START_SPEC succeeds, and
+    switch back to SS_FREE when it ends (detected via a spec save callback).
+    - The START_SPEC command is not asynchronous! It returns an ACK once the
+    spec has ended, not once it has started. To avoid this weirdness causing
+    logic issues, we pause polling during SS_SPEC.
+    - The probe position getter gets the *actual* position at any instance in
+    time. This diverges from how the getter works with other translators, where
+    it tells us where we have set it to be. To minimize deviations from other
+    translators, we thus pause poll_probe_pos if we are not free.
+
+    Attributes:
+        _old_scans: the last scans, to send out if it has not changed.
+        _old_scan_path: the prior scan filepath. We use this to avoid loading
+            the same scans multiple times.
+        _old_spec: the last spec, to send out if it has not changed.
+        _old_spec_path: the prior spec filepath. We use this to avoid loading
+            the same spectroscopies multiple times.
+        _probe_pos_moving: bool, holds whether we have been moving the probe
+            pos.
+
+        _spectroscopy_mode: mode we want to be in when running spectroscopies.
+        _fake_spectroscopy_settings: settings for our fake spectroscopy, used
+            to move the probe position. Can be either SpectroscopySettingsHeight
+            or SpectroscopySettingsBias.
+
+        _client: SXM client.
     """
-    def __init__(self, save_directory: str = None, **kwargs):
-        """Initialize internal logic.""" 
 
-        self.last_scan_fname = ""   #which of these two do we want to compare?
-        self.old_scans = []         #
+    INI_SECTION_SAVE = 'Save'
+    INI_ITEM_PATH = 'Path'
 
-        #omicron-specific field
-        self.save_directory = save_directory
+    DEFAULT_SPEC_MODE = params.SpectroscopyMode.X_U
+    DEFAULT_FAKE_X_U = params.SpectroscopySettingsBias(ONE_MS, ONE_MS, 0.0,
+                                                       0.0, 0.0)
+    DEFAULT_FAKE_X_Z = params.SpectroscopySettingsHeight(ONE_MS, ONE_MS, 0.0,
+                                                         0.0)
+    DEFAULT_FAKE_SPEC_SETTINGS = DEFAULT_FAKE_X_Z
+    FAKE_SPEC_SLEEP_S = 0.5
 
-        self.DDE_client = SXMRemote.DDEClient("SXM","Remote")
+    def __init__(self, param_handler: ParameterHandler = None,
+                 action_handler: ActionHandler = None,
+                 client: sxm.DDEClient = None,
+                 spectroscopy_mode: params.SpectroscopyMode = DEFAULT_SPEC_MODE,
+                 fake_spectroscopy_settings: params.SpectroscopySettingsBias |
+                 params.SpectroscopySettingsHeight = DEFAULT_FAKE_SPEC_SETTINGS,
+                 **kwargs):
+        """Init our translator."""
+        self._old_scan_path = None
+        self._old_scans = []
+        self._old_spec_path = None
+        self._old_spec = None
+        self._probe_pos_moving = False
 
+        self._spectroscopy_mode = spectroscopy_mode
+        self._fake_spectroscopy_settings = fake_spectroscopy_settings
+
+        # Default initialization of handler
+        kwargs = self._init_handlers(client, param_handler, action_handler,
+                                     **kwargs)
+
+        # Set hard-coded float tolerance if not provided
+        if FLOAT_TOLERANCE_KEY not in kwargs:
+            kwargs[FLOAT_TOLERANCE_KEY] = FLOAT_TOLERANCE
+
+        # Tell parent class that SXM *does not* detect moving
+        kwargs[ct.DETECTS_MOVING_KEY] = False
+        # Tell parent class that SXM requires setting y before x.
+        kwargs[ct.SET_X_BEFORE_Y_KEY] = False
         super().__init__(**kwargs)
 
-        self.param_method_map = PARAM_METHOD_MAP   #TODO implement get_set_scan_speed()
-    
-    #TODO put this in own file to avoid circular bad when implementing get set
-    def reset_DDE(self): 
-        """Closes current DDE connexion (if any) and establishes a new one.
-            
-        Called before reading / setting scan parameters to avoid the "set+get
-        error": setting and getting parameters (the same or different) sometimes
-        causes an error in Anfatec's code.
-        Note: if the current implementation does not work, try using the
-        disconnect method of the DDE client (SXMRemote line 134).
+        # Grab client from parameter handler, in case no client was provided
+        # (and it was init'ed in _init_handlers).
+        self._client = self.param_handler.client
+
+        # Set up our save settings (spec and scan) and configure our
+        # spectroscopy settings.
+        self._init_save_settings()
+        self._init_spec_settings()
+
+    def _init_handlers(self, client: sxm.DDEClient,
+                       param_handler: ParameterHandler,
+                       action_handler: ActionHandler,
+                       **kwargs) -> dict:
+        """Init handlers and update kwargs."""
+        if not client:
+            client = sxm.DDEClient("SXM", "Remote")
+        self._register_scan_spec_end_callbacks(client)
+
+        if not param_handler:
+            param_handler = _init_param_handler(client)
+            kwargs[ct.PARAM_HANDLER_KEY] = param_handler
+        if not action_handler:
+            action_handler = _init_action_handler(client)
+            kwargs[ct.ACTION_HANDLER_KEY] = action_handler
+        return kwargs
+
+    def _validate_required_actions_exist(self):
+        """Override to allow to run. Throw warning on startup."""
+        logger.warning('SXMTranslator does not support STOP_SCAN or STOP_SPEC!'
+                       ' If API support is added, update actions.toml and'
+                       ' remove this override. Allowing to continue.')
+
+    def _init_save_settings(self):
+        """Set up scan / spec defaults: autosave and do not repeat."""
+        self.param_handler.set_param(params.SXMParam.SCAN_AUTOSAVE, 1)
+        # TODO: Can we turn continuous scan OFF?
+
+        self.param_handler.set_param(params.SXMParam.SPEC_AUTOSAVE, 1)
+        self.param_handler.set_param(params.SXMParam.SPEC_REPEAT, 0)
+
+    def _init_spec_settings(self):
+        """On startup, set 'fake' spec settings and switch to real spec mode.
+
+        First, we switch to our 'fake' spectroscopy mode and set its parameters
+        according to our 'fake' settings. The goal here is for the 'fake' spec
+        to be a short as possible and minimally invasive on the project.
+
+        Then, we switch to our actual spectroscopy, which we want to be using
+        when calling START_SPEC.
         """
-        try:
-            #if self.DDE_client: self.DDE_client.__del__()   #is this required? or can we un-assign self.DDE_client and let the garbage collector clean it up?
-            self.DDE_client = SXMRemote.DDEClient("SXM","Remote")   #NOTE: could be problem if DDE must be closed before making new one
-        except Exception as e:
-            msg = f"Error resetting DDE connection: {e}"
-            logger.error(msg)
-            raise Exception(msg)
+        self.set_spectroscopy_settings(self._fake_spectroscopy_settings)
+        self.set_spectroscopy_mode(self._spectroscopy_mode)
 
-    def on_start_scan(self) -> control_pb2.ControlResponse:
-        """Override on starting scan."""
-        self.reset_DDE()
-        try: 
-            set_param(self.DDE_client, "Scan", 1.0)
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_FAILURE
+    def _get_latest_file(self, spec: bool) -> str | None:
+        """Return the filepath for the latest scan/spec.
 
-    def on_stop_scan(self) -> control_pb2.ControlResponse:
-        """Handle a request to stop a scan."""
-        self.reset_DDE()
-        try:
-            set_param(self.DDE_client, "Scan", 0.0)
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_FAILURE
+        Args:
+            spec: if true, we grab the latest spec. If false, the latest
+                scan.
 
-    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
-                           ) -> control_pb2.ControlResponse:
-        """Handle a request to change the scan parameters."""
-        self.reset_DDE()
+        Raises:
+            ValueError if the file structure is incorrect (i.e. there are
+                no/several metadata files in a sub-directory).
+        """
+        latest_dir = self._client.get_ini_entry(self.INI_SECTION_SAVE,
+                                                self.INI_ITEM_PATH)
+        # Remove double-quotes, as they break os.path.join
+        if latest_dir.startswith('"') and latest_dir.endswith('"'):
+            latest_dir = latest_dir[1:-1]
+        ext = reader.SPEC_DATA_EXT if spec else reader.SCAN_METADATA_EXT
+        file_form = "*" + ext
         try:
-            set_pb2_scan_params(self.DDE_client, scan_params)
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_FAILURE
-
-    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
-                            ) -> control_pb2.ControlResponse:
-        """Handle a request to change the Z-Controller Feedback parameters."""
-        self.reset_DDE()
-        try:
-            set_pb2_feedback_params(self.DDE_client, zctrl_params):
-            return control_pb2.ControlResponse.REP_SUCCESS
-        except Exception as e:
-            print(e)
-            return control_pb2.ControlResponse.REP_PARAM_ERROR
+            files = sorted(glob(os.path.join(latest_dir, file_form)),
+                           key=os.path.getmtime)  # Sorted by access time
+        except ValueError:
+            # No files currently showing
+            return None
+        return files[-1] if files else None  # Get latest
 
     def poll_scope_state(self) -> scan_pb2.ScopeState:
         """Poll the controller for the current scope state.
 
-        NOTE: We cannot detect whether the motor is running via SXMRemote.
+        NOTE:
+        - We cannot detect whether the motor is running via sxm.
+        - We cannot detect SS_SPEC via sxm, so we have to have state logic
+        in this class.
         Throws a MicroscopeError on failure.
         """
-        self.reset_DDE()
-        scanning = get_param(self.DDE_client, "Scan")
-        if scanning: 
-            return scan_pb2.ScopeState.SS_SCANNING
+        state = self.param_handler.get_param(params.SXMParam.SCAN_STATE)
+        return (scan_pb2.ScopeState.SS_SCANNING if state
+                else scan_pb2.ScopeState.SS_FREE)
+
+    def poll_scans(self) -> [scan_pb2.Scan2d]:
+        """Override polling of scans."""
+        scan_path = self._get_latest_file(spec=False)  # Actually md path
+        if (scan_path and not self._old_scan_path or
+                scan_path != self._old_scan_path):
+            scans = load_scans_from_file(scan_path)
+            scans = [ct.correct_scan(scan, self._latest_scan_params)
+                     for scan in scans]
+            if scans:
+                self._old_scan_path = scan_path
+                self._old_scans = scans
+        return self._old_scans
+
+    def poll_spec(self) -> spec_pb2.Spec1d:
+        """Override spec polling."""
+        spec_path = self._get_latest_file(spec=True)
+        if (spec_path and not self._old_spec_path or
+                spec_path != self._old_spec_path):
+            spec = load_spec_from_file(spec_path)
+            spec = ct.correct_spec(spec, self._latest_probe_pos)
+            if spec:
+                self._old_spec_path = spec_path
+                self._old_spec = spec
+        return self._old_spec
+
+    def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
+        """Override to skip when not SS_FREE.
+
+        We need to do this because our probe position getter returns the
+        actual position of the probe at any point in time. This means
+        that we send many probe position updates during, e.g., a scan.
+
+        The current expectation is that probe pos get will tell us where
+        the probe will be for spectroscopies / tip manipulation operations,
+        and that a set() will result in SS_MOVING until the probe is at this
+        location. In short, while the current behaviour is nice, it is not
+        what our black-box expectations are.
+
+        With this override, we meet our black-box expectations.
+        """
+        if self.scope_state in [scan_pb2.ScopeState.SS_FREE,
+                                scan_pb2.ScopeState.SS_UNDEFINED]:
+            return super().poll_probe_pos()
+        return self.probe_pos
+
+    def _handle_polling_device(self):
+        """Override to not poll while spectroscopy is running.
+
+        We need to do this because the call to start spect does not
+        return until the spectroscopy has finished, and this breaks
+        our sxm client (because at some point, we receive the spect
+        finished response instead of a poll we were doing, causing
+        a crash).
+
+        Not great, pretty ugly. Oh well.
+        """
+        if self.scope_state is not scan_pb2.ScopeState.SS_SPEC:
+            super()._handle_polling_device()
         else:
-            return scan_pb2.ScopeState.SS_FREE
+            sxm.loop()  # Still check for callbacks
 
-    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
-        """Poll the controller for the current scan parameters."""
-        self.reset_DDE()
+    def on_action_request(self, action: control_pb2.ActionMsg
+                          ) -> control_pb2.ControlResponse:
+        """Override to change state for spec.
 
-        vals = get_all_scan_params(self.DDE_client)
-        scan_params = scan_pb2.ScanParameters2d()
-        scan_params.spatial.roi.top_left.x = vals[0]
-        scan_params.spatial.roi.top_left.y = vals[1]
-        scan_params.spatial.roi.size.x = vals[2]
-        scan_params.spatial.roi.size.y = vals[2]
-        scan_params.spatial.length_units = OmicronParameterUnit.X
-    
-        # Note: we must provide image resolution as an int, so we convert here 
-        scan_params.data.shape.x = int(vals[3])
-        scan_params.data.shape.y = int(vals[3])
+        There is no way to poll the spec state via the API, so we
+        have to resort to this ugly hack.
+        """
+        rep = super().on_action_request(action)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            if action.action == MicroscopeAction.START_SPEC:
+                # Indicate start of spec (and start disable polling).
+                self._update_scope_state(scan_pb2.ScopeState.SS_SPEC)
+        return rep
 
-        return scan_params
+    def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
+                         ) -> control_pb2.ControlResponse:
+        """Override for proper pos moving."""
+        rep = super().on_set_probe_pos(probe_position)
+        if rep == control_pb2.ControlResponse.REP_SUCCESS:
+            self._probe_pos_moving = True
+            # Pause all polling for duration of fake spec.
+            # Note we only set the state internally to use the logic,
+            # but do not send out a state change (because this is a fake spec).
+            self.scope_state = scan_pb2.ScopeState.SS_SPEC
+            self._start_probe_pos_move()
+        return rep
 
-    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
-        """Poll the controller for the current Z-Control parameters."""
-        self.reset_DDE()
+    # --- Feedback stuff --- #
+    def switch_feedback_mode(self, mode: params.FeedbackMode):
+        """Switch to using appropriate feedback mode."""
+        self.param_handler.switch_feedback_mode(mode)
 
-        vals = get_all_feedback_params()    #TODO make also return whether zctrl is on
-        feedback_params = feedback_pb2.ZCtrlParameters()
-        feedback_params.feedbackOn = bool(vals[0])
-        feedback_params.proportionalGain = vals[1]
-        feedback_params.integralGain = vals[2]
+    # --- Spectroscopy Setters --- #
+    def set_spectroscopy_mode(self, spec_mode: params.SpectroscopyMode):
+        """Switch spectroscopy to chosen mode."""
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE,
+                                     spec_mode.value)
 
-        return feedback_params
+    def set_spectroscopy_settings(self,
+                                  settings: params.SpectroscopySettingsHeight |
+                                  params.SpectroscopySettingsBias):
+        """Set spectroscopy settings for D(z) or D(U).
 
-    def poll_scans(self) -> list[scan_pb2.Scan2d]:
-        """Obtain latest performed scans."""
-        latest_path = get_latest_scan_metadata_path(self.save_directory)
+        We currently only support setting one of these two modes. Its main use
+        is to configure the 'fake' spectroscopy we use to move the probe pos.
 
-        # Avoid reloading scans if same filename. Return old scans.
-        if latest_path == self.old_scan_fname:
-            return self.old_scans
+        Note that after setting, we return the spectroscopy mode to
+        self._spectroscopy_mode.
+        """
+        mode = get_spectroscopy_mode(settings)
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE, mode.value)
+        for uuid, val in zip(settings.get_uuids(), astuple(settings)):
+            self.param_handler.set_param(uuid, val)
 
-        dt_modified = get_file_modification_datetime(latest)  #this is a datetime
+    # --- Spectroscopy callback --- #
+    def _register_scan_spec_end_callbacks(self, client: sxm.DDEClient):
+        """Ensure we detect when scans/specs end, to update scope state."""
+        client.register_spect_save_callback(self._on_spec_end)
 
-        # TODO: Validate. From code, it would seem we need the path to the .int,
-        # *not* the .txt metadata file...
-        try:
-            logger.debug(f'Getting datasets from {latest_path}.')
-            reader = pifm.PiFMTranslator(latest_path)
-            res = reader.read()     #returns a list of sidpy datasets
-        except Exception as exc:
-            logger.error(f"Failure loading scan at {latest_path}: {exc}")
-            return self.old_scans
+    def _on_spec_end(self, filename: str):
+        """Return scope state to free when spec ends.
 
-        # Convert and prepare scans, update old_scans.
+        The main scope state logic is handled in on_action_request()
+        and on_spec_end().
+
+        On a spectroscopy ending, we call _handle_probe_pos_move() if
+        it was a 'fake' spectroscopy to move the probe.
+        """
+        # Necessary sleep to allow response to specstart being returned.
+        time.sleep(self.FAKE_SPEC_SLEEP_S)
+
+        # Force one more loop to grab ACK from start_spec() (send after
+        # the spec_end callback).
+        sxm.loop()
+
+        if self._probe_pos_moving:
+            logger.trace('Spec save end for fake spec.')
+            self._delete_fake_spec(filename)
+            self._end_probe_pos_move()
+            self._probe_pos_moving = False
+        else:  # If not a fake spec, update our specs!
+            logger.trace('Spec save end for true spec. Updating specs.')
+            self._update_specs()
+
+        # Polling is disabled for duration of SS_FREE so send here.
+        self._update_scope_state(scan_pb2.ScopeState.SS_FREE)
+
+    # --- Probe Pos Movement Faking --- #
+    def _start_probe_pos_move(self):
+        """Start a probe movement.
+
+        The SXM controller does not move the probe position on set.
+        In fact, the recommended way to move the probe is to force a
+        spectroscopy!
+
+        This method does that, which means we have to:
+        - We change to our 'fake spect' self._fake_spectroscopy_mode.
+        - Run spect.
+
+        Note that separately we will delete this fake spect once it
+        finishes. We cannot disable saving because the only way
+        we know a spectroscopy ends is due to it saving.
+        """
+        logger.trace('Starting probe pos move via fake spec.')
+        mode = get_spectroscopy_mode(self._fake_spectroscopy_settings)
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE,
+                                     mode.value)
+        self.action_handler.request_action(MicroscopeAction.START_SPEC)
+
+    def _end_probe_pos_move(self):
+        """End a probe pose movement.
+
+        Here, we:
+        - Switch to the prior spect mode.
+        """
+        logger.trace('End of fake spec, returning to proper spec mode.')
+        self.param_handler.set_param(params.SXMParam.SPEC_MODE,
+                                     self._spectroscopy_mode.value)
+        self._prior_spec_mode = None
+        self._prior_spec_vals = None
+
+    def _delete_fake_spec(self, filepath: str):
+        """Delete the file we created to move the probe position.
+
+        Here, we expect both a .dat file (included here) and a .bmp
+        file (an image of the data). We try to delete both.
+        """
+        spec_paths = [filepath, os.path.splitext(filepath)[0] + BMP_EXT]
+
+        logger.trace(f'Spec ended, should delete: {spec_paths}')
+        for spec_path in spec_paths:
+            if os.path.isfile(spec_path):
+                logger.trace(f'Deleting {spec_path}')
+                os.remove(spec_path)
+
+
+def _init_action_handler(client: sxm.DDEClient
+                         ) -> actions.SXMActionHandler:
+    """Initialize SXM action handler pointing to default config."""
+    actions_config_path = os.path.join(os.path.dirname(__file__),
+                                       DEFAULT_ACTIONS_FILENAME)
+    return actions.SXMActionHandler(
+        client, actions_config_path=actions_config_path)
+
+
+def _init_param_handler(client: sxm.DDEClient
+                        ) -> params.SXMParameterHandler:
+    """Initialize SXM action handler pointing to default config."""
+    params_config_path = os.path.join(os.path.dirname(__file__),
+                                      DEFAULT_PARAMS_FILENAME)
+    return params.SXMParameterHandler(
+        client, params_config_path=params_config_path)
+
+
+def load_scans_from_file(md_path: str
+                         ) -> list[scan_pb2.Scan2d] | None:
+    """Load SXM scan, filling in info possible from file only.
+
+    NOTE: We follow the suggestions of config_translator and use correct_scan()
+    in the calling method (avoids any coordinate system differences).
+    We still need to set the filename, however.
+
+    Args:
+        md_path: path to the scan metadata.
+
+    Returns:
+        loaded scans in scan_pb2 format (one scan per channel). None if
+        dataset is empty.
+
+    Raises:
+        Unknown/unforeseen read error.
+    """
+    sxm_reader = reader.SXMScanReader(md_path)
+    datasets = sxm_reader.read()
+
+    if datasets:
         scans = []
-        for dataset in res:
-            scan = convert_sidpy_to_scan_pb2(dataset)
-
-            # Set ROI angle, timestamp, filename
-            # TODO: Set ROI Angle!
-            scan.timestamp.FromDateTime(dt_modified)
-            scan.filename = latest_path
+        for ds in datasets:
+            file_path = os.path.join(
+                os.path.dirname(md_path),
+                ds.original_metadata[reader.MD_SCAN_FILENAME])
+            scan = conv.convert_sidpy_to_scan_pb2(ds)
+            scan.filename = file_path
             scans.append(scan)
-        
-        self.old_scans = scans
-        self.last_scan_fname = latest_path  #path to metadata is OK?
+        return scans
+    return None
 
-        return  self.old_scans
+
+def load_spec_from_file(fname: str,
+                        ) -> spec_pb2.Spec1d | None:
+    """Load Spec1d from provided filename (None on failure).
+
+    NOTE: We follow the suggestions of config_translator and use correct_spec()
+    in the calling method (avoids any coordinate system differences).
+
+    Args:
+        fname: path to spec file.
+
+    Returns:
+        Spec1d if loaded properly, None if spec file was empty.
+
+    Raises:
+        Unknown/unforeseen read error.
+    """
+    sxm_reader = reader.SXMSpecReader(fname)
+    datasets = sxm_reader.read()
+
+    spec = conv.convert_sidpy_to_spec_pb2(datasets)
+    spec.filename = fname
+    return spec
+
+
+def get_spectroscopy_mode(settings: params.SpectroscopySettingsHeight |
+                          params.SpectroscopySettingsBias
+                          ) -> params.SpectroscopyMode:
+    """Get the spec mode associated with given settings.
+
+    Note we only support D(z) or D(U) right now.
+    """
+    if isinstance(settings, params.SpectroscopySettingsHeight):
+        return params.SpectroscopyMode.X_Z
+    elif isinstance(settings, params.SpectroscopySettingsBias):
+        return params.SpectroscopyMode.X_U
+    else:
+        msg = 'Unable to set spectroscopy settings for unsupported mode.'
+        raise MicroscopeError(msg)

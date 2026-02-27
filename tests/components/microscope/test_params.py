@@ -5,7 +5,7 @@ import sys
 import math
 import logging
 import pytest
-from typing import Any
+from typing import Any, Callable
 import tomli
 
 from afspm.components.microscope import params
@@ -57,6 +57,10 @@ class MyParameterHandler(params.ParameterHandler):
         """Different from parent in that we feed str rather than file path."""
         self.param_infos = {}
         self.param_methods = {}
+        self.param_info_class = params.ParameterInfo
+        self.param_methods_class = params.ParameterMethods
+        self.validate_parameter = params.validate_parameter
+
         self._build_param_infos_methods(params_config)
 
     def get_param_spm(self, spm_uuid: str) -> Any:
@@ -165,23 +169,16 @@ def test_param_missing_setter_getter(config_set_get):
     params_config = load_config(config_set_get)
     params_config[key].pop('setter', None)
 
-    param_handler = MyParameterHandler(params_config)
-    assert param_handler
+    logger.info('It should throw a config error on startup...')
+    with pytest.raises(params.ParameterConfigurationError):
+        param_handler = MyParameterHandler(params_config)
 
-    logger.info('It should fail when we try to set...')
-    key = params.MicroscopeParameter.SCAN_TOP_LEFT_X
-    with pytest.raises(params.ParameterNotSupportedError):
-        param_handler.set_param(key, 1, 'nm')
-
+    logger.info('Trying without getter.')
     params_config = load_config(config_set_get)
     params_config[key].pop('getter', None)
-    param_handler = MyParameterHandler(params_config)
-    assert param_handler
-
-    logger.info('It should fail when we try to get...')
-    key = params.MicroscopeParameter.SCAN_TOP_LEFT_X
-    with pytest.raises(params.ParameterNotSupportedError):
-        param_handler.get_param(key)
+    logger.info('It should throw a config error on startup...')
+    with pytest.raises(params.ParameterConfigurationError):
+        param_handler = MyParameterHandler(params_config)
 
     logger.info('Trying without both.')
     params_config = load_config(config_set_get)
@@ -195,6 +192,18 @@ def test_param_missing_setter_getter(config_set_get):
     params_config = load_config(config_set_get)
     param_handler = MyParameterHandler(params_config)
     assert param_handler
+
+    logger.info('Removing the setter after the fact (hack).')
+    param_handler.param_methods[key].setter = None
+    logger.info('It should fail when we try to set...')
+    with pytest.raises(params.ParameterNotSupportedError):
+        param_handler.set_param(key, 1, 'nm')
+
+    logger.info('Removing the getter after the fact (hack).')
+    param_handler.param_methods[key].getter = None
+    logger.info('It should fail when we try to get...')
+    with pytest.raises(params.ParameterNotSupportedError):
+        param_handler.get_param(key)
 
 
 def test_choose_setter_getter_priority(config_both, config_param_info):

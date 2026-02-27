@@ -503,10 +503,6 @@ def setup_faster_scan(config_dict: dict, client: ControlClient,
     """
     logger.info("Check if we provided specific scan parameters "
                 "(so the scan is not super long)")
-    scan_speeds = get_config_scan_speed(config_dict, client)
-    if len(scan_speeds) == 2:  # We received a desired speed, try to set
-        set_scan_speed(client, scan_speeds[1])
-
     desired_phys_size_nm = get_config_phys_size_nm(config_dict)
     desired_data_shape = get_config_data_shape(config_dict)
 
@@ -517,6 +513,11 @@ def setup_faster_scan(config_dict: dict, client: ControlClient,
                                          desired_phys_size_nm,
                                          desired_data_shape)
         scan_paramses.append(desired_params)
+
+    scan_speeds = get_config_scan_speed(config_dict, client)
+    if len(scan_speeds) == 2:  # We received a desired speed, try to set
+        set_scan_speed(client, scan_speeds[1])
+
     return scan_speeds, scan_paramses
 
 
@@ -537,12 +538,12 @@ def revert_original_scan_settings(
     """
     if orig_scan_speed or orig_scan_params:
         logger.info("Reset scan settings to what they were before the test.")
-        if orig_scan_speed:
-            set_scan_speed(client, orig_scan_speed)
         if orig_scan_params:
             set_scan_params(client, orig_scan_params)
             sub_scope_state.poll_and_store()  # Grab an SS_MOVING
             sub_scope_state.poll_and_store()  # Grab an SS_FREE
+        if orig_scan_speed:
+            set_scan_speed(client, orig_scan_speed)
 
 
 def test_run_scan(client, default_control_state,
@@ -645,11 +646,6 @@ def test_probe_pos(client, default_control_state,
     rep = client.set_probe_pos(modified_probe_pos)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    logger.info("Next, validate that our subscriber receives these new "
-                "params.")
-    last_probe_pos = assert_and_return_message(sub_probe_pos)
-    assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
-
     logger.info('Requested new position. Expect scope state change.')
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_MOVING)
@@ -661,6 +657,11 @@ def test_probe_pos(client, default_control_state,
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
+
+    logger.info("Next, validate that our subscriber receives these new "
+                "params.")
+    last_probe_pos = assert_and_return_message(sub_probe_pos)
+    assert check_equal(last_probe_pos, modified_probe_pos, float_tolerance)
 
     logger.info("Now, return to our initial parameters.")
     rep = client.set_probe_pos(initial_probe_pos)
@@ -801,9 +802,6 @@ def test_scan_coords(client, default_control_state,
     rep = client.set_scan_params(modified_params)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    last_params = assert_and_return_message(sub_scan_params)
-    assert check_equal(last_params, modified_params, float_tolerance)
-
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_MOVING)
     assert_sub_received_proto(sub_scope_state,
@@ -812,6 +810,9 @@ def test_scan_coords(client, default_control_state,
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
+
+    last_params = assert_and_return_message(sub_scan_params)
+    assert check_equal(last_params, modified_params, float_tolerance)
 
     # --- Perform a scan --- #
     # Hack around, make poll short for this.
@@ -887,10 +888,6 @@ def test_spec_coords(client, default_control_state,
     rep = client.set_probe_pos(modified_probe_pos)
     assert rep == control_pb2.ControlResponse.REP_SUCCESS
 
-    logger.info("We *do not* validate that our subscriber receives these new "
-                "params, as we are setting the same params every time.")
-    sub_probe_pos.poll_and_store()
-
     logger.info('Requested new position. Expect scope state change.')
     scope_state_msg = scan_pb2.ScopeStateMsg(
         scope_state=scan_pb2.ScopeState.SS_MOVING)
@@ -902,6 +899,10 @@ def test_spec_coords(client, default_control_state,
         scope_state=scan_pb2.ScopeState.SS_FREE)
     assert_sub_received_proto(sub_scope_state,
                               scope_state_msg)
+
+    logger.info("We *do not* validate that our subscriber receives these new "
+                "params, as we are setting the same params every time.")
+    sub_probe_pos.poll_and_store()
 
     # Hack around (make poll short for this).
     tmp_timeout_ms = sub_spec._poll_timeout_ms

@@ -13,14 +13,14 @@ MOVE_PROBE_UUID = 'move-spec'
 
 
 class AsylumActionHandler(actions.ActionHandler):
-    """Implements asylum-specific aciton handling.
+    """Implements asylum-specific action handling.
 
     Attributes:
         client: XopClient, used to communicate with the Asylum controller
             (via the IGOR software).
     """
 
-    def __init__(self, actions_config_path: str, client: XopClient):
+    def __init__(self, client: XopClient, **kwargs):
         """Init our Asylum handler, feeding the Xop Client."""
         if client is None:
             msg = "No xop client provided, cannot continue!"
@@ -28,7 +28,7 @@ class AsylumActionHandler(actions.ActionHandler):
             raise AttributeError(msg)
 
         self.client = client
-        super().__init__(actions_config_path)
+        super().__init__(**kwargs)
 
 
 def request_action(handler: AsylumActionHandler, method_name: str,
@@ -54,5 +54,4 @@ def request_action(handler: AsylumActionHandler, method_name: str,
         pass
 
     msg = f'Asylum: Calling {method_name} with args {params} failed.'
-    logger.error(msg)
     raise actions.ActionError(msg)

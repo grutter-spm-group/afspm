@@ -37,12 +37,12 @@ range = [0, 9e-5]  # [0 nm, 90 um]
 
 
 # ----- Digital Scan Parameters ----- #
-[scan-resolution-x]  # Unitless, no range enforced.
+[scan-resolution-x]  # Unitless
 uuid = 'ScanPoints'
 type = 1
 range = [32, 1536]  # > 2000 may not save
 
-[scan-resolution-y]  # Unitless, no range enforced.
+[scan-resolution-y]  # Unitless
 uuid = 'ScanLines'
 type = 1
 range = [32, 1536]  # > 2000 may not save, real max is 4096.
@@ -57,12 +57,12 @@ uuid = 'SetPoint'
 type = 1.0
 range = [0, 10]  # TODO: Validate. This is allowed but probably crazy!
 
-[zctrl-pgain]  # Unitless, no range enforced.
+[zctrl-pgain]  # Unitless
 uuid = 'ProportionalGain'
 type = 1.0
 range = [0, 4096]
 
-[zctrl-igain]  # Unitless, no range enforced.
+[zctrl-igain]  # Unitless
 uuid = 'IntegralGain'
 type = 1.0
 range = [0, 4096]
@@ -108,30 +108,30 @@ range = [0, 9e-5]  # [0 nm, 90 um]
 # The 'generic' uuids (dictionary keys) match the names of AsylumParam.
 
 # (For scan size things)
-[SCAN_SIZE]
+[scan-size]
 uuid = 'ScanSize'
-# No units (uses SCAN_SIZE_X/SCAN_SIZE_Y)
+# No units (uses scan-size-x/scan-size-y)
 type = 1.0
 
-[X_RATIO]
+[x-ratio]
 uuid = 'FastRatio'
 # No units
 type = 1.0
 
-[Y_RATIO]
+[y-ratio]
 uuid = 'SlowRatio'
 # No units
 type = 1.0
 
 # Miscellaneous
-[IMG_PATH]
+[img-path]
 uuid = 'SaveImage'
 type = ''
 
-[SAVING_MODE]
+[saving-mode]
 uuid = 'SaveImage'
 type = 1
 
-[SCANNING_MODE]
+[scanning-mode]
 uuid = 'LastScan'
 type = 1

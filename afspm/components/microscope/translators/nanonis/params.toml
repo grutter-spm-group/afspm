@@ -1,0 +1,147 @@
+# This file holds the Nanonis parameters. Feel free to modify the
+# parameter ranges if you want to constrain any further.
+
+# ----- Physical Scan Parameters ----- #
+[scan-top-left-x]  # Changeable attributes in [center-x] below
+setter = 'afspm.components.microscope.translators.nanonis.params.set_scan_x'
+getter = 'afspm.components.microscope.translators.nanonis.params.get_scan_x'
+
+[scan-top-left-y]  # Changeable attributes in [center-y] below
+setter = 'afspm.components.microscope.translators.nanonis.params.set_scan_y'
+getter = 'afspm.components.microscope.translators.nanonis.params.get_scan_y'
+
+[scan-angle]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
+unit = 'degrees'
+type = 1.0
+range = [-360.0, 360.0]  # Will return in range [0, 360]
+index = 4
+
+[scan-size-x]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
+unit = 'm'
+range = [1e-10, 3e-6]  # [1 A, 3um]
+type = 1.0
+index = 2
+
+[scan-size-y]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
+unit = 'm'
+range = [1e-10, 3e-6]  # [1 A, 3um]
+type = 1.0
+index = 3
+
+# ----- Digital Scan Parameters ----- #
+[scan-resolution-x]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanBuffer'
+range = [16, 8192]  # [1, 8192] pix
+type = 1
+index = 2
+
+[scan-resolution-y]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanBuffer'
+range = [1, 8192]  # [1, 8192] pix
+type = 1
+index = 3
+
+# ----- Feedback Parameters ----- #
+[zctrl-setpoint]  # Unitless
+class_name = 'afspm.components.microscope.translators.nanonis.message.zctrl.ZCtrlSetpoint'
+range = [10e-13, 10e-9]  # [100f, 10n]
+type = 1.0
+index = 0
+
+[zctrl-pgain]  # Unitless
+class_name = 'afspm.components.microscope.translators.nanonis.message.zctrl.ZCtrlGain'
+range = [10e-13, 10e-9]  # [100f, 10n] No real range, matching setpoint range.
+type = 1.0
+index = 0
+
+[zctrl-igain]  # Unitless
+class_name = 'afspm.components.microscope.translators.nanonis.message.zctrl.ZCtrlGain'
+range = [10e-13, 10e-9]  # [100f, 10n] No real range, matching setpoint range.
+type = 1.0
+index = 2
+
+# ----- Sample Slope Correction ----- #
+[sample-slope-x]
+class_name = 'afspm.components.microscope.translators.nanonis.message.piezo.PiezoTilt'
+unit = 'degrees'
+range = [-30.0, 30.0]  # [-30, 30]
+type = 1.0
+index = 0
+
+[sample-slope-y]
+class_name = 'afspm.components.microscope.translators.nanonis.message.piezo.PiezoTilt'
+unit = 'degrees'
+range = [-30.0, 30.0]  # [-30, 30]
+type = 1.0
+index = 1
+
+# ----- Probe / Scan Parameters ----- #
+[scan-speed]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanSpeed'
+unit = 'm/s'
+range = [3.7e-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
+type = 1.0
+index = 0
+# NOTE: special setter for scan speed, to ensure we keep forward/backward const!
+# It uses the same range/etc. logic from param_info, we are just adding extra
+# safeties.
+setter = 'afspm.components.microscope.translators.nanonis.params.set_scan_speed'
+
+[move-speed]
+class_name = 'afspm.components.microscope.translators.nanonis.message.probe.Speed'
+unit = 'm/s'
+range = [3.7e-12, 3.8e-6]  #  [3.7 pm/s, 3.8 um/s]
+type = 1.0
+index = 0
+
+# ----- Probe Parameters ----- #
+[probe-pos-x]
+class_name = 'afspm.components.microscope.translators.nanonis.message.probe.XYPos'
+unit = 'm'
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
+type = 1.0
+index = 0
+
+[probe-pos-y]
+class_name = 'afspm.components.microscope.translators.nanonis.message.probe.XYPos'
+unit = 'm'
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
+type = 1.0
+index = 1
+
+# ----- Other ----- #
+[tip-bias-voltage]
+class_name = 'afspm.components.microscope.translators.nanonis.message.bias.Bias'
+unit = 'V'
+range = [-10.0, 10.0]  # [-10, 10] V  NOTE: This range seems 'soft'
+type = 1.0
+index = 0
+
+
+# ----- Nanonis-specific attributes ----- #
+[center-x]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
+unit = 'm'
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
+type = 1.0
+index = 0
+
+[center-y]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanFrame'
+unit = 'm'
+range = [-1.5e-6, 1.5e-6]  # [-1.5 um, 1.5 um]
+type = 1.0
+index = 1
+
+[scan-continuous-scan]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanProps'
+type = 1
+index = 0
+
+[scan-auto-save]
+class_name = 'afspm.components.microscope.translators.nanonis.message.scan.ScanProps'
+type = 1
+index = 2

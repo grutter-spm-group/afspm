@@ -67,6 +67,12 @@ class ActionError(Exception):
     pass
 
 
+class ActionConfigurationError(Exception):
+    """There was an error with the config tied to requested parameter."""
+
+    pass
+
+
 # ----- Action Handling Logic ----- #
 # Keys used to populate callables
 METHOD_KEY = 'method'

@@ -2,6 +2,7 @@
 
 from math import isclose
 import enum
+import math  # for isclose
 import logging
 from typing import Any
 
@@ -9,8 +10,6 @@ from afspm.utils import units
 from afspm.components.microscope import params
 from afspm.components.microscope.translators.asylum.client import (
     XopClient, XopMessageError)
-
-from afspm.io.protos.generated import scan_pb2
 
 
 logger = logging.getLogger(__name__)
@@ -64,7 +63,7 @@ class AsylumParameterHandler(params.ParameterHandler):
     GET_STRING = 'GS'
     SET_STRING = 'PS'
 
-    def __init__(self, params_config_path: str, client: XopClient):
+    def __init__(self, client: XopClient, **kwargs):
         """Init our Asylum handler, feeding the Xop Client."""
         if client is None:
             msg = "No xop client provided, cannot continue!"
@@ -74,7 +73,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         self.client = client
         self.latest_get_set_method = None
         self.generic_uuid_type_map = {}
-        super().__init__(params_config_path)
+        super().__init__(**kwargs)
         self._populate_generic_uuid_type_map()
 
     def _populate_generic_uuid_type_map(self):
@@ -106,10 +105,9 @@ class AsylumParameterHandler(params.ParameterHandler):
             pass
 
         msg = f"Call method failed for {method_str} with attrs {attrs}."
-        logger.error(msg)
         raise params.ParameterError(msg)
 
-    def get_param(self, generic_param: params.MicroscopeParameter) -> Any:
+    def get_param(self, generic_param: params.MicroscopeParameterBase) -> Any:
         """Override to store get-set method."""
         self.latest_get_set_method = self._obtain_get_set_method(
             generic_param, request_get=True)
@@ -118,25 +116,12 @@ class AsylumParameterHandler(params.ParameterHandler):
         return val
 
     def get_param_spm(self, spm_uuid: str) -> Any:
-        """Get the current value for the microscope parameter.
-
-        This method should only concern itself with requesting an
-        scope-specific param and returning the value.
-
-        Args:
-            spm_uuid: name of the param in scope-specific terminology.
-
-        Returns:
-            Current value.
-
-        Raises:
-            ParameterError if getting the parameter fails.
-        """
+        """Override for SPM-specific getter."""
         method_str = self.latest_get_set_method
         return self._call_method(method_str, (spm_uuid,))
 
-    def set_param(self, generic_param: params.MicroscopeParameter, val: Any,
-                  curr_unit: str = None):
+    def set_param(self, generic_param: params.MicroscopeParameterBase,
+                  val: Any, curr_unit: str = None):
         """Override to store get-set method."""
         self.latest_get_set_method = self._obtain_get_set_method(
             generic_param, request_get=False)
@@ -144,20 +129,7 @@ class AsylumParameterHandler(params.ParameterHandler):
         self.latest_get_set_method = None
 
     def set_param_spm(self, spm_uuid: str, spm_val: Any):
-        """Set the current value for the microscope parameter.
-
-        This method should only concern itself with setting an scope-specific
-        param and returning whether it succeeds or not. Conversion to
-        scope-expected units should have already been done, and the param
-        string should be the one expected by the specific microscope.
-
-        Args:
-            spm_uuid: name of the param in scope-specific terminology.
-            spm_val: val to set the param to, in scope-specific units.
-
-        Raises:
-            - ParameterError if the parameter could not be set.
-        """
+        """Override for SPM-specific setter."""
         method_str = self.latest_get_set_method
         self._call_method(method_str, (spm_uuid, spm_val))
 
@@ -193,7 +165,7 @@ class ScanningMode(enum.Enum):
     ONE_FRAME = 2
 
 
-class AsylumParam(enum.Enum):
+class AsylumParam(params.MicroscopeParameterBase):
     """Asylum-specific parameters, used as 'generic' names in config.
 
     We use the 'name' of these parameters as their generic uuid when
@@ -208,12 +180,12 @@ class AsylumParam(enum.Enum):
     the appropriate get/set method (different between str and other types).
     """
 
-    SCAN_SIZE = enum.auto()
-    X_RATIO = enum.auto()
-    Y_RATIO = enum.auto()
-    IMG_PATH = enum.auto()
-    SAVING_MODE = enum.auto()  # See SavingMode above.
-    SCANNING_MODE = enum.auto()  # See ScanningMode above.
+    SCAN_SIZE = 'scan-size'
+    X_RATIO = 'x-ratio'
+    Y_RATIO = 'y-ratio'
+    IMG_PATH = 'img-path'
+    SAVING_MODE = 'saving-mode'  # See SavingMode above.
+    SCANNING_MODE = 'scanning-mode'  # See ScanningMode above.
 
 
 # Hardcoded Y ratio (for setting)
@@ -230,7 +202,7 @@ def get_scan_size_x(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.X_RATIO.name]
+    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.X_RATIO]
     vals = handler.get_param_list(generic_uuids)
     return vals[0] * vals[1]  # scan_size * x_ratio
 
@@ -245,7 +217,7 @@ def get_scan_size_y(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE.name, AsylumParam.Y_RATIO.name]
+    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.Y_RATIO]
     vals = handler.get_param_list(generic_uuids)
     return vals[0] * vals[1]  # scan_size * y_ratio
 
@@ -272,11 +244,15 @@ def set_scan_size_x(handler: params.ParameterHandler,
     desired_val = params._correct_val_for_sending(val, param_info,
                                                   unit)
 
+    if math.isclose(desired_val, 0.0):
+        msg = 'Cannot set scan-size-x due to desired val being 0.'
+        raise params.ParameterError(msg)
+
     # Now, must determine the x ratio for this.
-    scan_size = handler.get_param(AsylumParam.SCAN_SIZE.name)
+    scan_size = handler.get_param(AsylumParam.SCAN_SIZE)
     x_ratio = scan_size / desired_val
 
-    handler.set_param(AsylumParam.X_RATIO.name, x_ratio, curr_unit=None)
+    handler.set_param(AsylumParam.X_RATIO, x_ratio, curr_unit=None)
 
 
 def set_scan_size_y(handler: params.ParameterHandler,
@@ -302,17 +278,17 @@ def set_scan_size_y(handler: params.ParameterHandler,
                                                   unit)
 
     _ensure_y_ratio_is_1(handler)  # Our logic assumes this!
-    handler.set_param(AsylumParam.SCAN_SIZE.name, desired_val, curr_unit=None)
+    handler.set_param(AsylumParam.SCAN_SIZE, desired_val, curr_unit=None)
 
 
 def _ensure_y_ratio_is_1(handler: params.ParameterHandler):
     """Ensure the scan size y-ratio is 1. If not, fix it and yell."""
-    y_ratio = handler.get_param(AsylumParam.Y_RATIO.name)
+    y_ratio = handler.get_param(AsylumParam.Y_RATIO)
 
     if not isclose(y_ratio, EXPECTED_Y_RATIO):
         logger.warning(f'Scan size FastRatio is not {EXPECTED_Y_RATIO}!'
                        'Going to set, but this is unexpected.')
-        handler.set_param(AsylumParam.Y_RATIO.name, EXPECTED_Y_RATIO,
+        handler.set_param(AsylumParam.Y_RATIO, EXPECTED_Y_RATIO,
                           curr_unit=None)
 
 

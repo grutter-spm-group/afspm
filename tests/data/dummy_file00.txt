@@ -1,0 +1,75 @@
+
+;ANFATEC Parameterfile
+
+Version : 1.12
+Date : 2025-12-17
+Time : 10:43:02 AM
+UserName : Supervisor
+
+SetPoint         :  1.0E-0010
+SetPointPhysUnit : A
+FeedBackModus    : Mixed Mode
+Bias             :     0.000
+BiasPhysUnit     : mV
+Ki               :   100.000
+Kp               :     0.000
+FeedbackOnCh     : 9
+
+dncFreq          : 22992.621
+Cantilever Q     :    0.0
+Drive_Uac        :    0.0
+InputGain        :  1
+Lockin_Tau       :   5.00000000000000E-0003
+
+KpPLL            :     0.000
+KiPLL            :     0.000
+PLLBaseFreq      : 22992.621
+RefAmpl          :  0.002500
+KiAmpl           :    600
+KpAmpl           : 50000000
+PullBackAt       : 25.000000
+PullBackSpeed    : 500.000000
+
+Weight1st_2nd[%] : 0
+SetPoint2nd      :    -1.000
+SetPointPUnit2nd : Hz
+Ki2nd            : 100000
+Kp2nd            :      0
+FeedbackOnCh2nd  : -35
+
+XScanRange :     0.500
+YScanRange :     0.500
+XPhysUnit  : nm
+YPhysUnit  : nm
+Speed      : 10.000 ; lines/sec
+LineRate   :  5.000 ; lines/sec
+Angle      :   0.000
+xPixel     :     32
+yPixel     :     32
+yCenter    :     0.000
+xCenter    :     0.000
+dzdx       : dz/dx=0.000°
+dzdy       : dz/dy=0.000°
+overscan[%]: 10.000
+
+LockInFreq         :  22992.62
+LockInFreqPhysUnit : Hz
+LockInAmpl         :     0.000
+LockInAmplPhysUnit : V
+
+FileDescBegin
+FileName : dummy_file00It_to_PCFwd.int
+Caption  : It_to_PCFwd
+Scale    :  9.87614440917969E-0018
+PhysUnit : A
+Offset   :  1.09459975045929E-0011
+FileDescEnd
+
+FileDescBegin
+FileName : dummy_file00It_to_PCBwd.int
+Caption  : It_to_PCBwd
+Scale    :  9.87614440917969E-0018
+PhysUnit : A
+Offset   :  1.09459975045929E-0011
+FileDescEnd
+

@@ -3,7 +3,7 @@
 import logging
 import pytest
 import tomli
-from typing import Any
+from typing import Any, Callable
 
 from afspm.components.microscope.translator import MicroscopeError
 from afspm.components.microscope.config_translator import ConfigTranslator
@@ -128,6 +128,10 @@ class MyParameterHandler(params.ParameterHandler):
         self.vals = vals_dict
         self.param_infos = {}
         self.param_methods = {}
+        self.param_info_class = params.ParameterInfo
+        self.param_methods_class = params.ParameterMethods
+        self.validate_parameter = params.validate_parameter
+
         self._build_param_infos_methods(params_config)
 
     def get_param_spm(self, spm_uuid: str) -> Any:

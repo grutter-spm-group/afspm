@@ -1,19 +1,16 @@
 """Handles device communication with aslyum research controllers."""
 
 import os
-import copy
 import logging
 import glob
 import SciFiReaders as sr
-import sidpy
-import numpy as np
 
-from ...params import (ParameterHandler, ParameterNotSupportedError,
-                       ParameterError, MicroscopeParameter,
+from ...translator import FLOAT_TOLERANCE_KEY
+from ...params import (ParameterHandler,
+                       ParameterError,
                        DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler, MicroscopeAction, ActionError,
                         DEFAULT_ACTIONS_FILENAME)
-from ...translator import get_file_modification_datetime
 from ... import config_translator as ct
 
 from .....utils import array_converters as conv
@@ -30,17 +27,9 @@ from . import actions
 logger = logging.getLogger(__name__)
 
 
-# The Asylum controller does not appear to have a great float tolerance (at
+# The Asylum translator does not appear to have a great float tolerance (at
 # least for probe position).
 FLOAT_TOLERANCE = 1e-05
-FLOAT_TOLERANCE_KEY = 'float_tolerance'
-
-
-# Attributes from the read scan file (differs from params.AsylumParameter,
-# which contains UUIDs for getting/setting parameters).
-SCAN_ATTRIB_ANGLE = 'ScanAngle'
-# Hardcoded, even though it is also in params.toml. For loading scan.
-SCAN_ANGLE_UNIT = 'degrees'
 
 
 class AsylumTranslator(ct.ConfigTranslator):
@@ -52,8 +41,10 @@ class AsylumTranslator(ct.ConfigTranslator):
     https://github.com/AllenInstitute/ZeroMQ-XOP
 
     Attributes:
+        _old_scans: the last scans, to send out if it has not changed.
         _old_scan_path: the prior scan filepath. We use this to avoid loading
             the same scans multiple times.
+        _old_spec: the last spec, to send out if it has not changed.
         _old_spec_path: the prior spec filepath. We use this to avoid loading
             the same spectroscopies multiple times.
         _old_saving_mode: the prior SavingMode state.
@@ -67,16 +58,6 @@ class AsylumTranslator(ct.ConfigTranslator):
     IMG_EXT = '.ibw'
     SCAN_PREFIX = 'Image'
     SPEC_PREFIX = 'Force'
-
-    # NOTE: We need our own order of scan params, because we are calling it
-    # in a different order (we need to due to internals).
-    SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
-                   MicroscopeParameter.SCAN_TOP_LEFT_Y,
-                   MicroscopeParameter.SCAN_SIZE_Y,  # <-- this is different
-                   MicroscopeParameter.SCAN_SIZE_X,
-                   MicroscopeParameter.SCAN_RESOLUTION_X,
-                   MicroscopeParameter.SCAN_RESOLUTION_Y,
-                   MicroscopeParameter.SCAN_ANGLE]
 
     def __init__(self, param_handler: ParameterHandler = None,
                  action_handler: ActionHandler = None,
@@ -109,6 +90,8 @@ class AsylumTranslator(ct.ConfigTranslator):
 
         # Tell parent class that Asylum *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
+        # Tell parent class that Asylum requires setting y before x.
+        kwargs[ct.SET_X_BEFORE_Y_KEY] = False
         super().__init__(**kwargs)
 
         # Do some setup
@@ -158,7 +141,7 @@ class AsylumTranslator(ct.ConfigTranslator):
 
     def _set_save_params(self, saving_mode: int, scanning_mode: int,
                          store_old_vals: bool):
-        """Set the saving mdoe and scanning mode of the controller.
+        """Set the saving mode and scanning mode of the controller.
 
         Args:
             saving_mode: whether or not to save images as we scan. See
@@ -171,51 +154,14 @@ class AsylumTranslator(ct.ConfigTranslator):
         """
         if store_old_vals:
             self._old_saving_mode = self.param_handler.get_param(
-                params.AsylumParam.SAVING_MODE.name)
+                params.AsylumParam.SAVING_MODE)
             self._old_scanning_mode = self.param_handler.get_param(
-                params.AsylumParam.SCANNING_MODE.name)
+                params.AsylumParam.SCANNING_MODE)
 
-        self.param_handler.set_param(params.AsylumParam.SAVING_MODE.name,
+        self.param_handler.set_param(params.AsylumParam.SAVING_MODE,
                                      saving_mode)
-        self.param_handler.set_param(params.AsylumParam.SCANNING_MODE.name,
+        self.param_handler.set_param(params.AsylumParam.SCANNING_MODE,
                                      scanning_mode)
-
-    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
-                           ) -> control_pb2.ControlResponse:
-        """Override setting of scan params.
-
-        We must set the scan params in a different order from default.
-
-        As a reminder: we do not send data units, because the translator
-        has no concept of the 'units' of data at the 'scan parameter' level.
-        When we read saved scans or specs, we are able to retrieve their
-        data units, but this is not something we concern ourselves with at
-        the MicroscopeTranslator granularity.
-        """
-        vals = [scan_params.spatial.roi.top_left.x,
-                scan_params.spatial.roi.top_left.y,
-                scan_params.spatial.roi.size.y,  # <-- this is different
-                scan_params.spatial.roi.size.x,
-                scan_params.data.shape.x,
-                scan_params.data.shape.y,
-                scan_params.spatial.roi.angle]
-        attr_units = [scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      scan_params.spatial.length_units,
-                      None, None,
-                      scan_params.spatial.angular_units]
-
-        try:
-            self.param_handler.set_param_list(self.SCAN_PARAMS, vals,
-                                              attr_units)
-            if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._handle_sending_fake_move()
-        except ParameterNotSupportedError:
-            return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
-        except ParameterError:
-            return control_pb2.ControlResponse.REP_PARAM_ERROR
-        return control_pb2.ControlResponse.REP_SUCCESS
 
     def on_set_probe_pos(self, probe_position: spec_pb2.ProbePosition
                          ) -> control_pb2.ControlResponse:
@@ -241,13 +187,13 @@ class AsylumTranslator(ct.ConfigTranslator):
             return scan_pb2.ScopeState.SS_SCANNING
         elif params.ScopeState.SINGLE_SPEC.value & val:
             return scan_pb2.ScopeState.SS_SPEC
-        return scan_pb2.SS_FREE
+        return scan_pb2.ScopeState.SS_FREE
 
     def _get_latest_file(self, prefix: str) -> str | None:
-        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH.name)
+        val = self.param_handler.get_param(params.AsylumParam.IMG_PATH)
         img_path = convert_igor_path_to_python_path(val)
-        images = sorted(glob.glob(img_path + os.sep + prefix + "*"
-                                  + self.IMG_EXT),
+        file_form = prefix + "*" + self.IMG_EXT
+        images = sorted(glob.glob(os.path.join(img_path, file_form)),
                         key=os.path.getmtime)  # Sorted by access time
         return images[-1] if images else None  # Get latest
 
@@ -302,63 +248,47 @@ class AsylumTranslator(ct.ConfigTranslator):
 
 
 def _init_action_handler(client: XopClient) -> actions.AsylumActionHandler:
-    """Initialize Asylum action handler pointing to defulat config."""
+    """Initialize Asylum action handler pointing to default config."""
     actions_config_path = os.path.join(os.path.dirname(__file__),
                                        DEFAULT_ACTIONS_FILENAME)
-    return actions.AsylumActionHandler(actions_config_path, client)
+    return actions.AsylumActionHandler(
+        client, actions_config_path=actions_config_path)
 
 
 def _init_param_handler(client: XopClient) -> params.AsylumParameterHandler:
-    """Initialize Asylum action handler pointing to defulat config."""
+    """Initialize Asylum param handler pointing to default config."""
     params_config_path = os.path.join(os.path.dirname(__file__),
                                       DEFAULT_PARAMS_FILENAME)
-    return params.AsylumParameterHandler(params_config_path, client)
-
-
-def convert_sidpy_to_spec_pb2(ds_dict: dict[str, sidpy.Dataset],
-                              ) -> spec_pb2.Spec1d:
-    """Convert a dict of sidpy datasets to a single Spec1d."""
-    names = [ds.dim_0.name for ds in ds_dict.values()]
-    units = [ds.dim_0.units for ds in ds_dict.values()]
-    num_variables = len(ds_dict)
-    data_per_variable = list(ds_dict.values())[0].shape[0]
-
-    # Extract data (first as 2D list)
-    values = [ds.compute() for ds in ds_dict.values()]
-    # Now, unravel to 1D version (using numpy's ravel)
-    values = np.array(values).ravel().tolist()
-
-    spec_data = spec_pb2.SpecData(num_variables=num_variables,
-                                  data_per_variable=data_per_variable,
-                                  names=names, units=units,
-                                  values=values)
-    spec = spec_pb2.Spec1d(data=spec_data)
-    return spec
+    return params.AsylumParameterHandler(
+        client, params_config_path=params_config_path)
 
 
 def load_scans_from_file(scan_path: str
                          ) -> list[scan_pb2.Scan2d] | None:
     """Load Asylum scan, filling in info possible from file only.
 
+    NOTE: We follow the suggestions of config_translator and use correct_scan()
+    in the calling method (avoids any coordinate system differences).
+    We still need to set the filename, however.
+
     Args:
         scan_path: path to the scan.
 
     Returns:
         loaded scans in scan_pb2 format (one scan per channel). None if
-        dataset is empty or failure loading scan.
+        dataset is empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
     logger.debug(f"Getting datasets from {scan_path} (each dataset"
                  " is a channel).")
-    try:
-        reader = sr.IgorIBWReader(scan_path)
-        datasets = list(reader.read(verbose=False).values())
-    except Exception as exc:
-        logger.error(f"Failure loading scan at {scan_path}: {exc}")
-        return None
+    reader = sr.IgorIBWReader(scan_path)
+    # NOTE: Why does Igor reader return dict instead of list?
+    datasets = list(reader.read(verbose=False).values())
 
     if datasets:
         scans = []
-        ts = get_file_modification_datetime(scan_path)
         for ds in datasets:
             # BUG WORKAROUND: scifireaders does not properly load the
             # scan data! The data is read originally in the same manner
@@ -371,25 +301,9 @@ def load_scans_from_file(scan_path: str
             # operations.
             swap_ds = ds.swapaxes(0, 1)
             scan = conv.convert_sidpy_to_scan_pb2(swap_ds)
-            # Note: we use the original ds for stuff below, as we
-            # cannot guarantee all is properly copied.
 
-            # BUG WORKAROUND: scifireaders does not properly read the
-            # length units of scans (it puts the data_units). Because
-            # of this, we get a conversion error when dealing, e.g.
-            # with the phase channel (it tries to convert 'm' to
-            # 'deg').
-            # Until this is fixed, we are just hard-coding the
-            # length_units as 'm', which is what IBW files appear
-            # to be anyway.
-            scan.params.spatial.length_units = 'm'
-
-            # Set ROI angle, timestamp, file
-            scan.params.spatial.roi.angle = ds.original_metadata[
-                SCAN_ATTRIB_ANGLE]
-            scan.params.spatial.angular_units = SCAN_ANGLE_UNIT
-
-            scan.timestamp.FromDatetime(ts)
+            # Setting filename. All else is done by correct_scan()
+            # (recommended to ensure coordinate system consistency).
             scan.filename = scan_path
             scans.append(scan)
         return scans
@@ -400,22 +314,23 @@ def load_spec_from_file(fname: str,
                         ) -> spec_pb2.Spec1d | None:
     """Load Spec1d from provided filename (None on failure).
 
+    NOTE: We follow the suggestions of config_translator and use correct_spec()
+    in the calling method (avoids any coordinate system differences). In this
+    case, probe position is not available in the saved data so we need it.
+
     Args:
         fname: path to spec file.
 
     Returns:
-        Spec1d if loaded properly, None if spec file was empty or exception
-        thrown when reading.
+        Spec1d if loaded properly, None if spec file was empty.
+
+    Raises:
+        Unknown/unforeseen read error.
     """
-    try:
-        reader = sr.IgorIBWReader(fname)
-        ds_dict = reader.read(verbose=False)
+    reader = sr.IgorIBWReader(fname)
+    # NOTE: Why does Igor reader return dict instead of list?
+    datasets = list(reader.read(verbose=False).values())
 
-        spec = convert_sidpy_to_spec_pb2(ds_dict)
-        spec.filename = fname
-
-        return spec
-    except Exception:
-        logger.error(f'Could not read spec fname {fname}.'
-                     'Got error.', exc_info=True)
-        return None
+    spec = conv.convert_sidpy_to_spec_pb2(datasets)
+    spec.filename = fname
+    return spec

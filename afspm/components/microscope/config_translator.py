@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 DETECTS_MOVING_KEY = 'detects_moving'
 PARAM_HANDLER_KEY = 'param_handler'
 ACTION_HANDLER_KEY = 'action_handler'
+SET_X_BEFORE_Y_KEY = 'set_x_before_y'
 
 
 class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
@@ -64,7 +65,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
     NOTE: implementing poll_scope_state() is a bit particular; please
     review poll_scope_state's pydoc in translator.py. ConfigTranslator uses a
     variable self.detects_moving to determine if it should call
-    self._handle_sending_fake_move() in on_set_probe_pos() /
+    self._update_scope_state() in on_set_probe_pos() /
     on_set_scan_params(). Use this in accordance with that pydoc's guidance.
 
     Args:
@@ -78,11 +79,15 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             the probe position or scan params top-left position change.
 
         _latest_scan_params: ScanParameters2d from when last scan was
-            done. Needed in order to create Scan2d from saved file, as the
-            metadata (oddly) does not appear to store the XY origin.
+            done. Needed in order to create Scan2d from saved file, as not
+            all file formats appear to store the XY origin.
         _latest_probe_pos: ProbePosition of XY position when last spec was
-            done. Needed in order to create Spec1d from saved file, as the
-            metadata (oddly) does not appear to store the XY position.
+            done. Needed in order to create Spec1d from saved file, as not
+            all file formats appear to store the XY position.
+        _set_x_before_y: whether or not, when setting, we prefer the x-dim
+            coordinates before the y-dim coordinates. If False, we set y-dim
+            before x-dim. Useful for translators where the two parameters are
+            linked, and thus the order is important.
     """
 
     def __init__(self, name: str, publisher: pub.Publisher,
@@ -90,6 +95,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                  param_handler: params.ParameterHandler,
                  action_handler: actions.ActionHandler,
                  detects_moving: bool = True,
+                 set_x_before_y: bool = True,
                  **kwargs):
         """Init our configured translator.
 
@@ -103,6 +109,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             action_handler: ActionHandler class, for handling action requests.
             detects_moving: whether or not the controller can detect SS_MOVING
                 events.
+            set_x_before_y: whether or not, when setting, we prefer the x-dim
+                coordinates before the y-dim coordinates. If False, we set
+                y-dim before x-dim. Useful for translators where the two
+                parameters are linked, and thus the order is important.
         """
         self.param_handler = param_handler
         self.action_handler = action_handler
@@ -110,6 +120,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
 
         self._latest_scan_params = None
         self._latest_probe_pos = None
+        self._set_x_before_y = set_x_before_y
 
         super().__init__(name, publisher, control_server, **kwargs)
         self._validate_required_actions_exist()
@@ -130,13 +141,25 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         data units, but this is not something we concern ourselves with at
         the MicroscopeTranslator granularity.
         """
-        vals = [scan_params.spatial.roi.top_left.x,
-                scan_params.spatial.roi.top_left.y,
-                scan_params.spatial.roi.size.x,
-                scan_params.spatial.roi.size.y,
-                scan_params.data.shape.x,
-                scan_params.data.shape.y,
-                scan_params.spatial.roi.angle]
+        if self._set_x_before_y:
+            vals = [scan_params.spatial.roi.size.x,
+                    scan_params.spatial.roi.size.y,
+                    scan_params.spatial.roi.top_left.x,
+                    scan_params.spatial.roi.top_left.y,
+                    scan_params.data.shape.x,
+                    scan_params.data.shape.y,
+                    scan_params.spatial.roi.angle]
+            scan_param_ids = params.SCAN_PARAMS_XY
+        else:
+            vals = [scan_params.spatial.roi.size.y,
+                    scan_params.spatial.roi.size.x,
+                    scan_params.spatial.roi.top_left.y,
+                    scan_params.spatial.roi.top_left.x,
+                    scan_params.data.shape.y,
+                    scan_params.data.shape.x,
+                    scan_params.spatial.roi.angle]
+            scan_param_ids = params.SCAN_PARAMS_YX
+
         attr_units = [scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
                       scan_params.spatial.length_units,
@@ -145,10 +168,10 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
                       scan_params.spatial.angular_units]
 
         try:
-            self.param_handler.set_param_list(params.SCAN_PARAMS, vals,
+            self.param_handler.set_param_list(scan_param_ids, vals,
                                               attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._handle_sending_fake_move()
+                self._update_scope_state(scan_pb2.ScopeState.SS_MOVING)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
@@ -190,7 +213,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             self.param_handler.set_param_list(params.PROBE_POS_PARAMS,
                                               vals, attr_units)
             if not self.detects_moving:  # Send fake SS_MOVING if needed
-                self._handle_sending_fake_move()
+                self._update_scope_state(scan_pb2.ScopeState.SS_MOVING)
         except params.ParameterNotSupportedError:
             return control_pb2.ControlResponse.REP_PARAM_NOT_SUPPORTED
         except params.ParameterError:
@@ -268,15 +291,7 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             Response to the request.
         """
         self._handle_action_not_in_actions(action)
-
-        # Store scan_params / probe_pos on action start (for setting
-        # later). NOTE: we must do this *here* (rather than on any
-        # poll) because the user may change things via the microscope
-        # controller UI (separate from our scripts and guardrails).
-        if action.action == actions.MicroscopeAction.START_SCAN:
-            self._latest_scan_params = self.poll_scan_params()
-        elif action.action == actions.MicroscopeAction.START_SPEC:
-            self._latest_probe_pos = self.poll_probe_pos()
+        self._store_info_before_action(action)
 
         try:
             self.action_handler.request_action(action.action)
@@ -286,6 +301,32 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             return control_pb2.ControlResponse.REP_ACTION_ERROR
 
         return control_pb2.ControlResponse.REP_SUCCESS
+
+    def _store_info_before_action(self, action: control_pb2.ActionMsg):
+        """If about to start a scan or spec, store the params/probe pos.
+
+        This is the method which stores parameters before a scan/spec is run,
+        allowing it to be used by ct.correct_scan()/ct.correct_spec() when
+        the file is read. It is used by default because many controllers do
+        not properly store these parameters in their save files (if you can
+        believe it).
+        """
+        if action.action == actions.MicroscopeAction.START_SCAN:
+            self._latest_scan_params = self.poll_scan_params()
+        elif action.action == actions.MicroscopeAction.START_SPEC:
+            self._latest_probe_pos = self.poll_probe_pos()
+
+    def _update_scan_params(self, scan_params: scan_pb2.ScanParameters2d):
+        """Override to store initial scan params on startup."""
+        super()._update_scan_params(scan_params)
+        if self._latest_scan_params is None:
+            self._latest_scan_params = self.scan_params
+
+    def _update_probe_pos(self, probe_pos: spec_pb2.ProbePosition):
+        """Override to store initial probe pos on startup."""
+        super()._update_probe_pos(probe_pos)
+        if self._latest_probe_pos is None:
+            self._latest_probe_pos = self.probe_pos
 
     def on_check_action_support(self, action: control_pb2.ActionMsg
                                 ) -> control_pb2.ControlResponse:
@@ -325,17 +366,25 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         angular_units = self.param_handler.get_unit(
             params.MicroscopeParameter.SCAN_ANGLE)
 
-        vals = self.param_handler.get_param_list(params.SCAN_PARAMS)
+        scan_param_ids = (params.SCAN_PARAMS_XY if self._set_x_before_y
+                          else params.SCAN_PARAMS_YX)
+        vals = self.param_handler.get_param_list(scan_param_ids)
 
         scan_params = scan_pb2.ScanParameters2d()
-        scan_params.spatial.roi.top_left.x = vals[0]
-        scan_params.spatial.roi.top_left.y = vals[1]
-        scan_params.spatial.roi.size.x = vals[2]
-        scan_params.spatial.roi.size.y = vals[3]
+        if self._set_x_before_y:
+            scan_params.spatial.roi.size.x = vals[0]
+            scan_params.spatial.roi.size.y = vals[1]
+            scan_params.spatial.roi.top_left.x = vals[2]
+            scan_params.spatial.roi.top_left.y = vals[3]
+        else:
+            scan_params.spatial.roi.size.y = vals[0]
+            scan_params.spatial.roi.size.x = vals[1]
+            scan_params.spatial.roi.top_left.y = vals[2]
+            scan_params.spatial.roi.top_left.x = vals[3]
+
         scan_params.spatial.roi.angle = vals[6]
         scan_params.spatial.length_units = length_units
         scan_params.spatial.angular_units = angular_units
-
         # Note: all gxsm attributes returned as float, must convert to int
         scan_params.data.shape.x = int(vals[4])
         scan_params.data.shape.y = int(vals[5])
@@ -400,7 +449,7 @@ def correct_scan(scan: scan_pb2,
 
     Note that the main attribute we need to correct here is the top-left
     position of the spatial region of interest, as this is what does not
-    appear to be stored by any microscope scan format. We assume the other
+    appear to be stored by many microscope scan formats. We assume the other
     parameters (physical size, digital resolution) are stored properly.
     However, to ensure we do not run into units issues, we copy the full
     *spatial* portion of the scan.

@@ -24,8 +24,6 @@ class ConversionError(Exception):
     an exception defined here.
     """
 
-    pass
-
 
 def convert(val: Any, unit: Optional[str] = None,
             desired_unit: Optional[str] = None) -> Any:

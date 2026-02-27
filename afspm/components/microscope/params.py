@@ -15,7 +15,7 @@ class to implement the get_param_spm()/set_param_spm() methods.
 
 import logging
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, astuple
 from enum import Enum
 from typing import Any, Callable
 from abc import ABCMeta, abstractmethod
@@ -31,7 +31,14 @@ logger = logging.getLogger(__name__)
 DEFAULT_PARAMS_FILENAME = 'params.toml'
 
 
-class MicroscopeParameter(str, Enum):
+class MicroscopeParameterBase(str, Enum):
+    """Base microscope parameter enumeration.
+
+    Used to inherit from when expanding microscope parameters.
+    """
+
+
+class MicroscopeParameter(MicroscopeParameterBase):
     """Holds generic parameter names that can be set."""
 
     # Physical Scan Parameters
@@ -124,13 +131,24 @@ DESCRIPTIONS = {
 }
 
 # ----- Helper lists of Microscope Parameters ----- #
-SCAN_PARAMS = [MicroscopeParameter.SCAN_TOP_LEFT_X,
-               MicroscopeParameter.SCAN_TOP_LEFT_Y,
-               MicroscopeParameter.SCAN_SIZE_X,
-               MicroscopeParameter.SCAN_SIZE_Y,
-               MicroscopeParameter.SCAN_RESOLUTION_X,
-               MicroscopeParameter.SCAN_RESOLUTION_Y,
-               MicroscopeParameter.SCAN_ANGLE]
+# NOTE: size before top-left because we may convert between a top-left and
+# a center definition of an ROI. In either case, the size has to be changed
+# first on any set (because the mapping between coordinate systems depends
+# on the ROI size.).
+SCAN_PARAMS_XY = [MicroscopeParameter.SCAN_SIZE_X,
+                  MicroscopeParameter.SCAN_SIZE_Y,
+                  MicroscopeParameter.SCAN_TOP_LEFT_X,
+                  MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                  MicroscopeParameter.SCAN_RESOLUTION_X,
+                  MicroscopeParameter.SCAN_RESOLUTION_Y,
+                  MicroscopeParameter.SCAN_ANGLE]
+SCAN_PARAMS_YX = [MicroscopeParameter.SCAN_SIZE_Y,
+                  MicroscopeParameter.SCAN_SIZE_X,
+                  MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                  MicroscopeParameter.SCAN_TOP_LEFT_X,
+                  MicroscopeParameter.SCAN_RESOLUTION_Y,
+                  MicroscopeParameter.SCAN_RESOLUTION_X,
+                  MicroscopeParameter.SCAN_ANGLE]
 
 
 ZCTRL_PARAMS = [MicroscopeParameter.ZCTRL_SETPOINT,
@@ -159,7 +177,7 @@ class ParameterNotSupportedError(Exception):
 
 
 class ParameterConfigurationError(Exception):
-    """There was an error with the config file tied to requested parameter."""
+    """There was an error with the config tied to requested parameter."""
 
     pass
 
@@ -171,7 +189,7 @@ class ParameterInfo:
 
     uuid: str  # Microscope-specific param UUID
     unit: str | None  # Microscope units for this param
-    range: tuple[Any]  # Acceptable range for this param.
+    range: tuple[Any] | None  # Acceptable range for this param.
     type: Any  # A sample value of the type of this param, for type handling
 
 
@@ -193,29 +211,51 @@ class ParameterMethods:
     getter: Callable[[Any], Any] | None
 
 
-def create_parameter_info(param_dict: dict) -> ParameterInfo:
+def create_parameter_info(param_dict: dict,
+                          param_info_class: Callable) -> ParameterInfo:
     """Create ParameterInfo from a param_dict (from params config).
+
+    Instantiates ParameterInfo (or child class) from provided dict.
+
+    If you have created additional fields in your ParameterInfo child class,
+    you should expand upon this method.
 
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
+        param_info: the imported class, which we can call to construct.
+            Note I have typed this as Callable as I do not know the proper
+            type for an imported class that is not an instance.
+
     Returns:
-        ParameterInfo instance.
+        ParameterInfo instance or None (if no vals are provided).
     """
     vals = []
-    for key in ParameterInfo.__annotations__.keys():
+    keys = [f.name for f in fields(param_info_class)]
+    for key in keys:
         vals.append(param_dict[key] if key in param_dict else None)
-    return ParameterInfo(*vals)
+
+    kwargs = dict(zip(keys, vals))
+    param_info = param_info_class(**kwargs)
+    return param_info
 
 
-def create_parameter_methods(param_dict: dict) -> ParameterMethods:
+def create_parameter_methods(param_dict: dict,
+                             param_methods_class: Callable
+                             ) -> ParameterMethods:
     """Create ParameterMethods from a param_dict (from params config).
 
     Attempts to import setter and getter methods for a param dict.
 
+    If you have created additional fields in your ParameterInfo child class,
+    you should expand upon this method.
+
     Args:
         param_dict: dict for a particular parameter, obtained from
             params_config.
+        param_info: the imported class, which we can call to construct.
+            Note I have typed this as Callable as I do not know the proper
+            type for an imported class that is not an instance.
 
     Returns:
         ParameterMethods instance.
@@ -225,11 +265,64 @@ def create_parameter_methods(param_dict: dict) -> ParameterMethods:
             import.
     """
     methods = []
-    for key in ParameterMethods.__annotations__.keys():
+    keys = [f.name for f in fields(param_methods_class)]
+    for key in keys:
         # Try to import method if in param_dict, else pass None.
         methods.append(import_from_string(param_dict[key])
                        if key in param_dict else None)
-    return ParameterMethods(*methods)
+
+    param_methods = param_methods_class(*methods)
+    return param_methods
+
+
+def _all_none(inst: ParameterInfo | ParameterMethods) -> bool:
+    """Check if inst is all None."""
+    tuple_inst = astuple(inst)
+    return tuple_inst.count(None) == len(tuple_inst)
+
+
+def validate_parameter(param_info: ParameterInfo,
+                       param_methods: ParameterMethods,
+                       gid: str) -> (ParameterInfo | None,
+                                     ParameterMethods | None):
+    """Validate we have enough infor in our param_info or param_methods.
+
+    This method allows us to validate that we have sufficient information for
+    a loaded parameter. After loading, we will have ParameterInfo and
+    ParameterMethods classes instantiated. Our goal is to ensure we have
+    enough in either one of them to continue.
+
+    In this base implementation, we check ParameterInfo for type and uuid; and
+    ParameterMethods for getter and setter. If either of the two meets these
+    criteria, we accept *both*. However, either of the two that has all None
+    attrs is set to None (as it is, in principle, a None).
+
+    Note that if you write your own version of this method, you can filter for
+    special parameters via the gid.
+
+    Args:
+        param_info: ParameterInfo that has been instantiated for this
+            Parameter.
+        param_methods: ParameterMethods that has been instantiated for this
+            Parameter.
+        gid: str associated to our MicroscopeParameter. Equivalent to
+            MicroscopeParameter.value.
+
+    Returns:
+        tuple consisting of:
+        - The ParameterInfo or None, if it is not accepted.
+        - The ParameterMethods or None, if it is not accepted.
+    """
+    param_methods_met = None not in [param_methods.getter,
+                                     param_methods.setter]
+    param_info_met = None not in [param_info.uuid, param_info.type]
+
+    if param_methods_met or param_info_met:
+        if _all_none(param_methods):
+            param_methods = None
+        if _all_none(param_info):
+            param_info = None
+    return (param_info, param_methods)
 
 
 # ----- Main handler class ----- #
@@ -285,6 +378,10 @@ class ParameterHandler(metaclass=ABCMeta):
     in this case are in a module my_file.py. The 'scan-top-left-x' parameter use
     uses get/set_param_spm() in this case.
 
+    NOTE: if you are using a getter/setter, you can still use the
+    internal logic to correct type, units, range (_correct_val_for_sending()).
+    We suggest doing so wherever possible.
+
     Attributes:
         param_infos: a dict of key:val pairs consisting of
             generic_param:ParameterInfo. For a given generic_param, its
@@ -294,12 +391,25 @@ class ParameterHandler(metaclass=ABCMeta):
             generic_param:ParameterMethods. For a given generic_param, its
             ParameterMethods will only be added if it has both a setter and a
             getter defined.
+        param_info_class: an import of the class we will instantiate in
+            create_parameter_info. Defaults to ParameterInfo.
+        param_methods_class: an import of the class we will instantiate in
+            create_parameter_methods. Defaults to ParameterMethods.
+        validate_parameter: method to validate whether we have the minimum
+            in either our ParameterInfo or ParameterMethods for a given
+            parameter.
     """
 
-    def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME):
+    def __init__(self, params_config_path: str = DEFAULT_PARAMS_FILENAME,
+                 param_info_class: Callable = ParameterInfo,
+                 param_methods_class: Callable = ParameterMethods,
+                 validate_parameter: Callable = validate_parameter):
         """Init class, loading params config for these purposes."""
         self.param_infos = {}
         self.param_methods = {}
+        self.param_info_class = param_info_class
+        self.param_methods_class = param_methods_class
+        self.validate_parameter = validate_parameter
         self._load_config_build_params(params_config_path)
 
     @abstractmethod
@@ -358,38 +468,24 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for key, val in params_config.items():
             if isinstance(val, dict):
-                # Ceck if we have our own set/get methods
-                param_methods = create_parameter_methods(val)
+                param_info = create_parameter_info(val, self.param_info_class)
+                param_methods = create_parameter_methods(
+                    val, self.param_methods_class)
 
-                if param_methods.setter or param_methods.getter:
-                    no_setter_or_getter = (
-                        'setter' if not param_methods.setter
-                        else 'getter' if not param_methods.getter
-                        else None)
-                    if no_setter_or_getter:
-                        logger.warning(f'For parameter {key}'
-                                       f', {no_setter_or_getter} not '
-                                       'provided! Continuing.')
-
-                    logger.debug('Custom setter/getter provided for ' +
-                                 f'parameter {key}. Using.')
-                    self.param_methods[key] = param_methods
-
-                # Load all the param info we can get.
-                param_info = create_parameter_info(val)
-                self.param_infos[key] = param_info
-
-                # Check that we have what is needed to set/get:
-                # either a uuid + type from param_info or a getter/setter.
-                no_uuid_or_type = (param_info.uuid is None or
-                                   param_info.type is None)
-                if key not in self.param_methods and no_uuid_or_type:
-                    msg = (f"Parameter {key} provided without either set/" +
-                           "get methods or both 'type' and 'uuid' attributes.")
+                param_info, param_methods = self.validate_parameter(
+                    param_info, param_methods, key)
+                if [param_info, param_methods].count(None) == 2:
+                    msg = (f'Parameter {key} provided without minimum'
+                           'ParameterMethods or ParameterInfo attributes.')
                     logger.error(msg)
                     raise ParameterConfigurationError(msg)
 
-    def _get_param_info(self, generic_param: MicroscopeParameter
+                if param_info is not None:
+                    self.param_infos[key] = param_info
+                if param_methods is not None:
+                    self.param_methods[key] = param_methods
+
+    def _get_param_info(self, generic_param: MicroscopeParameterBase
                         ) -> ParameterInfo:
         """Get ParameterInfo with error handling."""
         if generic_param not in self.param_infos:
@@ -398,18 +494,18 @@ class ParameterHandler(metaclass=ABCMeta):
             raise ParameterNotSupportedError(msg)
         return self.param_infos[generic_param]
 
-    def _get_param_methods(self, generic_param: MicroscopeParameter
+    def _get_param_methods(self, generic_param: MicroscopeParameterBase
                            ) -> ParameterMethods:
         """Get ParameterInfo (None if not found)."""
         if generic_param not in self.param_methods:
             return None
         return self.param_methods[generic_param]
 
-    def get_unit(self, generic_param: MicroscopeParameter) -> str | None:
+    def get_unit(self, generic_param: MicroscopeParameterBase) -> str | None:
         """Get the scope-specific unit for the provided parameter.
 
         Args:
-            generic_param: MicroscopeParameter we want to get.
+            generic_param: MicroscopeParameterBase we want to get.
 
         Returns:
             Units as str, None if no unit is defined.
@@ -420,11 +516,11 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         return self._get_param_info(generic_param).unit
 
-    def get_param(self, generic_param: MicroscopeParameter) -> Any:
+    def get_param(self, generic_param: MicroscopeParameterBase) -> Any:
         """Get the current value for the provided parameter.
 
         Args:
-            generic_param: MicroscopeParameter we want to get.
+            generic_param: MicroscopeParameterBase we want to get.
 
         Returns:
             Current value.
@@ -448,14 +544,16 @@ class ParameterHandler(metaclass=ABCMeta):
         val = self.get_param_spm(param_info.uuid)
         return val
 
-    def set_param(self, generic_param: MicroscopeParameter, val: Any,
-                  curr_unit: str = None):
+    def set_param(self, generic_param: MicroscopeParameterBase, val: Any,
+                  curr_unit: str = None, override_methods: bool = False):
         """Convert a value to appropriate units and set it.
 
         Args:
-            generic_param: MicroscopeParameter we want to set.
+            generic_param: MicroscopeParameterBase we want to set.
             val: value to set it to, in expected format.
             curr_unit: unit of provided value. optional.
+            override_methods: whether or not we purposefully skip
+                param_methods. Defaults to False.
 
         Raises:
             - ConversionError if the method failed to convert to the
@@ -464,11 +562,12 @@ class ParameterHandler(metaclass=ABCMeta):
                 in the params_config dict.
             - ParameterError if the parameter could not be set.
         """
-        methods = self._get_param_methods(generic_param)
-        if methods and methods.setter:
-            logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
-            methods.setter(self, val, curr_unit)
-            return
+        if not override_methods:
+            methods = self._get_param_methods(generic_param)
+            if methods and methods.setter:
+                logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
+                methods.setter(self, val, curr_unit)
+                return
 
         param_info = self._get_param_info(generic_param)
         if param_info.uuid is None:
@@ -482,17 +581,17 @@ class ParameterHandler(metaclass=ABCMeta):
         logger.trace(f'Setting {generic_param} to {val} {curr_unit}.')
         self.set_param_spm(param_info.uuid, val)
 
-    def get_param_list(self, generic_params: list[MicroscopeParameter]
+    def get_param_list(self, generic_params: list[MicroscopeParameterBase]
                        ) -> list[Any]:
         """Get params for a list of provided parameters."""
         return [self.get_param(param) for param in generic_params]
 
-    def set_param_list(self, generic_params: list[MicroscopeParameter],
+    def set_param_list(self, generic_params: list[MicroscopeParameterBase],
                        vals: list[str], curr_units: tuple[str | None]):
         """Convert a list of values to microscope units and set them.
 
         Args:
-            generic_param: MicroscopeParameters we wish to set.
+            generic_param: MicroscopeParameterBases we wish to set.
             vals: values to set them to in str format (as they are sent in
                 ParameterMsg).
             curr_units: units of provided values. optional.
@@ -506,6 +605,11 @@ class ParameterHandler(metaclass=ABCMeta):
         """
         for (param, val, unit) in zip(generic_params, vals, curr_units):
             self.set_param(param, val, unit)
+
+    def get_unit_list(self, generic_params: list[MicroscopeParameterBase]
+                      ) -> list[Any]:
+        """Get units for a list of provided parameters."""
+        return [self.get_unit(param) for param in generic_params]
 
 
 def _correct_val_for_sending(val: str, param_info: ParameterInfo,
@@ -535,7 +639,7 @@ def _cap_val_in_range(val: Any, val_range: tuple[Any] | None,
         old_val = val
         val = (val_range[0] if val < val_range[0] else val_range[1]
                if val > val_range[1] else val)
-        logger.info(f'Trying to set {generic_uuid} with value {old_val}, ' +
+        logger.info(f'Trying to set {generic_uuid} with value {old_val}, '
                     f'which is outside of range {val_range}. Capping to {val}.')
     return val
 
@@ -567,7 +671,7 @@ def _typify_val(val: Any, sample_type: Any) -> Any:
     elif isinstance(sample_type, bool):
         return bool(val)
 
-    msg = (f'Sample type {sample_type} is not of supported types for ' +
+    msg = (f'Sample type {sample_type} is not of supported types for '
            'conversion - cannot convert val to it.')
     logger.error(msg)
     raise AttributeError(msg)

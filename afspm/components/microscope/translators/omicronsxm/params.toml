@@ -1,0 +1,247 @@
+# This file holds the SXM parameters. Feel free to modify the
+# parameter ranges if you want to constrain any further.
+
+# ----- Physical Scan Parameters ----- #
+# NOTE: The true ranges of top-left and scan-size are linked. If you were to
+# make the max top-left smaller, the max scan-size would increase (and
+# vice-versa). We've chosen 'reasonable defaults', but feel free to change.
+
+[scan-top-left-x]  # Changeable attributes in [center-x] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_x'
+
+[scan-top-left-y]  # Changeable attributes in [center-y] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_y'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_y'
+
+[scan-angle]
+caller_id = 'Angle'
+unit = 'degrees'
+type = 1.0
+range = [-180.0, 180.0]  # Will return in range [0, 360]
+caller = 'SCAN'
+
+[scan-size-x]   # [size-x-ratio] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_size_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_size_x'
+unit = 'nm'
+range = [0.0, 1000.0]  # [0, 1000nm]
+type = 1.0
+
+[scan-size-y]
+caller_id = 'Range'
+unit = 'nm'
+type = 1.0
+range = [0.0, 1000.0]  # [0, 1000 nm]
+caller = 'SCAN'
+
+# ----- Digital Scan Parameters ----- #
+[scan-resolution-x]  # [pixel-x-ratio] below
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_x'
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_res_x'
+type = 1
+range = [32, 4100]
+
+[scan-resolution-y]  # Unitless
+# NOTE: Special setter for scan resolution, due to limitation on setting.
+# The API only adds one of 5 resolutions to be set for...mysterious reasons.
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_res_y'
+caller_id = 'Pixel'
+type = 1
+caller = 'SCAN'
+
+# ----- Feedback Parameters ----- #
+[zctrl-setpoint]
+caller_id = 'Ref'
+# Note: units are pA, but we consider it unitless, because in
+# ZCtrlParameters it is unitless.
+type = 1.0
+range = [0, 1000.0]   # [0, 1000.0] pA
+caller = 'FEEDBACK'
+
+[zctrl-pgain]  # Unitless
+caller_id = 'Kp'
+type = 1.0
+range = [0, 1]   # [0, 1.0]  #  More conservative, we don't change this often.
+caller = 'FEEDBACK'
+
+[zctrl-igain]  # Unitless
+caller_id = 'Ki'
+type = 1.0
+range = [0, 100]   # [0, 100.0]  # Less conservative, we change this often.
+caller = 'FEEDBACK'
+
+# ----- Sample Slope Correction ----- #
+[sample-slope-x]
+caller_id = 'SlopeX'
+unit = 'deg'
+type = 1.0
+range = [0, 10.0]   # [0, 10] \deg
+caller = 'SCAN'
+
+[sample-slope-y]
+caller_id = 'SlopeY'
+unit = 'deg'
+type = 1.0
+range = [0, 10.0]   # [0, 10] \deg
+caller = 'SCAN'
+
+# ----- Probe / Scan Parameters ----- #
+[scan-speed]  # Uses [speed-lines-s] below.
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_scan_speed'
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_scan_speed'
+unit = 'nm/s'
+type = 1.0
+range = [0, 100]  #  [0, 100] nm/s
+
+# ----- Probe Parameters ----- #
+[probe-pos-x]  # See spec-pos-x *and* tip-pos-x
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_probe_pos_x'
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_probe_pos_x'
+unit = 'nm'
+type = 1.0
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
+# This is in absolute coordinate system
+
+[probe-pos-y]  # See spec-pos-y *and* tip-pos-y
+getter = 'afspm.components.microscope.translators.omicronsxm.params.get_probe_pos_y'
+setter = 'afspm.components.microscope.translators.omicronsxm.params.set_probe_pos_y'
+unit = 'nm'
+type = 1.0
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
+# This is in absolute coordinate system
+
+# ----- Other ----- #
+[tip-bias-voltage]
+caller_id = 'Bias'
+unit = 'mV'
+type = 1.0
+range = [-10e4, 10e4]  # [-10.0, 10.0] V
+caller = 'FEEDBACK'
+
+
+# ----- SXM-Specific Parameters ----- #
+# The following parameters are SXM-specific, used for some internal logic.
+# We use this rather than hard-coded values in params.py, because WHY?
+
+[center-x]
+caller_id = 'X'
+unit = 'nm'
+type = 1.0
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
+caller = 'SCAN'
+
+[center-y]
+caller_id = 'Y'
+unit = 'nm'
+type = 1.0
+range = [-1400.0, 1400.0]  # [-1400.0, 1400.0 nm]
+caller = 'SCAN'
+
+[size-x-ratio]
+caller_id = 'AspectRatio'
+# No units
+type = 1.0
+caller = 'SCAN'
+
+[pixel-x-ratio]
+caller_id = 'PixelDensity'
+# No units
+type = 1.0
+caller = 'SCAN'
+
+[speed-lines-s]  # Range check is in scan-speed
+caller_id = 'Speed'
+type = 1
+caller = 'SCAN'
+
+[scan-state]
+caller_id = 'Scan'
+type = 1
+caller = 'SCAN'
+
+# NOTE: We cannot get this param, only set!
+[scan-autosave]
+caller_id = 'AUTOSAVE'
+type = 1
+caller = 'SCAN'
+
+# NOTE: We cannot get this param, only set!
+[spec-autosave]
+caller_id = 'AUTOSAVE'
+type = 1
+caller = 'SPECTRA'
+
+# NOTE: We cannot get this param, only set!
+[spec-repeat]
+caller_id = 'Repeat'
+type = 1
+caller = 'SPECTRA'
+
+# NOTE: We cannot get this param, only set!
+[spec-pos-x]  # This is the position where a spec *will* be taken
+caller_id = 1
+type = 1.0
+caller = 'SPECTRA'
+unit = 'nm'
+
+# NOTE: We cannot get this param, only set!
+[spec-pos-y]  # This is the position where a spec *will* be taken
+caller_id = 2
+type = 1.0
+caller = 'SPECTRA'
+unit = 'nm'
+
+# NOTE: We cannot set this param, only get!
+[tip-pos-x]  # This is the actual position of the probe
+caller_id = 2
+type = 1.0
+caller = 'CHANNEL'
+unit = 'nm'
+
+# NOTE: We cannot set this param, only get!
+[tip-pos-y]  # This is the actual position of the probe
+caller_id = 3
+type = 1.0
+caller = 'CHANNEL'
+unit = 'nm'
+
+# NOTE: We cannot get this param, only set!
+[spec-mode]
+caller_id = 0
+type = 1
+caller = 'SPECTRA'
+
+# NOTE: We cannot get this param, only set!
+[dz-u-delay]
+caller_id = 3
+type = 1.0
+caller = 'SPECTRA'
+
+# NOTE: We cannot get this param, only set!
+[dz-u-acq-t]
+caller_id = 4
+type = 1.0
+caller = 'SPECTRA'
+
+# NOTE: We cannot get this param, only set!
+[dz-u-dz1]
+caller_id = 5
+type = 1.0
+caller = 'SPECTRA'
+
+# NOTE: We cannot get this param, only set!
+[dz-dz2]
+caller_id = 6
+type = 1.0
+caller = 'SPECTRA'
+
+[u-u-start]
+caller_id = 6
+type = 1.0
+caller = 'SPECTRA'
+
+[u-u-stop]
+caller_id = 7
+type = 1.0
+caller = 'SPECTRA'

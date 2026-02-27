@@ -16,7 +16,9 @@ import logging
 import xarray as xr
 import numpy as np
 import imageio.v3 as iio
+from ..io.pubsub.logic.pbc_logic import DIVIDER
 from ..io.protos.generated import scan_pb2
+from ..io.protos.generated import spec_pb2
 from ..io.protos.generated import geometry_pb2
 
 
@@ -67,6 +69,9 @@ def convert_scan_pb2_to_xarray(scan: scan_pb2.Scan2d) -> xr.DataArray:
 def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     """Convert protobuf Scan message to xarray Dataset.
 
+    NOTE: We manually remove any DIVIDER substrs in the channel name,
+    as this could cause issues with our io logic.
+
     Args:
         data_array: xarray DataArray instance.
 
@@ -96,8 +101,9 @@ def convert_xarray_to_scan_pb2(da: xr.DataArray) -> scan_pb2.Scan2d:
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=data_units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
+    channel = da.name.replace(DIVIDER, '') if da.name is not None else None
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=da.name,
+                           channel=channel,
                            values=da.values.ravel().tolist())
     return scan
 
@@ -145,6 +151,9 @@ def convert_scan_pb2_to_sidpy(scan: scan_pb2.Scan2d) -> Dataset:
 def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
     """Convert sidpy Dataset to protobuf Scan message.
 
+    NOTE: We manually remove any DIVIDER substrs in the channel name,
+    as this could cause issues with our io logic.
+
     Args:
         dataset: sidpy Dataset instance.
 
@@ -161,21 +170,23 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
                                    y=ds.shape[1])
     tl = {}
     size = {}
-    for dim in [ds.x, ds.y]:
-        key = 'x' if 'x' in dim.name else 'y'
+    for dim in [ds.dim_0, ds.dim_1]:
+        key = 'x' if 'x' in dim.name.lower() else 'y'
         tl[key] = dim.values.min().item()
         size[key] = dim.values.max().item() - dim.values.min().item()
     top_left = geometry_pb2.Point2d(**tl)
     size = geometry_pb2.Size2d(**size)
     roi = geometry_pb2.RotRect2d(top_left=top_left, size=size)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
-                                              length_units=ds.x.units)
+                                              length_units=ds.dim_0.units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=ds.units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
 
+    channel = (ds.quantity.replace(DIVIDER, '') if ds.quantity is not None
+               else None)
     scan = scan_pb2.Scan2d(params=scan_params,
-                           channel=ds.quantity,
+                           channel=channel,
                            values=ds.compute().ravel().tolist())
     return scan
 
@@ -209,3 +220,34 @@ def create_xarray_from_img_path(img_path: str,
         da.name = channel_id
 
     return da
+
+
+def convert_sidpy_to_spec_pb2(datasets: list[Dataset],
+                              ) -> spec_pb2.Spec1d:
+    """Convert a list of sidpy Datasets to a single Spec1d.
+
+    NOTE: The probe position is metadata specific, so the parent
+    method should update this data accordingly.
+
+    Args:
+        datasets: list of sidpy Datasets containing spec data.
+
+    Returns:
+        Spec1d containing data from datasets.
+    """
+    names = [ds.quantity for ds in datasets]
+    units = [ds.units for ds in datasets]
+    num_variables = len(datasets)
+    data_per_variable = datasets[0].shape[0]
+
+    # Extract data (first as 2D list)
+    values = [ds.compute() for ds in datasets]
+    # Now, unravel to 1D version (using numpy's ravel)
+    values = np.array(values).ravel().tolist()
+
+    spec_data = spec_pb2.SpecData(num_variables=num_variables,
+                                  data_per_variable=data_per_variable,
+                                  names=names, units=units,
+                                  values=values)
+    spec = spec_pb2.Spec1d(data=spec_data)
+    return spec

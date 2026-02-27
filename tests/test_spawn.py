@@ -37,7 +37,7 @@ def key_to_expand_from():
 
 @pytest.fixture
 def original_url():
-   return 'inproc://banana'
+    return 'inproc://banana'
 
 
 @pytest.fixture

@@ -1,7 +1,9 @@
 """Holds common I/O logic."""
 import time
+from datetime import datetime, timezone, timedelta
 
 from google.protobuf.internal.enum_type_wrapper import EnumTypeWrapper
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ..io.protos.generated import scan_pb2
 from ..io.protos.generated import geometry_pb2
@@ -18,7 +20,7 @@ ALL_ENVELOPE_LOG = "ALL"
 # --- Good defaults --- #
 REQUEST_TIMEOUT_MS = 500  # Linked to TCP delay
 POLL_TIMEOUT_MS = 50
-LOOP_SLEEP_S = 0.1  # 100 ms
+LOOP_SLEEP_S = 0.333  # 333 ms
 HEARTBEAT_PERIOD_S = 1
 BEATS_BEFORE_DEAD = 3
 
@@ -40,6 +42,31 @@ SPAWN_DELAY_S = 1.0
 # We appear to need a small startup delay, to allow zmq sockets to properly
 # get setup.
 _STARTUP_SLEEP_S = 0.25  # 250 ms
+
+
+# --- Reliable cross-platform timestamps ---
+# It appears that on Windows, datetime.now() has a lower accuracy than on
+# Linux. The net effect is that you can receive multiple messages that were
+# sent around the same time, and they will all have the same timestamp. This
+# breaks our usage of timestamps to throw out old ones.
+# The fix is to use perf_counter() in addition to a per-Python interpreter
+# datetime (START_DATETIME below). This seems to allow our logic to work
+# in a cross-platform manner.
+START_DATETIME = datetime.now(timezone.utc)
+START_PERF = time.perf_counter()
+
+
+def create_datetime():
+    """Create datetime for this moment."""
+    return START_DATETIME + timedelta(seconds=time.perf_counter() -
+                                      START_PERF)
+
+
+def create_ts():
+    """Create timestamp for this moment."""
+    ts = Timestamp()
+    ts.FromDatetime(create_datetime())
+    return ts
 
 
 def sleep_on_socket_startup():
