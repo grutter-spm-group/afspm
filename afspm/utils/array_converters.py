@@ -178,7 +178,7 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
     size = geometry_pb2.Size2d(**size)
     roi = geometry_pb2.RotRect2d(top_left=top_left, size=size)
     spatial_aspects = scan_pb2.SpatialAspects(roi=roi,
-                                              length_units=ds.x.units)
+                                              length_units=ds.dim_0.units)
     data_aspects = scan_pb2.DataAspects(shape=da_shape, units=ds.units)
     scan_params = scan_pb2.ScanParameters2d(spatial=spatial_aspects,
                                             data=data_aspects)
