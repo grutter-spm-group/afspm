@@ -235,7 +235,7 @@ class NanonisParameterHandler(params.ParameterHandler):
         if len(astuple(set_req)) > 1:
             try:
                 get_rep = self._get_param_spm_rep(class_name)
-                return copy_data(set_req, get_rep)
+                return copy_data(get_rep, set_req)
             except params.ParameterConfigurationError:
                 logger.debug(f'Not getting initial values for {class_name},'
                              ' due to GET() not existing.')
@@ -254,7 +254,7 @@ class NanonisParameterHandler(params.ParameterHandler):
 
         list_data = list(astuple(set_req))
         list_data[index] = spm_val
-        return copy_data_from_tuple(set_req, list_data)
+        return copy_data_from_tuple(list_data, set_req)
 
     def set_param_spm(self, spm_uuid: tuple[str, int], spm_val: Any):
         """Implement.
@@ -284,8 +284,8 @@ class NanonisParameterHandler(params.ParameterHandler):
         send_request(self._client, req, rep)
 
 
-def copy_data(copy_to: base.NanonisMessage,
-              copy_from: base.NanonisMessage
+def copy_data(copy_from: base.NanonisMessage,
+              copy_to: base.NanonisMessage
               ) -> base.NanonisMessage:
     """Copy the data from one message to another.
 
@@ -294,17 +294,18 @@ def copy_data(copy_to: base.NanonisMessage,
     a ScanBufferSetReq and a ScanBufferGetRep).
 
     Args:
-        copy_to: NanonisMessage we will copy data to.
         copy_from: NanonisMessage we will copy data from.
+        copy_to: NanonisMessage we will copy data to.
 
     Returns:
         Instance of copy_to, with data copied from copy_from.
     """
-    return copy_data_from_tuple(copy_to, astuple(copy_from))
+    return copy_data_from_tuple(astuple(copy_from), copy_to)
 
 
-def copy_data_from_tuple(copy_to: base.NanonisMessage,
-                         tuple_data: (Any,)) -> base.NanonisMessage:
+def copy_data_from_tuple(tuple_data: (Any,),
+                         copy_to: base.NanonisMessage
+                         ) -> base.NanonisMessage:
     """Equivalen to copy_data(), but copy_from is tuple."""
     return replace(copy_to, **copy_to.create_data_dict(tuple_data))
 
