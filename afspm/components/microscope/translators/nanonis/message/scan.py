@@ -185,24 +185,6 @@ class ScanBufferStruct(base.NanonisMessage):
         """Override."""
         return 'i%diii' % (self.num_channels)
 
-    def create_data_dict(self, tuple_data: tuple[Any]
-                         ) -> dict[str, Any]:
-        """Override due to channel_indices.
-
-        Because our tuple is of the form:
-        (num_channels, channel_indices[0], ..., channel_indices[-1], ... )
-
-        (i.e., the channel_indices are not pre-packed in their own iterable),
-        we need to manually pack them here.
-        """
-        num_channels = tuple_data[0]
-        channel_indices = list(tuple_data[1:-2])
-        pixels = tuple_data[-2]
-        lines = tuple_data[-1]
-
-        new_tuple_data = (num_channels, channel_indices, pixels, lines)
-        return super().create_data_dict(new_tuple_data)
-
 
 class ScanBufferSet(base.NanonisMessage):
     """Scan buffer set call."""
@@ -248,6 +230,24 @@ class ScanBufferGetRep(base.NanonisResponse, ScanBufferGet,
         format = base.BIG_ENDIAN + 'i'
         self.num_channels = struct.unpack_from(format, buffer, offset)
         return base.BIG_ENDIAN + self.format()
+
+    def create_data_dict(self, tuple_data: tuple[Any]
+                         ) -> dict[str, Any]:
+        """Override due to channel_indices.
+
+        Because our tuple is of the form:
+        (num_channels, channel_indices[0], ..., channel_indices[-1], ... )
+
+        (i.e., the channel_indices are not pre-packed in their own iterable),
+        we need to manually pack them here.
+        """
+        num_channels = tuple_data[0]
+        channel_indices = list(tuple_data[1:-2])
+        pixels = tuple_data[-2]
+        lines = tuple_data[-1]
+
+        new_tuple_data = (num_channels, channel_indices, pixels, lines)
+        return super().create_data_dict(new_tuple_data)
 
 
 # ----- Scan Props ----- $
