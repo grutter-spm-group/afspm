@@ -147,8 +147,8 @@ class NanonisTranslator(ct.ConfigTranslator):
     # get/set calls (look at this issue in params.py).
     PHYSICAL_SCAN_PARAMS = [MicroscopeParameter.SCAN_SIZE_X,
                             MicroscopeParameter.SCAN_SIZE_Y,
-                            MicroscopeParameter.SCAN_TOP_LEFT_X,
-                            MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                            params.NanonisParam.CENTER_X,
+                            params.NanonisParam.CENTER_Y,
                             MicroscopeParameter.SCAN_ANGLE]
     DIGITAL_SCAN_PARAMS = [MicroscopeParameter.SCAN_RESOLUTION_X,
                            MicroscopeParameter.SCAN_RESOLUTION_Y]
@@ -193,26 +193,30 @@ class NanonisTranslator(ct.ConfigTranslator):
         req_rep.req = self.param_handler.populate_req(
             req_rep.req, self.DIGITAL_SCAN_PARAMS, vals, units)
         self.param_handler.send_request(req_rep.req, req_rep.rep)
+
+        if not self.detects_moving:  # Send fake SS_MOVING if needed
+            self._update_scope_state(scan_pb2.ScopeState.SS_MOVING)
+
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Override to avoid many get calls."""
         length_units = self.param_handler.get_unit(
-            params.MicroscopeParameter.SCAN_SIZE_X)
+            MicroscopeParameter.SCAN_SIZE_X)
         angular_units = self.param_handler.get_unit(
-            params.MicroscopeParameter.SCAN_ANGLE)
+            MicroscopeParameter.SCAN_ANGLE)
 
         # Get physical scan params
         class_name = self.param_handler._get_param_info(
             MicroscopeParameter.SCAN_SIZE_X).class_name
         req_rep = self.param_handler._get_getter_req_rep(class_name)
-        phys_rep = self.param_handler.set_param_reqrep(req_rep)
+        phys_rep = self.param_handler.send_request(req_rep.req, req_rep.rep)
 
         # Get digital scan params
         class_name = self.param_handler._get_param_info(
             MicroscopeParameter.SCAN_RESOLUTION_X).class_name
         req_rep = self.param_handler._get_getter_req_rep(class_name)
-        digital_rep = self.param_handler.set_param_reqrep(req_rep)
+        digital_rep = self.param_handler.send_request(req_rep.req, req_rep.rep)
 
         # Center -> Top Left correction
         top_left_x = params.center_to_top_left(phys_rep.center_x,
