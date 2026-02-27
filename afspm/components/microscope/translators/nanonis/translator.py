@@ -7,13 +7,15 @@ import logging
 import SciFiReaders as sr
 
 from ...translator import FLOAT_TOLERANCE_KEY
-from ...params import (ParameterHandler, DEFAULT_PARAMS_FILENAME)
+from ...params import (ParameterHandler, DEFAULT_PARAMS_FILENAME,
+                       MicroscopeParameter)
 from ...actions import (ActionHandler, DEFAULT_ACTIONS_FILENAME)
 from ... import config_translator as ct
 from .....utils import array_converters as conv
 
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import spec_pb2
+from ...io.protos.generated import control_pb2
 
 from . import params
 from . import actions
@@ -143,7 +145,95 @@ class NanonisTranslator(ct.ConfigTranslator):
     # --- Parameter Handlers --- #
     # Here, we override composite setters / getters to avoid unnecessary
     # get/set calls (look at this issue in params.py).
-    # TODO: Consider implementing?
+    PHYSICAL_SCAN_PARAMS = [MicroscopeParameter.SCAN_SIZE_X,
+                            MicroscopeParameter.SCAN_SIZE_Y,
+                            MicroscopeParameter.SCAN_TOP_LEFT_X,
+                            MicroscopeParameter.SCAN_TOP_LEFT_Y,
+                            MicroscopeParameter.SCAN_ANGLE]
+    DIGITAL_SCAN_PARAMS = [MicroscopeParameter.SCAN_RESOLUTION_X,
+                           MicroscopeParameter.SCAN_RESOLUTION_Y]
+
+    def on_set_scan_params(self, scan_params: scan_pb2.ScanParameters2d
+                           ) -> control_pb2.ControlResponse:
+        """Override to avoid many get calls."""
+        # Populate and send physical scan params
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.SCAN_SIZE_X).class_name
+        req_rep = self.param_handler._get_setter_req_rep(class_name)
+
+        # Top Left -> Center correction
+        center_x = params.top_left_to_center(scan_params.spatial.roi.top_left.x,
+                                             scan_params.spatial.roi.size.x)
+        center_y = params.top_left_to_center(scan_params.spatial.roi.top_left.y,
+                                             scan_params.spatial.roi.size.y)
+
+        vals = [scan_params.spatial.roi.size.x,
+                scan_params.spatial.roi.size.y,
+                center_x,
+                center_y,
+                scan_params.spatial.roi.angle]
+        units = [scan_params.spatial.length_units,
+                 scan_params.spatial.length_units,
+                 scan_params.spatial.length_units,
+                 scan_params.spatial.length_units,
+                 scan_params.spatial.angular_units]
+        req_rep.req = self.param_handler.populate_req(
+            req_rep.req, self.PHYSICAL_SCAN_PARAMS, vals, units)
+        self.param_handler.send_request(req_rep.req, req_rep.rep)
+
+        # Populate and send resolution (this requires a get due to
+        # channels data in Nanonis struct)
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.SCAN_RESOLUTION_X).class_name
+        req_rep = self.param_handler._get_setter_req_rep(class_name)
+        req_rep.req = self.param_handler._obtain_base_set_req(class_name)
+        vals = [scan_params.data.shape.x,
+                scan_params.data.shape.y]
+        units = [None, None]
+        req_rep.req = self.param_handler.populate_req(
+            req_rep.req, self.DIGITAL_SCAN_PARAMS, vals, units)
+        self.param_handler.send_request(req_rep.req, req_rep.rep)
+        return control_pb2.ControlResponse.REP_SUCCESS
+
+    def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
+        """Override to avoid many get calls."""
+        length_units = self.param_handler.get_unit(
+            params.MicroscopeParameter.SCAN_SIZE_X)
+        angular_units = self.param_handler.get_unit(
+            params.MicroscopeParameter.SCAN_ANGLE)
+
+        # Get physical scan params
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.SCAN_SIZE_X).class_name
+        req_rep = self.param_handler._get_getter_req_rep(class_name)
+        phys_rep = self.param_handler.set_param_reqrep(req_rep)
+
+        # Get digital scan params
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.SCAN_RESOLUTION_X).class_name
+        req_rep = self.param_handler._get_getter_req_rep(class_name)
+        digital_rep = self.param_handler.set_param_reqrep(req_rep)
+
+        # Center -> Top Left correction
+        top_left_x = params.center_to_top_left(phys_rep.center_x,
+                                               phys_rep.width)
+        top_left_y = params.center_to_top_left(phys_rep.center_y,
+                                               phys_rep.height)
+
+        # Populate scan params
+        scan_params = scan_pb2.ScanParameters2d()
+        scan_params.spatial.roi.size.x = phys_rep.width
+        scan_params.spatial.roi.size.y = phys_rep.height
+        scan_params.spatial.roi.top_left.x = top_left_x
+        scan_params.spatial.roi.top_left.y = top_left_y
+        scan_params.spatial.roi.angle = phys_rep.angle
+        scan_params.spatial.length_units = length_units
+        scan_params.spatial.angular_units = angular_units
+
+        scan_params.data.shape.x = digital_rep.pixels
+        scan_params.data.shape.y = digital_rep.lines
+
+        return scan_params
 
     def set_setup_properties(self, props: params.SetupProperties):
         """Set the current SetupProperties."""
