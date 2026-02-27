@@ -10,12 +10,12 @@ from ...translator import FLOAT_TOLERANCE_KEY
 from ...params import (ParameterHandler, DEFAULT_PARAMS_FILENAME,
                        MicroscopeParameter)
 from ...actions import (ActionHandler, DEFAULT_ACTIONS_FILENAME)
-from ... import config_translator as ct
+from ...import config_translator as ct
 from .....utils import array_converters as conv
 
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import spec_pb2
-from ...io.protos.generated import control_pb2
+from .....io.protos.generated import control_pb2
 
 from . import params
 from . import actions
