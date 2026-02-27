@@ -17,7 +17,7 @@ class PiezoTiltStruct(base.NanonisMessage):
     tilt_x: float = base.DEF_FLT  # 4 bytes, float32
     tilt_y: float = base.DEF_FLT  # 4 bytes, float32
 
-    def format() -> str:
+    def format(self) -> str:
         """Override."""
         return 'ff'
 
