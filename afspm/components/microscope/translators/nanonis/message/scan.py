@@ -231,7 +231,8 @@ class ScanBufferGetRep(base.NanonisResponse, ScanBufferGet,
         self.num_channels = struct.unpack_from(format, buffer, offset)
         return base.BIG_ENDIAN + self.format()
 
-    def create_data_dict(self, tuple_data: tuple[Any]
+    @classmethod
+    def create_data_dict(cls, tuple_data: tuple[Any]
                          ) -> dict[str, Any]:
         """Override due to channel_indices.
 
