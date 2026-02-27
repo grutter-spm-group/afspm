@@ -304,14 +304,13 @@ class NanonisParameterHandler(params.ParameterHandler):
             units: units of each value in vals.
         """
         param_infos = [self._get_param_info(gid) for gid in gids]
-        indices = [self.param_handler._get_param_info(gid).index
-                   for gid in gids]
+        indices = [self._get_param_info(gid).index for gid in gids]
         new_vals = [params._correct_val_for_sending(val, param_info, unit, gid)
                     for val, gid, unit, param_info in zip(vals, gids, units,
                                                           param_infos)]
 
-        list_data = astuple(req)
-        for index, val in zip(new_vals, indices):
+        list_data = list(astuple(req))
+        for index, val in zip(indices, new_vals):
             list_data[index] = val
         return copy_data_from_tuple(tuple(list_data), req)
 
