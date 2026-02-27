@@ -6,6 +6,7 @@ import logging
 
 import SciFiReaders as sr
 
+from ...translator import FLOAT_TOLERANCE_KEY
 from ...params import (ParameterHandler, DEFAULT_PARAMS_FILENAME)
 from ...actions import (ActionHandler, DEFAULT_ACTIONS_FILENAME)
 from ... import config_translator as ct
@@ -21,6 +22,10 @@ from .message import base, spectroscopy
 
 
 logger = logging.getLogger(__name__)
+
+
+# Nanonis tolerance
+FLOAT_TOLERANCE = 1e-07
 
 
 class NanonisTranslator(ct.ConfigTranslator):
@@ -73,6 +78,9 @@ class NanonisTranslator(ct.ConfigTranslator):
 
         # Tell parent class that Nanonis *does not* detect moving
         kwargs[ct.DETECTS_MOVING_KEY] = False
+        # Set hard-coded float tolerance if not provided
+        if FLOAT_TOLERANCE_KEY not in kwargs:
+            kwargs[FLOAT_TOLERANCE_KEY] = FLOAT_TOLERANCE
         super().__init__(**kwargs)
 
         # Store current setup properties and set to our desired ones.
