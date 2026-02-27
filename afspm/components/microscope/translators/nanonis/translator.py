@@ -217,8 +217,10 @@ class NanonisTranslator(ct.ConfigTranslator):
         units = [None, None]
         req_rep.req = self.param_handler.populate_req(
             req_rep.req, self.ZCTRL_PARAMS, vals, units)
-        # TODO: do I need to add param for time constant? If this fails,
-        # you can do that. Add to params.toml and then gids/vals above.
+
+        # Time constant must be P/I
+        req_rep.req.time_constant = (req_rep.req.proportional
+                                     / req_rep.req.integral)
 
         self.param_handler.send_request(req_rep.req, req_rep.rep)
         return control_pb2.ControlResponse.REP_SUCCESS
