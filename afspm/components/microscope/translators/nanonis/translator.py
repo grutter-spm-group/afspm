@@ -238,6 +238,9 @@ class NanonisTranslator(ct.ConfigTranslator):
             req_rep.req, PROBE_POS_PARAMS, vals, units)
 
         self.param_handler.send_request(req_rep.req, req_rep.rep)
+        if not self.detects_moving:  # Send fake SS_MOVING if needed
+            self._update_scope_state(scan_pb2.ScopeState.SS_MOVING)
+
         return control_pb2.ControlResponse.REP_SUCCESS
 
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
