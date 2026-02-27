@@ -29,9 +29,11 @@ class NanonisActionHandler(actions.ActionHandler):
 
     def _populate_guid_to_reqrep_map(self):
         self._guid_to_reqrep_map[actions.MicroscopeAction.START_SCAN] = (
-            base.NanonisReqRep(scan.ScanActionReq(), scan.ScanActionRep()))
+            base.NanonisReqRep(scan.ScanActionReq(action=scan.ScanAction.START),
+                               scan.ScanActionRep()))
         self._guid_to_reqrep_map[actions.MicroscopeAction.STOP_SCAN] = (
-            self._guid_to_reqrep_map[actions.MicroscopeAction.START_SCAN])
+            base.NanonisReqRep(scan.ScanActionReq(action=scan.ScanAction.STOP),
+                               scan.ScanActionRep()))
         # Set default spectroscopy mapping
         self._update_spec_mappings(spectroscopy.SpectroscopyMode.BIAS)
 
@@ -50,7 +52,7 @@ class NanonisActionHandler(actions.ActionHandler):
 
         self._guid_to_reqrep_map[actions.MicroscopeAction.START_SPEC] = (
             base.NanonisReqRep(start_req, start_rep))
-        self._guid_to_reqrep_map[actions.MicroscopeAction.STOP_SCAN] = (
+        self._guid_to_reqrep_map[actions.MicroscopeAction.STOP_SPEC] = (
             base.NanonisReqRep(stop_req, stop_rep))
 
     def set_spectroscopy_mode(self, mode: spectroscopy.SpectroscopyMode):
@@ -65,10 +67,9 @@ class NanonisActionHandler(actions.ActionHandler):
             msg = f'Could not find NanonisMessages for {guid}.'
             raise actions.ActionConfigurationError(msg)
 
-        req = self._guid_to_reqrep_map[guid].req
-        rep = (self._guid_to_reqrep_map[guid].rep if req.request_response()
-               else None)
-        rep = send_request(self._client, req, rep)
+        send_request(self._client, req_rep.req,
+                     req_rep.rep if req_rep.req.request_response()
+                     else None)
 
 
 def scan_action(handler: NanonisActionHandler,
