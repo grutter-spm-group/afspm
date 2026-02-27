@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # TODO: Review these defaults!
 DEFAULT_HOST = '127.0.0.1'
 DEFAULT_PORT = 6501
-DEFAULT_TIMEOUT_S = 5.0
+DEFAULT_TIMEOUT_S = 0.25
 DEFAULT_BUFSIZE = 1024
 
 
