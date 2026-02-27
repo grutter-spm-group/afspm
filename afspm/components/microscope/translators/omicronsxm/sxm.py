@@ -367,7 +367,7 @@ class DDEClient(object):
             self._scan_end_callback()
 
     def on_spect_save(self, filepath: str):
-        """Once the spectroscopy ends, trigger callback.
+        r"""Once the spectroscopy ends, trigger callback.
 
         Note that filepath is a bytes array ending in '\r\n'. We manipulate
         it to turn it into a reasonable filepath before returning.
