@@ -300,7 +300,7 @@ class NanonisTranslator(ct.ConfigTranslator):
 
     def poll_probe_pos(self) -> spec_pb2.ProbePosition | None:
         """Override to avoid many get calls."""
-        gid = params.MicroscopeParameter.PROBE_POS_X
+        gid = MicroscopeParameter.PROBE_POS_X
         units = self.param_handler.get_unit(gid)
         class_name = self.param_handler._get_param_info(gid).class_name
         req_rep = self.param_handler._get_getter_req_rep(class_name)
