@@ -316,6 +316,18 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
         elif action.action == actions.MicroscopeAction.START_SPEC:
             self._latest_probe_pos = self.poll_probe_pos()
 
+    def _update_scan_params(self, scan_params: scan_pb2.ScanParameters2d):
+        """Override to store initial scan params on startup."""
+        super()._update_scan_params(scan_params)
+        if self._latest_scan_params is None:
+            self._latest_scan_params = self.scan_params
+
+    def _update_probe_pos(self, probe_pos: spec_pb2.ProbePosition):
+        """Override to store initial probe pos on startup."""
+        super()._update_probe_pos(probe_pos)
+        if self._latest_probe_pos is None:
+            self._latest_probe_pos = self.probe_pos
+
     def on_check_action_support(self, action: control_pb2.ActionMsg
                                 ) -> control_pb2.ControlResponse:
         """Inform whether this translator supports this action.
