@@ -25,7 +25,7 @@ class SpectraStart(base.NanonisMessage):
 
     def format(self) -> str:
         """Override."""
-        return 'Ii%ds' % (len(self.name_size),)
+        return 'Ii%ds' % (self.name_size)
 
 
 class SpectraStartReq(base.NanonisRequest, SpectraStart):
