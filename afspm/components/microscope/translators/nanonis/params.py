@@ -489,6 +489,7 @@ def set_scan_speed(handler: params.ParameterHandler,
 BASE_CLASS = 'afspm.components.microscope.translators.nanonis.message.'
 STATUS_GENERIC_IDS = [NanonisParam.SCAN_STATUS, NanonisParam.BIAS_SPEC_STATUS,
                       NanonisParam.Z_SPEC_STATUS, NanonisParam.FILE_PATH]
+STATUS_GENERIC_INDICES = [0, 0, 0, 1]
 STATUS_CLASSES = [BASE_CLASS + 'scan.ScanStatus',
                   BASE_CLASS + 'spectroscopy.BiasSpectraStatus',
                   BASE_CLASS + 'spectroscopy.ZSpectraStatus',
@@ -506,9 +507,11 @@ def _create_status_param_info_entries() -> dict:
             NanonisParameterHandler.
     """
     param_info_map = {}
-    for generic_id, class_name in zip(STATUS_GENERIC_IDS, STATUS_CLASSES):
+    for generic_id, class_name, index in zip(STATUS_GENERIC_IDS,
+                                             STATUS_CLASSES,
+                                             STATUS_GENERIC_INDICES):
         info = NanonisParameterInfo(uuid=None, unit=None, range=None,
-                                    class_name=class_name, index=0,
+                                    class_name=class_name, index=index,
                                     type=1)  # int for all statuses
         param_info_map[generic_id] = info
     return param_info_map
