@@ -402,26 +402,14 @@ def load_scans_from_file(scan_path: str
     Raises:
         Unknown/unforeseen read error.
     """
-    logger.debug(f"Getting datasets from {scan_path} (each dataset"
-                 " is a channel).")
+    logger.debug(f"Getting datasets from {scan_path}.")
     reader = sr.NanonisSXMReader(scan_path)
     datasets = reader.read()
 
     if datasets:
         scans = []
         for ds in datasets:
-            # BUG WORKAROUND: scifireaders does not properly load the
-            # scan data! The data is read originally in the same manner
-            # as gwyddion, which causes the origin to be misplaced. In an
-            # attempt to fix this, the IgorIBWReader performs np.rot90(m, 3),
-            # i.e. rotates by 90 \deg 3x counter-clockwise. This *mostly* works,
-            # except that it swaps the axes!
-            # To workaround this, we swap the axes back. The more 'proper' fix
-            # would be to simple perform an np.flip(m, 0) rather than these
-            # operations.
-            swap_ds = ds.swapaxes(0, 1)
-            scan = conv.convert_sidpy_to_scan_pb2(swap_ds)
-
+            scan = conv.convert_sidpy_to_scan_pb2(ds)
             # Setting filename. All else is done by correct_scan()
             # (recommended to ensure coordinate system consistency).
             scan.filename = scan_path
