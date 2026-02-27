@@ -16,6 +16,7 @@ from .....utils import array_converters as conv
 from .....io.protos.generated import scan_pb2
 from .....io.protos.generated import spec_pb2
 from .....io.protos.generated import control_pb2
+from .....io.protos.generated import feedback_pb2
 
 from . import params
 from . import actions
@@ -199,6 +200,28 @@ class NanonisTranslator(ct.ConfigTranslator):
 
         return control_pb2.ControlResponse.REP_SUCCESS
 
+    ZCTRL_PARAMS = [MicroscopeParameter.ZCTRL_IGAIN,
+                    MicroscopeParameter.ZCTRL_PGAIN]
+
+    def on_set_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters
+                            ) -> control_pb2.ControlResponse:
+        """Override to void extra get calls."""
+        self.param_handler.set_param(MicroscopeParameter.ZCTRL_SETPOINT,
+                                     zctrl_params.setPoint)
+
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.ZCTRL_IGAIN).class_name
+        req_rep = self.param_handler._get_setter_req_rep(class_name)
+
+        vals = [zctrl_params.integralGain, zctrl_params.proportionalGain]
+        req_rep.req = self.param_handler.populate_req(
+            req_rep.req, self.ZCTRL_PARAMS, vals)
+        # TODO: do I need to add param for time constant? If this fails,
+        # you can do that. Add to params.toml and then gids/vals above.
+
+        self.param_handler.send_request(req_rep.req, req_rep.rep)
+        return control_pb2.ControlResponse.REP_SUCCESS
+
     def poll_scan_params(self) -> scan_pb2.ScanParameters2d:
         """Override to avoid many get calls."""
         length_units = self.param_handler.get_unit(
@@ -238,6 +261,24 @@ class NanonisTranslator(ct.ConfigTranslator):
         scan_params.data.shape.y = digital_rep.lines
 
         return scan_params
+
+    def poll_zctrl_params(self) -> feedback_pb2.ZCtrlParameters:
+        """Override to avoid many get calls."""
+        set_point = self.param_handler.get_param(
+            MicroscopeParameter.ZCTRL_SETPOINT)
+
+        class_name = self.param_handler._get_param_info(
+            MicroscopeParameter.ZCTRL_IGAIN).class_name
+        req_rep = self.param_handler._get_setter_req_rep(class_name)
+        gain_rep = self.param_handler.send_request(req_rep.req, req_rep.rep)
+
+        # Populate
+        zctrl_params = feedback_pb2.ZCtrlParameters()
+        zctrl_params.setPoint = set_point
+        zctrl_params.integralGain = gain_rep.integral
+        zctrl_params.proportionalGain = gain_rep.proportional
+
+        return zctrl_params
 
     def set_setup_properties(self, props: params.SetupProperties):
         """Set the current SetupProperties."""
