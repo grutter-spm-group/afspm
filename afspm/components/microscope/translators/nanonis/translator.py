@@ -269,7 +269,7 @@ class NanonisTranslator(ct.ConfigTranslator):
 
         class_name = self.param_handler._get_param_info(
             MicroscopeParameter.ZCTRL_IGAIN).class_name
-        req_rep = self.param_handler._get_setter_req_rep(class_name)
+        req_rep = self.param_handler._get_getter_req_rep(class_name)
         gain_rep = self.param_handler.send_request(req_rep.req, req_rep.rep)
 
         # Populate
