@@ -322,6 +322,9 @@ def validate_parameter(param_info: ParameterInfo,
             param_methods = None
         if _all_none(param_info):
             param_info = None
+    else:
+        param_info = None
+        param_methods = None
     return (param_info, param_methods)
 
 
