@@ -170,8 +170,8 @@ def convert_sidpy_to_scan_pb2(ds: Dataset) -> scan_pb2.Scan2d:
                                    y=ds.shape[1])
     tl = {}
     size = {}
-    for dim in [ds.x, ds.y]:
-        key = 'x' if 'x' in dim.name else 'y'
+    for dim in [ds.dim_0, ds.dim_1]:
+        key = 'x' if 'x' in dim.name.lower() else 'y'
         tl[key] = dim.values.min().item()
         size[key] = dim.values.max().item() - dim.values.min().item()
     top_left = geometry_pb2.Point2d(**tl)
