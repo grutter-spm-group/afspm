@@ -1,6 +1,8 @@
 """Probe positioning message structures."""
 import logging
 from dataclasses import dataclass
+from typing import Any
+
 from . import base
 
 
@@ -46,6 +48,18 @@ class XYPosSetReq(base.NanonisRequest, XYPosSet,
     def format(self) -> str:
         """Override."""
         return super().format() + 'I'
+
+    @classmethod
+    def create_data_dict(cls, tuple_data: tuple[Any]
+                         ) -> dict[str, Any]:
+        """Override due to get/set mismatch.
+
+        There is one extra attribute in the setter than the getter.
+        We don't care (we keep the default), but we need to override
+        as the parent method will fail.
+        """
+        tuple_data = tuple_data + (1,)  # Default wait_end_of_move
+        return super().create_data_dict(tuple_data)
 
 
 class XYPosSetRep(base.EmptyResponse, XYPosSet):
