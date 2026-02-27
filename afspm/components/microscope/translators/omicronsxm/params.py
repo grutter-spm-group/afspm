@@ -88,7 +88,27 @@ class SXMParameterInfo(params.ParameterInfo):
 
     def configure_uuid(self):
         """Set up the uuid based on other attributes."""
-        self.uuid = (self.caller, self.caller_id)
+        uuid = (self.caller, self.caller_id)
+        if None not in uuid:
+            self.uuid = uuid
+
+
+def validate_parameter(param_info: params.ParameterInfo,
+                       param_methods: params.ParameterMethods,
+                       gid: str) -> (params.ParameterInfo | None,
+                                     params.ParameterMethods | None):
+    """Override for SXMParameterInfo."""
+    param_methods_met = None not in [param_methods.getter,
+                                     param_methods.setter]
+    param_info_met = None not in [param_info.type, param_info.caller,
+                                  param_info.caller_id]
+
+    if param_methods_met or param_info_met:
+        if params._all_none(param_methods):
+            param_methods = None
+        if params._all_none(param_info):
+            param_info = None
+    return (param_info, param_methods)
 
 
 class SXMParameterHandler(params.ParameterHandler):
@@ -123,6 +143,7 @@ class SXMParameterHandler(params.ParameterHandler):
         self.client = client
         self.cs_correction_ratio = cs_correction_ratio
         kwargs['param_info_class'] = SXMParameterInfo
+        kwargs['validate_parameter'] = validate_parameter
         super().__init__(**kwargs)
 
         # Asserting some parameters' units are the same. If they're not
