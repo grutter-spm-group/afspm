@@ -2,8 +2,7 @@
 
 import logging
 
-from afspm.components.microscope import actions
-
+from ... import actions
 from . import client as clnt
 from .message import base, scan, spectroscopy
 

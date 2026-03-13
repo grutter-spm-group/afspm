@@ -5,15 +5,13 @@ import logging
 import glob
 import pandas as pd
 
-from afspm.components.microscope.params import (ParameterHandler,
-                                                DEFAULT_PARAMS_FILENAME)
-from afspm.components.microscope.actions import (ActionHandler,
-                                                 DEFAULT_ACTIONS_FILENAME)
-from afspm.components.microscope import config_translator as ct
-from afspm.utils import array_converters as conv
+from ...params import (ParameterHandler, DEFAULT_PARAMS_FILENAME)
+from ...actions import (ActionHandler, DEFAULT_ACTIONS_FILENAME)
+from ... import config_translator as ct
+from .....utils import array_converters as conv
 
-from afspm.io.protos.generated import scan_pb2
-from afspm.io.protos.generated import spec_pb2
+from .....io.protos.generated import scan_pb2
+from .....io.protos.generated import spec_pb2
 
 import gxsm  # Dynamic DLL, so not in pyproject.
 from gxsmread import read

@@ -3,7 +3,7 @@
 import enum
 import logging
 
-from afspm.components.microscope import actions
+from ... import actions
 
 
 logger = logging.getLogger(__name__)

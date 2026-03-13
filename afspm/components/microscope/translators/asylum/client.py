@@ -5,8 +5,8 @@ import time
 import zmq
 from typing import Optional
 
-from afspm.io.common import POLL_TIMEOUT_MS
-from afspm.components.microscope.translators.asylum import xop
+from .....io.common import POLL_TIMEOUT_MS
+from .....components.microscope.translators.asylum import xop
 
 
 logger = logging.getLogger(__name__)

@@ -6,10 +6,9 @@ import math  # for isclose
 import logging
 from typing import Any
 
-from afspm.utils import units
-from afspm.components.microscope import params
-from afspm.components.microscope.translators.asylum.client import (
-    XopClient, XopMessageError)
+from .....utils import units
+from ... import params
+from .client import (XopClient, XopMessageError)
 
 
 logger = logging.getLogger(__name__)

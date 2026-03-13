@@ -1,9 +1,9 @@
 """Holds asylum controller action handling."""
 
 import logging
-from afspm.components.microscope import actions
-from afspm.components.microscope.translators.asylum.client import (
-    XopClient, XopMessageError)
+
+from ... import actions
+from .client import (XopClient, XopMessageError)
 
 
 logger = logging.getLogger(__name__)

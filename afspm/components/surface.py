@@ -44,7 +44,7 @@ from sklearn.linear_model import (
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
-from afspm.io.protos.generated import scan_pb2
+from ..io.protos.generated import scan_pb2
 
 
 logger = logging.getLogger(__name__)

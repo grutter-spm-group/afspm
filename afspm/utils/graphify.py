@@ -6,9 +6,9 @@ import graphviz
 import tomli
 import fire
 
-from afspm.utils.parser import (expand_variables_in_dict, CLASS_KEY,
-                                IS_COMPONENT_KEY, IS_URL_KEY)
-from afspm.utils.log import set_up_logging
+from .parser import (expand_variables_in_dict, CLASS_KEY,
+                     IS_COMPONENT_KEY, IS_URL_KEY)
+from .log import set_up_logging
 
 
 logger = logging.getLogger(__name__)
