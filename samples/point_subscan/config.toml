@@ -61,7 +61,7 @@ url = 'pub_url'
 class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'analysis_url'
 
-[scheduler_psc]
+[mediator_psc]
 class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
@@ -87,7 +87,7 @@ subs = ['sub_spm', 'sub_points']
 class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
-[scheduler_router]
+[mediator_router]
 class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
@@ -198,12 +198,12 @@ visualization_colormap_list = ['visualization_colormap', 'visualization_colormap
 visualize_undeclared_scans = true
 scan_id = 'Scan2d'
 
-[scheduler]
+[mediator]
 component = true
-class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
+class = 'afspm.components.microscope.mediator.MicroscopeMediator'
 
-pubsubcache = 'scheduler_psc'
-router = 'scheduler_router'
+pubsubcache = 'mediator_psc'
+router = 'mediator_router'
 
 [translator]
 component = true

@@ -45,9 +45,9 @@ router_url = 'router_url'
 
 
 # ----- Components ----- #
-[scheduler]
+[mediator]
 component = true
-class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
+class = 'afspm.components.microscope.mediator.MicroscopeMediator'
 pubsubcache = 'psc'
 router = 'router'
 

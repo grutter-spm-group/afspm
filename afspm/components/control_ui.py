@@ -1,4 +1,4 @@
-"""PySimpleGUI interface for controllling the MicroscopeScheduler."""
+"""PySimpleGUI interface for controllling the MicroscopeMediator."""
 
 import copy
 import logging
@@ -43,7 +43,7 @@ ALL_TOPICS = ""
 
 
 class AfspmControlUI(AfspmComponentUI):
-    """Simple UI class to present info from, and control, the scheduler.
+    """Simple UI class to present info from, and control, the mediator.
 
     This class will present a simple UI to show current ControlState/ScopeState
     of the afspm system, and allow admin controls of it.

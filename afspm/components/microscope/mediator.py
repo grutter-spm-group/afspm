@@ -19,10 +19,10 @@ CACHE_KEY = 'pubsubcache'
 ROUTER_KEY = 'router'
 
 
-class MicroscopeScheduler(afspmc.AfspmComponent):
+class MicroscopeMediator(afspmc.AfspmComponent):
     """Manages communication between MicroscopeTranslator and multiple clients.
 
-    The MicroscopeScheduler serves as an intermediary between the
+    The MicroscopeMediator serves as an intermediary between the
     MicroscopeTranslator and one or more clients. It has 2 main constituents:
     1. A PubSubCache instance, to store information published by the
     MicroscopeTranslator and publish them to any new subscribers (to ensure all
@@ -47,7 +47,7 @@ class MicroscopeScheduler(afspmc.AfspmComponent):
                  loop_sleep_s: float = common.LOOP_SLEEP_S,
                  beat_period_s: float = common.HEARTBEAT_PERIOD_S,
                  ctx: zmq.Context = None, **kwargs):
-        """Initialize MicroscopeScheduler instance.
+        """Initialize MicroscopeMediator instance.
 
         Args:
             name: component name.

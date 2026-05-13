@@ -118,9 +118,9 @@ scan_id = 'Scan2d'
 subscriber = 'sub'
 control_client = 'ui_client'  # TODO: Do we need this?
 
-[scheduler]
+[mediator]
 component = true
-class = 'afspm.components.drift.scheduler.DriftCompensatedScheduler'
+class = 'afspm.components.drift.mediator.DriftCompensatedMediator'
 pubsubcache = 'psc'
 router = 'router'
 publisher = 'rescan_pub'  # Publish rescan requests

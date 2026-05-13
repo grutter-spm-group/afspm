@@ -66,15 +66,15 @@
 
   package "afspm abstraction" <<groupinternal>> {
     component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler
+    component "microscope\nmediator\n<$ma_tune>" <<internal>> <<required>> as mediator
 
     component "experiment\n<$ma_script>" <<internal>> as exp
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz
 
-    translator <--> scheduler
+    translator <--> mediator
 
-    scheduler <--> exp
-    scheduler <--> viz
+    mediator <--> exp
+    mediator <--> viz
   }
 
   spmcon <-> translator: low freq. \ncommands
@@ -100,24 +100,24 @@
 
   package "afspm abstraction" <<groupinternal>> as afspm {
     component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler
+    component "microscope\nmediator\n<$ma_tune>" <<internal>> <<required>> as mediator
 
     component "experiment\n<$ma_script>" <<internal>> <<optional>> as exp
     component "roi analyzer\n<$ma_crop>" <<internal>> as roi
     component "tip detector\n<$ma_alert_box>" <<internal>> <<optional>> as tip_detector
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz
 
-    translator <--> scheduler
+    translator <--> mediator
 
-    scheduler -l-> exp: scope state
-    scheduler --> roi: scans
+    mediator -l-> exp: scope state
+    mediator --> roi: scans
     roi -l-> exp: roi points
-    exp -r-> scheduler: scan\nparameters
+    exp -r-> mediator: scan\nparameters
 
-    scheduler -r-> tip_detector: scans
-    tip_detector .l.> scheduler: log tip\nproblem
+    mediator -r-> tip_detector: scans
+    tip_detector .l.> mediator: log tip\nproblem
 
-    scheduler --> viz: scans
+    mediator --> viz: scans
   }
 
   spmcon <-r-> translator: low freq.\ncommands
@@ -146,9 +146,9 @@
   package "generic abstraction" <<groupinternal>> as afspm {
 
     component "microscope\ntranslator\n<$ma_network>" <<interface>> <<required>> as translator
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler
+    component "microscope\nmediator\n<$ma_tune>" <<internal>> <<required>> as mediator
 
-    translator <--> scheduler
+    translator <--> mediator
 
     package " " <<layout>> as feedback_group {
       component "feedback\noptimizer\n<$ma_repeat>" <<internal>> <<optional>> as feedback_optimizer
@@ -166,23 +166,23 @@
     }
 
     component "experiment\nscript\n<$ma_script>" <<internal>> <<optional>> as exp
-    scheduler -l-> exp: scope state,\nscans
-    exp -r-> scheduler: scan\nparameters
+    mediator -l-> exp: scope state,\nscans
+    exp -r-> mediator: scan\nparameters
 
-    scheduler -l-> feedback_analyzer: scans
-    feedback_analyzer .r.> scheduler: log\nproblem
+    mediator -l-> feedback_analyzer: scans
+    feedback_analyzer .r.> mediator: log\nproblem
 
     exp -[hidden]down- feedback_analyzer
 
-    scheduler -d-> feedback_optimizer: problems
-    feedback_optimizer .u.> scheduler: feedback\nweights
+    mediator -d-> feedback_optimizer: problems
+    feedback_optimizer .u.> mediator: feedback\nweights
 
 
-    scheduler -r-> tip_detector: scans
-    tip_detector .l.> scheduler: log\nproblem
+    mediator -r-> tip_detector: scans
+    tip_detector .l.> mediator: log\nproblem
 
-    scheduler -d-> tip_corrector: problems
-    tip_corrector .u.> scheduler: corrective\nactions
+    mediator -d-> tip_corrector: problems
+    tip_corrector .u.> mediator: corrective\nactions
   }
 
   spmcon <-r-> translator: low freq.\ncommands
@@ -253,10 +253,10 @@ __Main Socket Types__:
   :results:
   [[file:images/network_framework.png]]
   :end:
-* afspm without microscope scheduler
+* afspm without microscope mediator
 
 #+header: :post attr_fit_width(data=*this*, org_percent=75, latex_percent=90)
-#+begin_src plantuml :file images/afspm_without_scheduler.png
+#+begin_src plantuml :file images/afspm_without_mediator.png
   !include style.puml
   !include microscopy.puml
   !include <material/network>
@@ -284,7 +284,7 @@ __Main Socket Types__:
   :results:
   #+attr_org: :width 75%
   #+attr_latex: :width .90\linewidth
-  [[file:images/afspm_without_scheduler.png]]
+  [[file:images/afspm_without_mediator.png]]
   :end:
 
 * afspm control
@@ -307,22 +307,22 @@ __Main Socket Types__:
     }
 
 
-    component "microscope\nscheduler\n<$ma_tune>" <<internal>> <<required>> as scheduler {
-      component XPUB <<socket>> as scheduler_pub
-      component SUB <<socket>> as scheduler_sub
-      component "//cache//" as scheduler_cache
-      scheduler_sub .. scheduler_cache
-      scheduler_cache .. scheduler_pub
+    component "microscope\nmediator\n<$ma_tune>" <<internal>> <<required>> as mediator {
+      component XPUB <<socket>> as mediator_pub
+      component SUB <<socket>> as mediator_sub
+      component "//cache//" as mediator_cache
+      mediator_sub .. mediator_cache
+      mediator_cache .. mediator_pub
 
-      component ROU <<socket>> as scheduler_rou
-      component REQ <<socket>> as scheduler_req
-      component "//control//" as scheduler_ctrl
-      scheduler_req .. scheduler_ctrl
-      scheduler_ctrl .. scheduler_rou
+      component ROU <<socket>> as mediator_rou
+      component REQ <<socket>> as mediator_req
+      component "//control//" as mediator_ctrl
+      mediator_req .. mediator_ctrl
+      mediator_ctrl .. mediator_rou
     }
 
-    dc_pub -d-> scheduler_sub: data, \nstatus
-    dc_rep <-d- scheduler_req: control\nrequests
+    dc_pub -d-> mediator_sub: data, \nstatus
+    dc_rep <-d- mediator_req: control\nrequests
 
 
     component "experiment\n<$ma_script>" <<internal>> as exp {
@@ -330,15 +330,15 @@ __Main Socket Types__:
       component SUB <<socket>> as exp_sub
     }
 
-    scheduler_rou <-- exp_req: "scan parameters,\nstart / stop scan requests"
-    scheduler_pub --> exp_sub: scope state
+    mediator_rou <-- exp_req: "scan parameters,\nstart / stop scan requests"
+    mediator_pub --> exp_sub: scope state
 
     component "visualizer\n<$ma_chart_areaspline>" <<internal>> as viz {
       component REQ <<socket>> as viz_req
       component SUB <<socket>> as viz_sub
     }
 
-    scheduler_pub --> viz_sub: scope state
+    mediator_pub --> viz_sub: scope state
   }
 
   spmcon <--> translator: low freq. \ncommands

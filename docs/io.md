@@ -14,8 +14,8 @@ Where ```Envelope ``` is a string defining a 'topic', ```Data Structure``` is a 
 
 In the case of our microscope communication, data is passed between 3 node types:
 - The MicroscopeTranslator has a Publisher node which it uses to publish any state changes.
-- The MicroscopeScheduler connects to this and caches data received via a PubSubCache node. It functions as an intermediary, such that other components can connect to it in the same manner they might connect directly to the MicroscopeTranslator.
-- Other components, that have Subscriber nodes which connect to the MicroscopeScheduler to receive information.
+- The MicroscopeMediator connects to this and caches data received via a PubSubCache node. It functions as an intermediary, such that other components can connect to it in the same manner they might connect directly to the MicroscopeTranslator.
+- Other components, that have Subscriber nodes which connect to the MicroscopeMediator to receive information.
 
 All three of these node types take as input methods that map from an envelope to a data structure, so that they can know what data structure they are sending/receiving based on the envelope they received.  The defaults used for these can be found in ```afspm.io.pubsub.defaults.py```. The PubSubCache has a mapping for the data it receives (from the Publisher) and a mapping for the data it sends out, allowing more complicated mappings for caching purposes.
 
@@ -55,10 +55,10 @@ Where ```Response ID``` is an integer associated with the ControlRequest enumera
 
 In the case of our microscope communication, data is passed between 3 I/O node types:
 - The MicroscopeTranslator has a ControlServer node, which receives requests from other components and responds to them.
-- The MicroscopeScheduler has a ControlRouter node, which routes requests from other components to the MicroscopeTranslator.
+- The MicroscopeMediator has a ControlRouter node, which routes requests from other components to the MicroscopeTranslator.
 - Other components have ControlClient nodes, which send requests and receive responses.
 
-Note that the MicroscopeScheduler, via the ControlRouter node, handles access to the MicroscopeTranslator. A subset of requests are handled only by the MicroscopeScheduler and can be sent by any component at any time. These are listed in ```control.proto``` as 'specific to ControlRouter', and entail requesting/releasing control, adding/removing problems. The main 'microscope communication' requests can only be send if a component is in control. Additionally, some 'admin' controls exist; these can technically be sent by any component, but we suggest not using them unless necessary for your component.
+Note that the MicroscopeMediator, via the ControlRouter node, handles access to the MicroscopeTranslator. A subset of requests are handled only by the MicroscopeMediator and can be sent by any component at any time. These are listed in ```control.proto``` as 'specific to ControlRouter', and entail requesting/releasing control, adding/removing problems. The main 'microscope communication' requests can only be send if a component is in control. Additionally, some 'admin' controls exist; these can technically be sent by any component, but we suggest not using them unless necessary for your component.
 
 # heartbeat
 

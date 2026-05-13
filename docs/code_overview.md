@@ -12,7 +12,7 @@ We expand a bit upon the purpose of each (and their subdirectories) below.
 The main 'base' components are:
 - ```AfspmComponent```: all components inherit from this!
 - ```AfspmComponentMonitor```: this monitor 'spawns' each component and monitors them. If a component has died by mistake, it will respawn it; if on-purpose it will accept this sad fact. spawn.py passes all components to be spawned (and their arguments) to the monitor.
-- ```MicroscopeScheduler```: the 'mediator' class, to determine who has control of the SPM at an instance in time.
+- ```MicroscopeMediator```: the 'mediator' class, to determine who has control of the SPM at an instance in time.
 - ```MicroscopeTranslator```: the base translator class, for communicating directly with the SPM.
 
 SPM-specific translators are defined in subdirectories within components/microscope/translators. The other components in here may be of use for particular experiments.
@@ -20,7 +20,7 @@ SPM-specific translators are defined in subdirectories within components/microsc
 ## I/O
 
 Communication between components is divided into:
-- ```control```: control requests and responses that are sent to the MicroscopeScheduler (and forwarded to the MicroscopeTranslator, if appropriate). This is for explicitly controlling the SPM and flagging/unflagging 'problems' that have been detected.
+- ```control```: control requests and responses that are sent to the MicroscopeMediator (and forwarded to the MicroscopeTranslator, if appropriate). This is for explicitly controlling the SPM and flagging/unflagging 'problems' that have been detected.
 - ```heartbeat```: all components open heartbeat sockets, to indicate whether they are alive. AfspmComponentsMonitor uses these to determine if a component is still alive or needs to be respawned.
 - ```pubsub```: this publisher/subscriber logic is how the SPM MicroscopeTranslator informs the rest of the components on what is happening. State changes, scans, etc are published by the translator, and all components can subscribe to listen to what they are interested in.
 - ```protos```: this holds the protobuffer files, i.e. the structure that are sent between components (over zeromq).

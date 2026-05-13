@@ -20,14 +20,14 @@ As a general precaution, it is recommended to have an 'import gxsm' in any modul
 
 With an experiment defined in a TOML file:
 
-1. You want to separately startup your MicroscopeScheduler first, to store any messages sent on startup in its cache. This can be done by calling, in a separate terminal:
+1. You want to separately startup your MicroscopeMediator first, to store any messages sent on startup in its cache. This can be done by calling, in a separate terminal:
 ```bash
 cd /path/to/experiment/file
-poetry run spawn config.toml --components_to_spawn=['scheduler']
+poetry run spawn config.toml --components_to_spawn=['mediator']
 ```
-, and then adding 'scheduler' to your list of components *not* to spawn when spawning the rest of your experiment.
+, and then adding 'mediator' to your list of components *not* to spawn when spawning the rest of your experiment.
 
-(This assumes 'scheduler' is your MicroscopeScheduler key in your TOML).
+(This assumes 'mediator' is your MicroscopeMediator key in your TOML).
 
 2. Startup gxsm from *within* your python environment, in the directory where you TOML file is located:
 ```bash

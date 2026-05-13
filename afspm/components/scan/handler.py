@@ -64,7 +64,7 @@ class ScanHandler:
             None is provided, it will log this and retry later.
         next_params_kwargs: kwargs for get_next_params.
         problem_to_solve: ExperimentProblem the calling component solves (
-            EP_NONE if generic). If the scheduler does not have this problem
+            EP_NONE if generic). If the mediator does not have this problem
             flagged, we do nothing until it does.
         component_id: holds str to indicate the component using this handler.
             Used when logging messages.

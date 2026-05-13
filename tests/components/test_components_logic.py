@@ -173,10 +173,10 @@ def thread_microscope_translator(pub_url, server_url, psc_url, ctx,
     return thread
 
 
-# -- Microscope Scheduler Stuff -- #
-@pytest.fixture(params=[sc.microscope_scheduler_routine,
-                        sc.cs_corrected_scheduler_routine])
-def thread_microscope_scheduler(psc_url, pub_url, server_url, router_url,
+# -- Microscope Mediator Stuff -- #
+@pytest.fixture(params=[sc.microscope_mediator_routine,
+                        sc.cs_corrected_mediator_routine])
+def thread_microscope_mediator(psc_url, pub_url, server_url, router_url,
                                 cache_kwargs, ctx, request):
     thread = threading.Thread(target=request.param,  # Get from params above
                               args=(psc_url, pub_url, server_url, router_url,
@@ -241,8 +241,8 @@ def end_experiment(afspm_component: AfspmComponentBase):
 
 
 def wait_on_threads(thread_microscope_translator: threading.Thread,
-                    thread_microscope_scheduler: threading.Thread):
-    thread_microscope_scheduler.join()
+                    thread_microscope_mediator: threading.Thread):
+    thread_microscope_mediator.join()
     thread_microscope_translator.join()
 
 
@@ -258,23 +258,23 @@ def startup_and_req_ctrl(afspm_component: AfspmComponentBase,
 
 def end_and_wait_threads(afspm_component: AfspmComponentBase,
                          thread_microscope_translator: threading.Thread,
-                         thread_microscope_scheduler: threading.Thread):
+                         thread_microscope_mediator: threading.Thread):
     end_experiment(afspm_component)
-    wait_on_threads(thread_microscope_translator, thread_microscope_scheduler)
+    wait_on_threads(thread_microscope_translator, thread_microscope_mediator)
 
 
 # -------------------- Tests -------------------- #
 def test_end_experiment(thread_microscope_translator,
-                        thread_microscope_scheduler,
+                        thread_microscope_mediator,
                         afspm_component, wait_count, ctx):
     """Ensure we can end the experiment."""
     startup_flush_messages(afspm_component, wait_count)
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
 def test_get_release_control(thread_microscope_translator,
-                             thread_microscope_scheduler, no_problem,
+                             thread_microscope_mediator, no_problem,
                              afspm_component, wait_count, move_time_ms,
                              component_name, default_control_state, ctx):
     """Ensure we can obtain and release control."""
@@ -287,10 +287,10 @@ def test_get_release_control(thread_microscope_translator,
                               default_control_state)
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
-def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
+def test_start_scan(thread_microscope_translator, thread_microscope_mediator,
                     afspm_component, wait_count, scan_time_ms, no_problem,
                     sub_scan2d, component_name, default_control_state):
     """Ensure we receive indication of a scan starting when we request it."""
@@ -317,10 +317,10 @@ def test_start_scan(thread_microscope_translator, thread_microscope_scheduler,
     assert sub_scan2d.poll_and_store()
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
-def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
+def test_stop_scan(thread_microscope_translator, thread_microscope_mediator,
                    afspm_component, wait_count, no_problem,
                    sub_scan2d, default_control_state, component_name):
     """Ensure that we can cancel a scan and receive updates."""
@@ -352,11 +352,11 @@ def test_stop_scan(thread_microscope_translator, thread_microscope_scheduler,
     assert not afspm_component.subscriber.poll_and_store()
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
 def test_set_scan_params(thread_microscope_translator,
-                         thread_microscope_scheduler, no_problem,
+                         thread_microscope_mediator, no_problem,
                          afspm_component, wait_count, move_time_ms,
                          sub_scan2d, default_control_state, component_name):
     """Ensure that we receive motion messages when we change scan params.
@@ -387,10 +387,10 @@ def test_set_scan_params(thread_microscope_translator,
     assert not afspm_component.subscriber.poll_and_store()
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
-def test_start_spec(thread_microscope_translator, thread_microscope_scheduler,
+def test_start_spec(thread_microscope_translator, thread_microscope_mediator,
                     afspm_component, wait_count, spec_time_ms, no_problem,
                     sub_spec, component_name, default_control_state):
     """Ensure we receive indication of a scan starting when we request it."""
@@ -417,10 +417,10 @@ def test_start_spec(thread_microscope_translator, thread_microscope_scheduler,
     assert sub_spec.poll_and_store()
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
-def test_stop_spec(thread_microscope_translator, thread_microscope_scheduler,
+def test_stop_spec(thread_microscope_translator, thread_microscope_mediator,
                    afspm_component, wait_count, no_problem,
                    sub_spec, default_control_state, component_name):
     """Ensure that we can cancel a scan and receive updates."""
@@ -452,11 +452,11 @@ def test_stop_spec(thread_microscope_translator, thread_microscope_scheduler,
     assert not afspm_component.subscriber.poll_and_store()
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
 def test_experiment_problems(thread_microscope_translator,
-                             thread_microscope_scheduler,
+                             thread_microscope_mediator,
                              afspm_component, wait_count, move_time_ms,
                              default_control_state):
     """Ensure we can set/unset experiment problems and receive in sub."""
@@ -477,11 +477,11 @@ def test_experiment_problems(thread_microscope_translator,
                               default_control_state)
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
 def test_calls_while_scanning(thread_microscope_translator, no_problem,
-                              thread_microscope_scheduler, wait_count,
+                              thread_microscope_mediator, wait_count,
                               afspm_component, default_control_state,
                               component_name, scan_time_ms):
     """Confirm that very few calls can be run while scanning."""
@@ -510,10 +510,10 @@ def test_calls_while_scanning(thread_microscope_translator, no_problem,
     assert afspm_component.subscriber.poll_and_store()
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
-def test_set_control_mode(thread_microscope_translator, thread_microscope_scheduler,
+def test_set_control_mode(thread_microscope_translator, thread_microscope_mediator,
                           afspm_component, wait_count, default_control_state):
     """Confirm we can set the control mode."""
     startup_flush_messages(afspm_component, wait_count)
@@ -527,11 +527,11 @@ def test_set_control_mode(thread_microscope_translator, thread_microscope_schedu
     assert_sub_received_proto(afspm_component.subscriber, cs)
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)
 
 
 def test_set_get_params(thread_microscope_translator,
-                        thread_microscope_scheduler, no_problem,
+                        thread_microscope_mediator, no_problem,
                         afspm_component, wait_count, default_control_state,
                         component_name):
     """Confirm we can get/set supported params, and fail on unsupported."""
@@ -577,4 +577,4 @@ def test_set_get_params(thread_microscope_translator,
     assert rep == control_pb2.ControlResponse.REP_PARAM_ERROR
 
     end_and_wait_threads(afspm_component, thread_microscope_translator,
-                         thread_microscope_scheduler)
+                         thread_microscope_mediator)

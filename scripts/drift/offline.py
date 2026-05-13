@@ -6,7 +6,7 @@ import fire
 from collections import deque
 
 from afspm.components.drift import drift
-from afspm.components.drift import scheduler
+from afspm.components.drift import mediator
 import afspm.components.microscope.translators.asylum.translator as asylum
 
 from afspm.utils import csv
@@ -26,8 +26,8 @@ ASYLUM_EXT = '.ibw'
 MAP_EXT_FILE_LOADER = {ASYLUM_EXT: asylum.load_scans_from_file}
 
 
-class OfflineDCScheduler(scheduler.DriftCompensatedScheduler):
-    """Run drift estimation like the scheduler, offline.
+class OfflineDCMediator(mediator.DriftCompensatedMediator):
+    """Run drift estimation like the mediator, offline.
 
     The biggest difference here is that our 'feedback loop' (of updating
     the PCS-to-SCS mapping) does not take place! Thus, even though we
@@ -45,20 +45,20 @@ class OfflineDCScheduler(scheduler.DriftCompensatedScheduler):
             self, channel_id: str, cache_size: int,
             drift_model: drift.DriftModel | None = None,
             csv_attribs: csv.CSVAttributes =
-            scheduler.DriftCompensatedScheduler.DEFAULT_CSV_ATTRIBUTES,
+            mediator.DriftCompensatedMediator.DEFAULT_CSV_ATTRIBUTES,
             min_intersection_ratio: float =
-            scheduler.DriftCompensatedScheduler.DEFAULT_MIN_INTERSECTION_RATIO,
+            mediator.DriftCompensatedMediator.DEFAULT_MIN_INTERSECTION_RATIO,
             min_spatial_res_ratio: float =
-            scheduler.DriftCompensatedScheduler.DEFAULT_MIN_SPATIAL_RES_RATIO,
+            mediator.DriftCompensatedMediator.DEFAULT_MIN_SPATIAL_RES_RATIO,
             max_fitting_score: float =
-            scheduler.DriftCompensatedScheduler.DEFAULT_MAX_FITTING_SCORE,
+            mediator.DriftCompensatedMediator.DEFAULT_MAX_FITTING_SCORE,
             update_weight: float =
-            scheduler.DEFAULT_UPDATE_WEIGHT,
+            mediator.DEFAULT_UPDATE_WEIGHT,
             rescan_intersection_ratio: float =
-            scheduler.DriftCompensatedScheduler.DEFAULT_RESCAN_INTERSECTION_RATIO,
+            mediator.DriftCompensatedMediator.DEFAULT_RESCAN_INTERSECTION_RATIO,
             grab_oldest_match: bool = True,
             **kwargs):
-        """Initialize our correction scheduler."""
+        """Initialize our correction mediator."""
         self.channel_id = channel_id.upper()
         self.drift_model = (drift.create_drift_model() if drift_model is None
                             else drift_model)
@@ -136,7 +136,7 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
     channel_id = channel_id.upper()
 
     csv_attribs = csv.CSVAttributes(os.path.join(scan_dir, csv_filename))
-    scheduler = OfflineDCScheduler(channel_id, cache_size,
+    mediator = OfflineDCMediator(channel_id, cache_size,
                                    csv_attribs=csv_attribs)
 
     filenames = [f for f in sorted(os.listdir(scan_dir))
@@ -147,8 +147,8 @@ def run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,
         desired_scan = [scan for scan in scans
                         if channel_id in scan.channel.upper()][0]
 
-        scheduler.update(desired_scan)
-        scheduler.update_cache(desired_scan)
+        mediator.update(desired_scan)
+        mediator.update_cache(desired_scan)
 
 
 def cli_run_drift_estimation_on_dir(scan_dir: str, scan_ext: str,

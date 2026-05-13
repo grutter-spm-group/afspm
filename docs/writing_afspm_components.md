@@ -26,7 +26,7 @@ ScanningComponents use a helper class (ScanHandler) to simplify requesting scans
 
 For the main component logic, there is a callable ```get_next_params``` which can be used to decide where to scan/spec next; it is called when a new ScopeState has been received and no scans/specs are currently in progress. This method also has an associated Python dict ```methods_kwargs``` that can be used to hold state throughout the experiment.
 
-Note that the configuration provided for ScanningComponent should contain the ExperimentProblem it resolves (```EP_NONE``` if it is a general component). This is used when requesting control to the MicroscopeScheduler.
+Note that the configuration provided for ScanningComponent should contain the ExperimentProblem it resolves (```EP_NONE``` if it is a general component). This is used when requesting control to the MicroscopeMediator.
 
 ### Example Usage of ScanningComponent
 

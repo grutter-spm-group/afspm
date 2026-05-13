@@ -1,8 +1,8 @@
 """This test suite exists to validate microscope translator functionality.
 
 In order to run it, you must:
-1. Start up the scheduler, via a call like the following:
-    poetry run spawn config.toml --components_to_spawn=['scheduler']
+1. Start up the mediator, via a call like the following:
+    poetry run spawn config.toml --components_to_spawn=['mediator']
 2. Start up the microscope translator you wish to test. This startup will be
 implementation-specific (look at the readme for your translator).
 3. Run these tests (backslash just to fit in line length limits):
@@ -830,10 +830,10 @@ def test_scan_coords(client, default_control_state,
     logger.info("Wait for a predetermined 'long-enough' period, "
                 "and validate the scan finishes.")
     # Ensure the scan params in the Scan2d match those we sent!
-    # NOTE: this is not a good practice if using DriftCompensatedScheduler,
+    # NOTE: this is not a good practice if using DriftCompensatedMediator,
     # as it will be 'correcting' for drift and thus you cannot guarantee
     # a perfect match. But for this experiment (where we have the base
-    # scheduler), it is ok.
+    # mediator), it is ok.
     scan = assert_and_return_message(sub_scan)
     # Confirm parameters match, BUT remember that the received params
     # have data units set. So we will test everything *except* that.

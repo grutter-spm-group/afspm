@@ -1,6 +1,6 @@
-"""Holds logic for a drift-corrected scheduler.
+"""Holds logic for a drift-corrected mediator.
 
-The scheduler in here will use logic from drift.py in order to automatically
+The mediator in here will use logic from drift.py in order to automatically
 convert from the tip coordinate system (TCS) to the 'true' sample coordinate
 system (SCS). The idea is to track drift and from it determine the correction
 vector needed to perform on any incoming request or outgoing message such that
@@ -17,7 +17,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from google.protobuf.message_factory import GetMessageClass
 
 from . import drift, correction
-from ..microscope import scheduler
+from ..microscope import mediator
 from ...utils import csv
 from ...utils import proto_geo
 from ...utils.units import convert_list
@@ -328,11 +328,11 @@ class DriftCompensatedCache(cache.PubSubCache):
         self._update_weight = update_weight
 
 
-class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
-    """Corrects coordinate system data in addition to being a scheduler.
+class DriftCompensatedMediator(mediator.MicroscopeMediator):
+    """Corrects coordinate system data in addition to being a mediator.
 
-    The DriftCompensatedScheduler is a wrapper on top of a standard
-    MicroscopeScheduler, where it additionally attempts to estimate drift
+    The DriftCompensatedMediator is a wrapper on top of a standard
+    MicroscopeMediator, where it additionally attempts to estimate drift
     in the system and correct for it. Thus:
     - any coordinate data that is sent to the Microscope will be 'corrected'
     such that it is in the tip coordinate system (TCS).
@@ -404,12 +404,12 @@ class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
     rescanning when the resulting scan is found to have drifted too far
     from the desired location. This is measured by the
     rescan intersection ratio (intersection area / scan area). When this ratio
-    is above self.rescan_intersection_ratio, this DriftCompensatedScheduler sends
+    is above self.rescan_intersection_ratio, this DriftCompensatedMediator sends
     out the desired ScanParameters2d via its publisher. If the DriftRescanner's
     subscriber is listening to the same url as the publisher, it will receive
     it, log an EP_THERMAL_DRIFT problem, take control, and rerun the scan. Once
     the scan has run, it will release control and the experiment will continue.
-    Note that this DriftCompensatedScheduler also publishes ControlState and
+    Note that this DriftCompensatedMediator also publishes ControlState and
     ScopeState messages, as these are necessary for DriftRescanner to function.
 
     Attributes:
@@ -475,7 +475,7 @@ class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
                  DEFAULT_RESCAN_INTERSECTION_RATIO,
                  display_fit: bool = DEFAULT_DISPLAY_FIT,
                  grab_oldest_match: bool = True, **kwargs):
-        """Initialize our correction scheduler."""
+        """Initialize our correction mediator."""
         self.channel_id = channel_id.upper()
         self.drift_model = (drift.create_drift_model() if drift_model is None
                             else drift_model)
@@ -507,10 +507,10 @@ class DriftCompensatedScheduler(scheduler.MicroscopeScheduler):
                            'is probably too low!')
 
         # Create our wrapper router and cache
-        kwargs[scheduler.ROUTER_KEY] = DriftCompensatedRouter.from_parent(
-            kwargs[scheduler.ROUTER_KEY])
-        kwargs[scheduler.CACHE_KEY] = DriftCompensatedCache.from_parent(
-            kwargs[scheduler.CACHE_KEY])
+        kwargs[mediator.ROUTER_KEY] = DriftCompensatedRouter.from_parent(
+            kwargs[mediator.ROUTER_KEY])
+        kwargs[mediator.CACHE_KEY] = DriftCompensatedCache.from_parent(
+            kwargs[mediator.CACHE_KEY])
 
         super().__init__(**kwargs)
 

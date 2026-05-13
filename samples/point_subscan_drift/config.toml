@@ -66,7 +66,7 @@ url = 'analysis_url'
 class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'rescan_url'
 
-[scheduler_psc]
+[mediator_psc]
 class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
@@ -96,7 +96,7 @@ subs = ['sub_spm', 'sub_points']
 class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
-[scheduler_router]
+[mediator_router]
 class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
@@ -208,12 +208,12 @@ visualize_undeclared_scans = true
 scan_id = 'Scan2d'
 
 
-[scheduler]
+[mediator]
 component = true
-class = 'afspm.components.drift.scheduler.DriftCompensatedScheduler'
+class = 'afspm.components.drift.mediator.DriftCompensatedMediator'
 
-pubsubcache = 'scheduler_psc'
-router = 'scheduler_router'
+pubsubcache = 'mediator_psc'
+router = 'mediator_router'
 publisher = 'rescan_pub'
 channel_id = 'channel_id'
 

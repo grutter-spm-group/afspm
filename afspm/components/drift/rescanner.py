@@ -20,7 +20,7 @@ class DriftRescanner(handler.ScanningComponent):
     """Monitors for scans to rerun, doing so with EP_THERMAL_DRIFT flagging.
 
     This component is expected to receive ScanParameters2d from a
-    DriftCompensatedScheduler indicating scans that need to be redone (due to there
+    DriftCompensatedMediator indicating scans that need to be redone (due to there
     being too little overlap between the desired and actual scan areas). When
     it does, it:
     1. Flags an EP_THERMAL_DRIFT problem.
@@ -32,7 +32,7 @@ class DriftRescanner(handler.ScanningComponent):
     ControlState and ScopeState messages.
 
     We expect this component's subscriber to be listening to a url that
-    DriftCompensatedScheduler publishes to.
+    DriftCompensatedMediator publishes to.
 
     Attributes:
         scan_params_id: cache key for ScanParameters2d.

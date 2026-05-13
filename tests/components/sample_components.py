@@ -11,8 +11,8 @@ from afspm.components.microscope.map_translator import MapTranslator
 from afspm.components.microscope.params import (MicroscopeParameter,
                                                 ParameterError)
 from afspm.components.microscope.actions import MicroscopeAction
-from afspm.components.microscope.scheduler import MicroscopeScheduler
-from afspm.components.drift.scheduler import DriftCompensatedScheduler
+from afspm.components.microscope.mediator import MicroscopeMediator
+from afspm.components.drift.mediator import DriftCompensatedMediator
 
 from afspm.io import common
 from afspm.io.pubsub.subscriber import Subscriber
@@ -233,8 +233,8 @@ def microscope_translator_routine(pub_url, server_url, psc_url,
     server._server.close()
 
 
-# --- MicroscopeScheduler Stuff --- #
-def microscope_scheduler_routine(psc_url, pub_url, server_url, router_url,
+# --- MicroscopeMediator Stuff --- #
+def microscope_mediator_routine(psc_url, pub_url, server_url, router_url,
                                  cache_kwargs, ctx):
     psc = PubSubCache(psc_url, pub_url,
                       cl.extract_proto,
@@ -244,15 +244,15 @@ def microscope_scheduler_routine(psc_url, pub_url, server_url, router_url,
                       update_cache_kwargs=cache_kwargs)
     router = ControlRouter(server_url, router_url, ctx)
 
-    scheduler = MicroscopeScheduler('scheduler', psc, router, ctx=ctx)
-    scheduler.run()
+    mediator = MicroscopeMediator('mediator', psc, router, ctx=ctx)
+    mediator.run()
 
     # Forcing closure of bound sockets (for pytests)
     psc._backend.close()
     router._frontend.close()
 
 
-def cs_corrected_scheduler_routine(psc_url, pub_url, server_url, router_url,
+def cs_corrected_mediator_routine(psc_url, pub_url, server_url, router_url,
                                    cache_kwargs, ctx):
     psc = PubSubCache(psc_url, pub_url,
                       cl.extract_proto,
@@ -262,12 +262,12 @@ def cs_corrected_scheduler_routine(psc_url, pub_url, server_url, router_url,
                       update_cache_kwargs=cache_kwargs)
     router = ControlRouter(server_url, router_url, ctx)
 
-    scheduler = DriftCompensatedScheduler(channel_id='',
-                                     name='scheduler',
+    mediator = DriftCompensatedMediator(channel_id='',
+                                     name='mediator',
                                      pubsubcache=psc,
                                      router=router, ctx=ctx,
                                      display_fit=False)
-    scheduler.run()
+    mediator.run()
 
     # Forcing closure of bound sockets (for pytests)
     psc._backend.close()

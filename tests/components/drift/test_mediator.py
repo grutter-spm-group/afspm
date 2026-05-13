@@ -1,4 +1,4 @@
-"""Test DriftCorrectedScheduler logic."""
+"""Test DriftCorrectedMediator logic."""
 
 import logging
 import pytest
@@ -9,7 +9,7 @@ import copy
 import zmq
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from afspm.components.drift import scheduler
+from afspm.components.drift import mediator
 from afspm.components.drift import correction
 from afspm.io.pubsub import publisher, subscriber, cache as pbc
 from afspm.io.control import router as ctrl_rtr
@@ -53,7 +53,7 @@ def channel_id():
 @pytest.fixture
 def csv_attribs():
     return csv.CSVAttributes(filepath=tempfile.gettempdir() +
-                             '/test_scheduler.csv')
+                             '/test_mediator.csv')
 
 
 @pytest.fixture
@@ -87,8 +87,8 @@ def rescan_url():
 
 
 # NOTE: I am not using fixtures here because they appeared to cause issues
-# with my monkeypatching of the corrected_scheduler. Additionally, the child
-# router/cache created by DriftCompensatedScheduler has the same...everything as
+# with my monkeypatching of the corrected_mediator. Additionally, the child
+# router/cache created by DriftCompensatedMediator has the same...everything as
 # the parent, so the fixtures lasting the lifetime of the test *could*  in
 # theory cause issues.
 def create_cache(pub_url, psc_url, ctx):
@@ -103,27 +103,27 @@ def create_publisher(rescan_url, ctx):
     return publisher.Publisher(rescan_url, ctx=ctx)
 
 
-def create_scheduler(cache, router, publisher, csv_attribs, channel_id):
-    return scheduler.DriftCompensatedScheduler(channel_id=channel_id,
+def create_mediator(cache, router, publisher, csv_attribs, channel_id):
+    return mediator.DriftCompensatedMediator(channel_id=channel_id,
                                           csv_attribs=csv_attribs,
-                                          name='scheduler',
+                                          name='mediator',
                                           pubsubcache=cache,
                                           router=router,
                                           display_fit=False,
                                           publisher=publisher)
 
 
-def create_scheduler_and_ios(pub_url, psc_url, server_url, router_url,
+def create_mediator_and_ios(pub_url, psc_url, server_url, router_url,
                              rescan_url, ctx,
                              csv_attribs, channel_id, update_weight):
     my_cache = create_cache(pub_url, psc_url, ctx)
     my_router = create_router(server_url, router_url, ctx)
     my_publisher = create_publisher(rescan_url, ctx) if rescan_url else None
 
-    my_scheduler = create_scheduler(my_cache, my_router, my_publisher,
+    my_mediator = create_mediator(my_cache, my_router, my_publisher,
                                     csv_attribs, channel_id)
-    my_scheduler.update_weight = update_weight
-    return my_scheduler
+    my_mediator.update_weight = update_weight
+    return my_mediator
 
 
 def send_empty_scan(self):
@@ -148,7 +148,7 @@ def update_weight():
     return 0.667
 
 
-def fake_update_scheduler(self, corr_info):
+def fake_update_mediator(self, corr_info):
     """Manually feed corr_info instead of proto."""
     logger.warning('in update!')
     self.total_corr_info = corr_info
@@ -157,35 +157,35 @@ def fake_update_scheduler(self, corr_info):
 
 def test_hooks_work(pub_url, psc_url, server_url, router_url, ctx, csv_attribs,
                     channel_id, corr_info, monkeypatch, update_weight):
-    logger.info("Validate that the hooks between scheduler, router, cache all "
+    logger.info("Validate that the hooks between mediator, router, cache all "
                 "work.")
     monkeypatch.setattr(pbc.PubSubCache, 'poll', send_empty_scan)
-    monkeypatch.setattr(scheduler.DriftCompensatedScheduler, 'update',
-                        fake_update_scheduler)
-    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+    monkeypatch.setattr(mediator.DriftCompensatedMediator, 'update',
+                        fake_update_mediator)
+    my_mediator = create_mediator_and_ios(pub_url, psc_url, server_url,
                                             router_url, None, ctx, csv_attribs,
                                             channel_id, update_weight)
 
     # Before running, there should be no 'scan_was_received' in cache
-    assert not hasattr(my_scheduler.pubsubcache, 'scan_was_received')
+    assert not hasattr(my_mediator.pubsubcache, 'scan_was_received')
 
     logger.warning(f'corr_info: {corr_info}')
-    my_scheduler.update(corr_info)
-    my_scheduler.run_per_loop()
+    my_mediator.update(corr_info)
+    my_mediator.run_per_loop()
 
-    assert hasattr(my_scheduler.pubsubcache, 'scan_was_received')
-    assert my_scheduler.total_corr_info == corr_info
+    assert hasattr(my_mediator.pubsubcache, 'scan_was_received')
+    assert my_mediator.total_corr_info == corr_info
 
     # Ensure pubsubcache has updated correction params
-    assert my_scheduler.pubsubcache._corr_info == corr_info
-    assert my_scheduler.pubsubcache._update_weight == update_weight
+    assert my_mediator.pubsubcache._corr_info == corr_info
+    assert my_mediator.pubsubcache._update_weight == update_weight
 
     neg_corr_info = copy.deepcopy(corr_info)
     neg_corr_info.vec = -neg_corr_info.vec
     neg_corr_info.rate = -neg_corr_info.rate
     # Ensure router has updated correction params
-    assert my_scheduler.router._corr_info == neg_corr_info
-    assert my_scheduler.router._update_weight == update_weight
+    assert my_mediator.router._corr_info == neg_corr_info
+    assert my_mediator.router._update_weight == update_weight
 
     # Kill context (needed due to funky lack of pytest fixture)
     ctx.destroy()
@@ -204,41 +204,41 @@ def test_update_curr_corr_info(pub_url, psc_url, server_url, router_url, ctx,
 
     logger.info("If no total_corr_info and no snapshot, total_corr_info "
                 "stays None.")
-    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+    my_mediator = create_mediator_and_ios(pub_url, psc_url, server_url,
                                             router_url, None, ctx, csv_attribs,
                                             channel_id, update_weight)
-    my_scheduler.total_corr_info = None
-    my_scheduler._update_curr_corr_info(scan, None)
-    assert my_scheduler.total_corr_info is None
+    my_mediator.total_corr_info = None
+    my_mediator._update_curr_corr_info(scan, None)
+    assert my_mediator.total_corr_info is None
 
     logger.info("If total_corr_info and no snapshot, total_corr_info "
                 "updates considering it's drift rate")
-    my_scheduler.total_corr_info = corr_info
-    my_scheduler._update_curr_corr_info(scan, None)
+    my_mediator.total_corr_info = corr_info
+    my_mediator._update_curr_corr_info(scan, None)
     # Delta corr info is vec * (dt2 - dt1) = vec
     # Therefore, total is vec + vec.
     expected_corr_info = correction.CorrectionInfo(dt2, vec + vec, vec,
                                                    unit)
-    assert my_scheduler.total_corr_info == expected_corr_info
+    assert my_mediator.total_corr_info == expected_corr_info
 
     logger.info("If no total_corr_info and a snapshot, total_corr_info "
                 "updates to it")
-    my_scheduler.total_corr_info = None
+    my_mediator.total_corr_info = None
     snapshot = correction.DriftSnapshot(dt1, dt2, -vec, unit)
-    my_scheduler._update_curr_corr_info(scan, snapshot)
+    my_mediator._update_curr_corr_info(scan, snapshot)
     # Delta corr info is the negative of the snapshot, so vec. (Remember, our
     # correction is the negation of the drift we detect via the snapshot).
     # Therefore, total is vec.
     expected_corr_info = correction.CorrectionInfo(dt2, vec, vec,
                                                    unit)
-    assert my_scheduler.total_corr_info == expected_corr_info
+    assert my_mediator.total_corr_info == expected_corr_info
 
     logger.info("If total_corr_info and a snapshot, total_corr_info "
                 "updates considering it's drift rate and the snapshot")
-    my_scheduler.update_weight = 1.0
-    my_scheduler.total_corr_info = corr_info
+    my_mediator.update_weight = 1.0
+    my_mediator.total_corr_info = corr_info
     snapshot = correction.DriftSnapshot(dt1, dt2, vec, unit)
-    my_scheduler._update_curr_corr_info(scan, snapshot)
+    my_mediator._update_curr_corr_info(scan, snapshot)
     # Drift corr info is the negative of the snapshot, so -vec.
     # Delta corr info is vec from old rate + new vec, so vec - vec = 0.
     # The total is old corr vec + new vec = old corr vec.
@@ -246,11 +246,11 @@ def test_update_curr_corr_info(pub_url, psc_url, server_url, router_url, ctx,
                                                    unit)
 
     logger.info("Same as last, but with update_weight=0.9")
-    my_scheduler.update_weight = 0.9
-    my_scheduler.total_corr_info = corr_info
+    my_mediator.update_weight = 0.9
+    my_mediator.total_corr_info = corr_info
     logger.warning(f'corr_info: {corr_info}')  # TODO Remove me
     snapshot = correction.DriftSnapshot(dt1, dt2, vec, unit)
-    my_scheduler._update_curr_corr_info(scan, snapshot)
+    my_mediator._update_curr_corr_info(scan, snapshot)
     # Drift corr info is the negative of the snapshot, so -vec.
     # Delta corr info is vec from old rate + new vec, so vec - vec = 0.
     # The total is:
@@ -258,7 +258,7 @@ def test_update_curr_corr_info(pub_url, psc_url, server_url, router_url, ctx,
     # b)  old_vec + update_vec = 1.1 * vec
     expected_corr_info = correction.CorrectionInfo(dt2, 1.1 * vec, 0.1 * vec,
                                                    unit)
-    assert my_scheduler.total_corr_info == expected_corr_info
+    assert my_mediator.total_corr_info == expected_corr_info
 
     # Kill context (needed due to funky lack of pytest fixture)
     ctx.destroy()
@@ -291,17 +291,17 @@ def test_determine_redo_scan(pub_url, psc_url, server_url, router_url, ctx,
                              unit, roi1, roi2, roi3):
     logger.info("Ensure we send out redo scans as needed, and the logic is as "
                 "expected.")
-    my_scheduler = create_scheduler_and_ios(pub_url, psc_url, server_url,
+    my_mediator = create_mediator_and_ios(pub_url, psc_url, server_url,
                                             router_url, rescan_url, ctx,
                                             csv_attribs,
                                             channel_id, update_weight)
-    my_scheduler.total_corr_info = correction.CorrectionInfo(
+    my_mediator.total_corr_info = correction.CorrectionInfo(
         dt1, np.array([0, 0]), np.array([0, 0]))
 
     # Set up original 'scan params' request
     requested_scan_params = scan_pb2.ScanParameters2d()
     requested_scan_params.spatial.roi.CopyFrom(roi2)
-    my_scheduler.router._last_scan_params = requested_scan_params
+    my_mediator.router._last_scan_params = requested_scan_params
 
     sub = subscriber.Subscriber(rescan_url, ctx=ctx)
 
@@ -313,13 +313,13 @@ def test_determine_redo_scan(pub_url, psc_url, server_url, router_url, ctx,
     prior_scan = scan_pb2.Scan2d()
     prior_scan.params.spatial.roi.CopyFrom(roi1)
 
-    my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    my_mediator._determine_redo_scan(uncorrected_scan, prior_scan)
     assert sub.poll_and_store() is None
 
     logger.debug("If we require a rescan, our subscriber receives it.")
     prior_scan = scan_pb2.Scan2d()
     prior_scan.params.spatial.roi.CopyFrom(roi2)
-    my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    my_mediator._determine_redo_scan(uncorrected_scan, prior_scan)
     received = sub.poll_and_store()
     __, proto = received[0]  # first received of list of messages
     assert proto == requested_scan_params
@@ -327,16 +327,16 @@ def test_determine_redo_scan(pub_url, psc_url, server_url, router_url, ctx,
     logger.debug("If the intersection is big enough, no rescan required.")
     prior_scan = scan_pb2.Scan2d()
     prior_scan.params.spatial.roi.CopyFrom(roi3)
-    my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    my_mediator._determine_redo_scan(uncorrected_scan, prior_scan)
     assert sub.poll_and_store() is None
 
     # logger.debug("Go back to a rescan case, but let's ensure we send the data "
     #              "in the sample coordinate system!")
-    # my_scheduler.total_corr_info = correction.CorrectionInfo(
+    # my_mediator.total_corr_info = correction.CorrectionInfo(
     #     dt1, np.array([1, 1]), np.array([0, 0]))
     # prior_scan = scan_pb2.Scan2d()
     # prior_scan.params.spatial.roi.CopyFrom(roi2)
-    # my_scheduler._determine_redo_scan(uncorrected_scan, prior_scan)
+    # my_mediator._determine_redo_scan(uncorrected_scan, prior_scan)
 
     # expected_params = uncorrected_scan.params
     # scs_tl = geometry_pb2.Point2d(x=1.0, y=1.0)
@@ -364,14 +364,14 @@ def test_metadata_writing(dt1, vec, unit, roi1, filename):
     scan.filename = filename
     scan.timestamp.FromDatetime(dt1)
 
-    row_vals = scheduler.get_metadata_row_v2(scan, corr_info, True)
+    row_vals = mediator.get_metadata_row_v2(scan, corr_info, True)
     expected_row_vals = [dt1.isoformat(), filename, corr_info.vec[0],
                          corr_info.vec[1], corr_info.unit, corr_info.rate[0],
                          corr_info.rate[1], corr_info.unit + '/s',
                          True]
     assert row_vals == expected_row_vals
 
-    row_vals = scheduler.get_metadata_row_v2(scan, None, True)
+    row_vals = mediator.get_metadata_row_v2(scan, None, True)
     expected_row_vals = [dt1.isoformat(), filename, None,
                          None, None, None, None, None, True]
     assert row_vals == expected_row_vals

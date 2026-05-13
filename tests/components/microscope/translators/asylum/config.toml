@@ -55,9 +55,9 @@ class = 'afspm.components.microscope.translators.asylum.client.XopClient'
 url = 'xop_url'
 
 # ----- Components ----- #
-[scheduler]
+[mediator]
 component = true
-class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
+class = 'afspm.components.microscope.mediator.MicroscopeMediator'
 pubsubcache = 'psc'
 router = 'router'
 

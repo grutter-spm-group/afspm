@@ -58,7 +58,7 @@ cache_logic = 'pbc_scan_logic'
 class = 'afspm.io.pubsub.publisher.Publisher'
 url = 'pub_url'
 
-[scheduler_psc]
+[mediator_psc]
 class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'
@@ -75,7 +75,7 @@ update_cache_kwargs = 'roi_cache_kwargs'
 class = 'afspm.io.control.server.ControlServer'
 url = 'server_url'
 
-[scheduler_router]
+[mediator_router]
 class = 'afspm.io.control.router.ControlRouter'
 server_url = 'server_url'
 router_url = 'router_url'
@@ -140,12 +140,12 @@ scan_id = 'Scan2d'
 subscriber = 'experiment_sub'
 control_client = 'ui_client'
 
-[scheduler]
+[mediator]
 component = true
-class = 'afspm.components.microscope.scheduler.MicroscopeScheduler'
+class = 'afspm.components.microscope.mediator.MicroscopeMediator'
 
-pubsubcache = 'scheduler_psc'
-router = 'scheduler_router'
+pubsubcache = 'mediator_psc'
+router = 'mediator_router'
 
 [translator]
 component = true

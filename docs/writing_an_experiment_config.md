@@ -164,7 +164,7 @@ This is then used as the input ```cache_logic``` for the cache-linked methods ``
 [roi_cache_kwargs]
 cache_logic = 'pbc_scan_logic'
 
-[scheduler_psc]
+[mediator_psc]
 class = 'afspm.io.pubsub.cache.PubSubCache'
 url = 'psc_url'
 sub_url = 'pub_url'

@@ -159,7 +159,7 @@ Concerned with the *choices* a researcher would perform *during* an experiment.
 #+beamer:\pause
 Any experiment must contain:
 - *Microscope Translator*: translates between afspm-generic and microscope-specific.
-- *Microscope Scheduler*: mediates control between components and translator and caches data.
+- *Microscope Mediator*: mediates control between components and translator and caches data.
 ** Scripting with / without =afspm=
 *** Left Col: :BMCOL:
 :PROPERTIES:
@@ -225,11 +225,11 @@ _*=ZeroMQ=*_: abstracts away transports used, handles common roadblocks.
 *** Publisher-Subscriber Path
 - The SPM *publishes* messages types when its 'state' changes.
 - Components may *subscribe* to only messages of interest.
-- Messages may be *cached* by the Scheduler, to send to new components.
+- Messages may be *cached* by the Mediator, to send to new components.
 #+beamer:\pause
 *** Control Path
 - Components send *requests* to the SPM and receive *responses*.
-- The Scheduler *routes* control to the SPM (one component at a time).
+- The Mediator *routes* control to the SPM (one component at a time).
 - Components not in control may flag *problems* -- control is dropped.
   - A user may *manually* fix a problem and unflag the problem.
   - A component that *fixes* a flagged problem can grab control.

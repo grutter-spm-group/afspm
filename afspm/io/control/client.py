@@ -390,7 +390,7 @@ class AdminControlClient(ControlClient):
     def end_experiment(self) -> control_pb2.ControlResponse:
         """Indicate the experiment should end.
 
-        The Microscope Scheduler should receive this request and notify all
+        The Microscope Mediator should receive this request and notify all
         connected components to close.
         """
         logger.debug("Sending end_experiment.")
