@@ -15,7 +15,7 @@ In order for spectroscopy to work, we also need to copy a custom Igor Procedure 
 In order to send spectroscopy requests, we needed to implement our own top-level functions in Igor (in the Spectroscopy.ipf file). To allow the Igor program to read these, we need to copy them into the appropriate location:
 
 ```text
-%USER_PROFILE%/Documents/WaveMetrics/Igor Pro 6 User Files/User Procedures
+%USERPROFILE%/Documents/WaveMetrics/Igor Pro 6 User Files/User Procedures
 ```
 
 ## Usage
@@ -42,7 +42,7 @@ zeromq_handler_start() // Prepare to handle incoming messages
 
 Next, we must tell Igor to include our methods from Spectroscopy.ipf. To do this, we:
 1. Open the Procedure window (either via Ctrl+M or selecting Windows->Procedure Windows->Procedure Window).
-2. In the opened window, place your cursor at the llast line of the Procedure file (i.e. after 'StartMeUp()').
+2. In the opened window, place your cursor at the last line of the Procedure file (i.e. after 'StartMeUp()').
 3. Type the following:
 
 ```text
@@ -60,12 +60,13 @@ poetry run spawn /path/to/config/config.toml
 
 ## Testing
 
-### ZeroMQ-XOP Validation
-To validate that the interface is working:
-1. Run the example program in ZeroMQ-XOP to ensure the XOP is functioning.
-2. Run the MicroscopeTranslator unit tests in afspm to ensure the Asylum translator is communicating properly with the Igor Pro software (via the ZeroMQ-XOP interface).
+To test this MicroscopeTranslator, run test_translator.py in ```tests/components/microscope/translators```.
+If further debugging is needed, you can validate that the afspm-Igor interface is via the methods below.
 
-For (1), you want to call the example script with an expected function, to validate the return is what you expect. For example, to call a 'Get Value' on the parameter 'ScanSize', you would do:
+### ZeroMQ-XOP Validation
+To validate that the interface is working:run the example program from the ZeroMQ-XOP repository.
+You want to call the example script with an expected function, to validate the return is what you expect. 
+For example, to call a 'Get Value' on the parameter 'ScanSize', you would do:
 
 ```
 zmq_xop_client.exe "tcp://127.0.0.1:5555" '{ \"version\" : 1, \"CallFunction\" : { \"name\" : \"GV\", \"params\" : [ \"ScanSize\"] } }'
