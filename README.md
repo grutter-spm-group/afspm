@@ -104,7 +104,8 @@ You can run unit tests (to validate the installation or otherwise) by running py
 poetry run pytest
 ```
 
-All tests should pass.
+To validate a given MicroscopeTranslator is functioning properly, run the translator tests at  ```tests/components/microscope/translators/test_translator.py```.
+
 
 ## Basic Usage
 
@@ -149,4 +150,23 @@ For info on expected arguments, call:
 ``` sh
 graphify --help  # Already in virtual environment
 poetry run graphify --help  # Outside of virtual environment
+
+NOTE: on Windows, graphify must render to a '.png' filepath.
+Thus, set 'render_filepath' to a path with a '.png' extension.
+```
+## Citation
+
+If you use this software in your work, we would appreciate if you cite our paper from Beilstein Nano:
+
+``` bibtex
+@article{sullivan2026afspm,
+  title={afspm: A framework for manufacturer-agnostic automation in scanning probe microscopy},
+  author={Sullivan, Nicholas J and Vald{\'e}s, Julio J and Bevan, Kirk H and Grutter, Peter},
+  journal={Beilstein Journal of Nanotechnology},
+  volume={17},
+  number={1},
+  pages={653--667},
+  year={2026},
+  publisher={Beilstein-Institut}
+}
 ```
