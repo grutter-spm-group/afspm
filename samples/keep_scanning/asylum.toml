@@ -1,0 +1,17 @@
+request_timeout_ms = 5000  # Need a very long timeout for asylum...
+scan_wait_s = 900  # 15 mins
+
+[xopclient]
+class = 'afspm.components.microscope.translators.asylum.client.XopClient'
+url = 'xop_url'
+timeout_s = 20  # 4x the request timeout
+
+[translator]
+component = true
+class = 'afspm.components.microscope.translators.asylum.translator.AsylumTranslator'
+
+xop_client = 'xopclient'
+
+publisher = 'pub'
+control_server = 'server'
+subscriber = 'sub'  # To close itself when we tell it to.

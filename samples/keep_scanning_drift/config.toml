@@ -1,0 +1,130 @@
+# ================================================
+#  config.toml for continuously scanning a region.
+# ================================================
+
+# ----- General variables ----- #
+# --- URLs --- #
+pub_url = "tcp://127.0.0.1:9000"
+psc_url = "tcp://127.0.0.1:9001"
+server_url = "tcp://127.0.0.1:6666"
+router_url = "tcp://127.0.0.1:6667"
+xop_url = 'tcp://127.0.0.1:5555'  # To be used on zmq-xop server startup in Igor
+rescan_url = "tcp://127.0.0.1:9005"
+
+
+# --- Experiment Scan Aspects --- #
+# - Physical Stuff - #
+our_phys_units = 'nm'
+full_scan_origin = [0, 0]
+full_scan_size = [200, 200]
+
+# - Data Stuff - #
+data_units = 'pixels'
+full_scan_res = [256, 256]
+
+
+# ----- Cache Logic ----- #
+[pbc_scan_logic]  # Set default scan cache to 3
+class = 'afspm.io.pubsub.logic.pbc_logic.PBCScanLogic'
+default_scan_history = 5
+
+[cache_kwargs]
+cache_logic = 'pbc_scan_logic'
+
+# ----- PubSub ----- #
+[pub]
+class = 'afspm.io.pubsub.publisher.Publisher'
+url = 'pub_url'
+
+[psc]
+class = 'afspm.io.pubsub.cache.PubSubCache'
+url = 'psc_url'
+sub_url = 'pub_url'
+update_cache_kwargs = 'cache_kwargs'
+
+[sub]
+class = 'afspm.io.pubsub.subscriber.Subscriber'
+sub_url = 'psc_url'
+
+[rescan_pub]
+class = 'afspm.io.pubsub.publisher.Publisher'
+url = 'rescan_url'
+
+[rescan_sub]
+class = 'afspm.io.pubsub.subscriber.Subscriber'
+sub_url = 'rescan_url'
+
+# ----- Control Logic ----- #
+[server]
+class = 'afspm.io.control.server.ControlServer'
+url = 'server_url'
+
+[router]
+class = 'afspm.io.control.router.ControlRouter'
+server_url = 'server_url'
+router_url = 'router_url'
+request_timeout_ms = 'request_timeout_ms'
+
+[client]
+class = 'afspm.io.control.client.ControlClient'
+url = 'router_url'
+request_timeout_ms = 'request_timeout_ms'
+
+[ui_client]
+class = 'afspm.io.control.client.AdminControlClient'
+url = 'router_url'
+
+# ----- Components ----- #
+[exp_data]
+class = 'experiment.ExperimentData'
+scan_origin = 'full_scan_origin'
+scan_size = 'full_scan_size'
+length_units = 'our_phys_units'
+scan_res = 'full_scan_res'
+scan_wait_s = 'scan_wait_s'
+
+[experiment]
+class = 'afspm.components.scan.handler.ScanningComponent'
+component = true
+
+subscriber = 'sub'
+control_client = 'client'
+
+rerun_wait_s = 5
+get_next_params = 'experiment.get_next_scan_params'
+next_params_kwargs = {'exp_data'= 'exp_data'}
+
+[ui]
+component = true
+class = 'afspm.components.control_ui.AfspmControlUI'
+
+subscriber = 'sub'
+control_client = 'ui_client'
+
+[mediator]
+component = true
+class = 'afspm.components.drift.mediator.DriftCompensatedMediator'
+pubsubcache = 'psc'
+router = 'router'
+publisher = 'rescan_pub'  # Publish rescan requests
+
+channel_id = 'channel_id'
+update_weight = 1.0  # Do not average!
+rescan_intersection_ratio = 0.9
+
+[rescanner]
+component = true
+class = 'afspm.components.drift.rescanner.DriftRescanner'
+rerun_wait_s = 5
+subscriber = 'rescan_sub'  # Listen to rescan requests
+control_client = 'client'
+
+# Common to both
+publisher = 'pub'
+control_server = 'server'
+subscriber = 'sub'  # To close itself when we tell it to.
+
+[metadata]
+component = true
+class = 'afspm.components.scan.metadata.ScanMetadataWriter'
+subscriber = 'sub'
