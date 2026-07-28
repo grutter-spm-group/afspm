@@ -376,15 +376,15 @@ class ConfigTranslator(translator.MicroscopeTranslator, metaclass=ABCMeta):
             scan_params.spatial.roi.size.y = vals[1]
             scan_params.spatial.roi.top_left.x = vals[2]
             scan_params.spatial.roi.top_left.y = vals[3]
-            scan_params.spatial.data.shape.x = int(vals[4])
-            scan_params.spatial.data.shape.y = int(vals[5])
+            scan_params.data.shape.x = int(vals[4])
+            scan_params.data.shape.y = int(vals[5])
         else:
             scan_params.spatial.roi.size.y = vals[0]
             scan_params.spatial.roi.size.x = vals[1]
             scan_params.spatial.roi.top_left.y = vals[2]
             scan_params.spatial.roi.top_left.x = vals[3]
-            scan_params.spatial.data.shape.y = int(vals[4])
-            scan_params.spatial.data.shape.x = int(vals[5])
+            scan_params.data.shape.y = int(vals[4])
+            scan_params.data.shape.x = int(vals[5])
 
         scan_params.spatial.roi.angle = vals[6]
         scan_params.spatial.length_units = length_units
