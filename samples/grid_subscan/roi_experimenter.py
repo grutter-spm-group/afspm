@@ -4,6 +4,7 @@ import logging
 import numpy as np
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
@@ -116,7 +117,8 @@ class ROIExperimenter(AfspmComponent):
                                        y_points.flatten()]).T
         self.sscan_phys_size = np.array([x[1] - x[0], y[1] - y[0]])
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override: we update the ScanHandler."""
         self.scan_handler.on_message_received(proto, self.control_client)
 

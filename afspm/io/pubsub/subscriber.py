@@ -9,10 +9,11 @@ import logging
 import zmq
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from .. import common
 from . import defaults
-from .logic.cache_logic import extract_ts
+from .logic.cache_logic import extract_ts, get_cache_item_ts, CACHE_LOGIC_KEY
 
 
 logger = logging.getLogger(__name__)
@@ -90,7 +91,8 @@ class Subscriber(ABCSubscriber):
         _poll_timeout_ms: the poll timeout, in milliseconds. If None,
             we do not poll and do a blocking receive instead.
         _uuid: a uuid to differentiate subscribers in logs.
-        _latest_dt: datetime of latest message received.
+        _internal_cache_logic: CacheLogic instance associated to
+            subscriber's cache. Taken from _update_cache_kwargs.
     """
 
     def __init__(self, sub_url: str,
@@ -142,13 +144,13 @@ class Subscriber(ABCSubscriber):
         self._poll_timeout_ms = poll_timeout_ms
         self._uuid = uuid
 
+        self._internal_cache_logic = self._update_cache_kwargs[CACHE_LOGIC_KEY]
+
         if not ctx:
             ctx = zmq.Context.instance()
 
         self._subscriber = ctx.socket(zmq.SUB)
         self._subscriber.connect(sub_url)
-
-        self._latest_dt = None
 
         # Subscribe to all our topics
         for topic in topics_to_sub:
@@ -169,7 +171,7 @@ class Subscriber(ABCSubscriber):
         """Overload parent."""
         return self._shutdown_was_requested
 
-    def poll_and_store(self) -> list[tuple[str, Message]] | None:
+    def poll_and_store(self) -> list[tuple[str, Message, Timestamp]] | None:
         """Receive message(s) and store in cache.
 
         We use a poll() first, to ensure there are messages to receive.
@@ -200,7 +202,7 @@ class Subscriber(ABCSubscriber):
         return decoded if len(decoded) > 0 else None
 
     def _on_message_received(self, msg: list[bytes]
-                             ) -> tuple[str, Message] | None:
+                             ) -> tuple[str, Message, Timestamp] | None:
         """Decode message and update cache.
 
         Args:
@@ -222,19 +224,23 @@ class Subscriber(ABCSubscriber):
         proto = self._sub_extract_proto(msg, **self._extract_proto_kwargs)
         ts = extract_ts(msg)
         dt = ts.ToDatetime(timezone.utc)
-        if self._latest_dt and dt <= self._latest_dt:
+
+        # Get latest timesteamp from cache for this message type
+        key = self._internal_cache_logic.get_envelope_for_proto(proto)
+        item_ts = get_cache_item_ts(self._cache, key, -1)
+        latest_dt = item_ts[1].ToDatetime(timezone.utc) if item_ts else None
+
+        if latest_dt and dt <= latest_dt:
             logger.debug(f"{self._uuid}: Received 'old' message, ignoring "
                          f"(envelope: {envelope}).")
             logger.trace(f" dt: {dt}")
-            logger.trace(f" self._latest_dt: {self._latest_dt}")
+            logger.trace(f" latest_dt: {latest_dt}")
             return None
 
         logger.debug(f"{self._uuid}: Message received {envelope}")
         self._update_cache(proto, ts, self._cache,
                            **self._update_cache_kwargs)
-        self._latest_dt = dt
-
-        return (envelope, proto)
+        return (envelope, proto, ts)
 
     def set_uuid(self, uuid: str):
         """Set id, to differentiate when logging."""
@@ -249,7 +255,7 @@ class ComboSubscriber(ABCSubscriber):
         self._subs = subs
         self._cache = {}
 
-    def poll_and_store(self) -> list[tuple[str, Message]] | None:
+    def poll_and_store(self) -> list[tuple[str, Message, Timestamp]] | None:
         """Overload parent class."""
         self._cache = {}
         total_messages = []

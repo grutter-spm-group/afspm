@@ -158,8 +158,8 @@ def test_experiment_problem(publisher, server, thread_scan_handler,
                     control_pb2.ExperimentProblem.EP_FEEDBACK_NON_OPTIMAL]:
         del control_state.problems_set[:]  # Clear problems set
         control_state.problems_set.append(problem)
-        publisher.send_message(control_state)
-        publisher.send_message(scope_state_msg)
+        publisher.send_message(control_state, common.create_ts())
+        publisher.send_message(scope_state_msg, common.create_ts())
 
         msg = server.poll()
         assert msg == (None, None)
@@ -181,11 +181,11 @@ def test_scanning(publisher, server, thread_scan_handler,
                control_pb2.ActionMsg(action=MicroscopeAction.START_SCAN)]
 
     # Inform scan handler we are in the expected control state.
-    publisher.send_message(control_state)
+    publisher.send_message(control_state, common.create_ts())
 
     # Start up in SS_FREE
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     # Run 3 scans
     for i in list(range(3)):
@@ -197,10 +197,10 @@ def test_scanning(publisher, server, thread_scan_handler,
             server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
             scope_state_msg.scope_state = state
-            publisher.send_message(scope_state_msg)
+            publisher.send_message(scope_state_msg, common.create_ts())
 
             scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-            publisher.send_message(scope_state_msg)
+            publisher.send_message(scope_state_msg, common.create_ts())
 
     logger.info("Sending kill signal")
     publisher.send_kill_signal()
@@ -213,8 +213,8 @@ def test_scan_lose_ctrl_after_move(publisher, server, thread_scan_handler,
                                    rerun_wait_s):
     logger.info("Validate we restart a scan if we lose control after a move.")
 
-    publisher.send_message(control_state)
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(control_state, common.create_ts())
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
@@ -222,9 +222,9 @@ def test_scan_lose_ctrl_after_move(publisher, server, thread_scan_handler,
     server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_MOVING
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_ACTION
@@ -256,8 +256,8 @@ def test_scan_interrupted(publisher, server, thread_scan_handler,
                           rerun_wait_s):
     logger.info("Validate we restart a scan if the scan is interrupted.")
 
-    publisher.send_message(control_state)
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(control_state, common.create_ts())
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
@@ -265,9 +265,9 @@ def test_scan_interrupted(publisher, server, thread_scan_handler,
     server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_MOVING
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_ACTION
@@ -275,9 +275,9 @@ def test_scan_interrupted(publisher, server, thread_scan_handler,
     server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_SCANNING
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_INTERRUPTED
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
@@ -301,11 +301,11 @@ def test_spec(publisher, server, thread_spec_handler,
                control_pb2.ActionMsg(action=MicroscopeAction.START_SPEC)]
 
     # Inform scan handler we are in the expected control state.
-    publisher.send_message(control_state)
+    publisher.send_message(control_state, common.create_ts())
 
     # Start up in SS_FREE
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     # Run 3 scans
     for i in list(range(3)):
@@ -317,10 +317,10 @@ def test_spec(publisher, server, thread_spec_handler,
             server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
             scope_state_msg.scope_state = state
-            publisher.send_message(scope_state_msg)
+            publisher.send_message(scope_state_msg, common.create_ts())
 
             scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-            publisher.send_message(scope_state_msg)
+            publisher.send_message(scope_state_msg, common.create_ts())
 
     logger.info("Sending kill signal")
     publisher.send_kill_signal()
@@ -333,8 +333,8 @@ def test_req_ctrl(publisher, server, thread_scan_handler, control_state,
     logger.info("Validate we try to gain control if we are not under control.")
 
     # Inform scan handler we are in the expected control state.
-    publisher.send_message(control_state)
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(control_state, common.create_ts())
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, __ = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
@@ -379,8 +379,8 @@ def test_flush_params(publisher, server, thread_scan_handler_alt,
                       rerun_wait_s):
     logger.info("Make sure flush_params_on_failure works as expected.")
 
-    publisher.send_message(control_state)
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(control_state, common.create_ts())
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS
@@ -388,9 +388,9 @@ def test_flush_params(publisher, server, thread_scan_handler_alt,
     server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_MOVING
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_FREE
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_ACTION
@@ -398,9 +398,9 @@ def test_flush_params(publisher, server, thread_scan_handler_alt,
     server.reply(control_pb2.ControlResponse.REP_SUCCESS)
 
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_SCANNING
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
     scope_state_msg.scope_state = scan_pb2.ScopeState.SS_INTERRUPTED
-    publisher.send_message(scope_state_msg)
+    publisher.send_message(scope_state_msg, common.create_ts())
 
     req, obj = server.poll()
     assert req == control_pb2.ControlRequest.REQ_SET_SCAN_PARAMS

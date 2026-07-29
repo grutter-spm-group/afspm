@@ -73,20 +73,33 @@ class Publisher:
 
         common.sleep_on_socket_startup()
 
-    def send_message(self, proto: Message):
+    def send_message(self, proto: Message, ts: Timestamp):
         """Send message via publisher.
 
         It uses get_envelope_for_proto to determine the envelope of our
         message.
 
+        --- NOTE ---
+        We purposefully force the user to provide a timestamp, to avoid
+        potential cache issues. If this message is completely original (e.g.
+        it came from the MicroscopeTranslator, it should use common.create_ts()
+        to create a new timestamp.
+
+        If, however, it is *derived* from prior data, it should use the
+        timestamp of that data! In doing so, we can ensure that 'old' data
+        does not get re-read by components if a new component is spawned.
+        This is because the new component will receive all old messages
+        in the cache and respond. Any data derived from data in the cache
+        should have the original data's timestamp, so it is automatically
+        treated as old and disregarded by pre-existing components.
+
         Args:
             proto: protobuf message to send.
+            ts: timestamp for said message.
         """
         envelope = self._get_envelope_for_proto(proto,
                                                 **self._get_envelope_kwargs)
         logger.debug(f"{self._uuid}: Sending message {envelope}")
-
-        ts = common.create_ts()
         self._publisher.send_multipart(
                     create_message_packet(envelope, proto, ts))
 

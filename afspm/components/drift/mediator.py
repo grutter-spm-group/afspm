@@ -21,6 +21,7 @@ from ..microscope import mediator
 from ...utils import csv
 from ...utils import proto_geo
 from ...utils.units import convert_list
+from ...io import common
 from ...io.control import router
 from ...io.pubsub import cache
 from ...io.pubsub.logic import cache_logic
@@ -567,7 +568,16 @@ class DriftCompensatedMediator(mediator.MicroscopeMediator):
 
     # ----- Drift mapping stuff ----- #
     def cache_received_message(self, proto: Message):
-        """Analyze scans whenever the cache receives them."""
+        """Analyze scans whenever the cache receives them.
+
+        This method is called whenever the cache in PubSubCache receives
+        a new message. It does two things:
+        1. Internally updates our drift estimation for Scan2d's we receive.
+        2. Publishes ControlState and ScopeState messages out via its
+        publisher. Recall that this publisher exists to allow a Rescanner
+        To determine when to rerun scans (if the drift correction has
+        added to much drift between any two scans).
+        """
         if (isinstance(proto, scan_pb2.Scan2d) and
                 self.channel_id in proto.channel.upper()):
             self.update(proto)
@@ -575,7 +585,7 @@ class DriftCompensatedMediator(mediator.MicroscopeMediator):
         if ((isinstance(proto, control_pb2.ControlState) or
                 isinstance(proto, scan_pb2.ScopeStateMsg)) and
                 self.publisher is not None):
-            self.publisher.send_message(proto)
+            self.publisher.send_message(proto, common.create_ts())
 
     def update(self, new_scan: scan_pb2.Scan2d):
         """Update correction infos given a new scan.
@@ -726,7 +736,7 @@ class DriftCompensatedMediator(mediator.MicroscopeMediator):
                 logger.error('Could not send out last scan params for a '
                              'rescan because our stored params are None!')
             else:
-                self.publisher.send_message(scs_params)
+                self.publisher.send_message(scs_params, common.create_ts())
 
     def _handle_shutdown(self):
         """Override to send kill via publisher (if provided)."""

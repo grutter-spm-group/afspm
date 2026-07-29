@@ -3,6 +3,7 @@
 import logging
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ..scan import handler
 from ...io.pubsub.logic import pbc_logic
@@ -62,9 +63,10 @@ class DriftRescanner(handler.ScanningComponent):
         super().__init__(rerun_wait_s, rerun_scans, next_params_kwargs,
                          self.EXP_PROBLEM, **kwargs)
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override to run ScanHandler."""
-        super().on_message_received(envelope, proto)
+        super().on_message_received(envelope, proto, ts)
         self._handle_rescans()
 
     def _handle_rescans(self):

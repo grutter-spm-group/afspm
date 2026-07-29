@@ -6,6 +6,7 @@ import copy
 from typing import Callable, Any
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ..component import AfspmComponent
 from ...io import common
@@ -355,7 +356,8 @@ class ScanningComponent(AfspmComponent):
         self.scan_handler.handle_issues(self.control_client)
         super().run_per_loop()
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override to run ScanHandler."""
         self.scan_handler.on_message_received(proto, self.control_client)
-        super().on_message_received(envelope, proto)
+        super().on_message_received(envelope, proto, ts)

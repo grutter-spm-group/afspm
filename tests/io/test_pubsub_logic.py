@@ -162,7 +162,7 @@ def test_pub_send_message(ctx, pub, sample_scan):
     Messages sent with no subscriber are just shelved. We should get no fail
     messages or error.
     """
-    pub.send_message(sample_scan)
+    pub.send_message(sample_scan, common.create_ts())
 
 
 def assert_sub_received_proto(sub: subscriber.Subscriber, proto: Message):
@@ -190,11 +190,11 @@ def test_pubsub_simple(pub_url, cache_kwargs, ctx, pub, topics_both,
 
     # Connect 2 subscribers and confirm we can send separate message envelopes.
     # (Subscribers have been registered via pytest.fixture)
-    pub.send_message(sample_scan)
+    pub.send_message(sample_scan, common.create_ts())
     assert not sub_control_state.poll_and_store()
     assert_sub_received_proto(sub_scan, sample_scan)
 
-    pub.send_message(control_state)
+    pub.send_message(control_state, common.create_ts())
     assert not sub_scan.poll_and_store()
     assert_sub_received_proto(sub_control_state, control_state)
 
@@ -212,7 +212,7 @@ def test_pubsub_simple(pub_url, cache_kwargs, ctx, pub, topics_both,
     assert not sub_both.poll_and_store()
 
     # Send a scan again, confirm both and sub_scan receive
-    pub.send_message(sample_scan)
+    pub.send_message(sample_scan, common.create_ts())
     assert not sub_control_state.poll_and_store()
     assert_sub_received_proto(sub_both, sample_scan)
     assert_sub_received_proto(sub_scan, sample_scan)
@@ -350,11 +350,11 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
 
     # Connect 2 subscribers and confirm we can send separate message envelopes.
     # (Subscribers have been registered via pytest.fixture)
-    pub.send_message(sample_scan)
+    pub.send_message(sample_scan, common.create_ts())
     assert not sub_control_state.poll_and_store()
     assert_sub_received_proto(sub_scan, sample_scan)
 
-    pub.send_message(control_state)
+    pub.send_message(control_state, common.create_ts())
     assert not sub_scan.poll_and_store()
     assert_sub_received_proto(sub_control_state, control_state)
 
@@ -375,7 +375,7 @@ def test_pubsubcache_interaction(psc_url, cache_kwargs, ctx, pub, topics_both,
     assert sub_both.poll_and_store()
 
     # Send a scan again, confirm both and sub_scan receive
-    pub.send_message(sample_scan)
+    pub.send_message(sample_scan, common.create_ts())
     assert not sub_control_state.poll_and_store()
     assert_sub_received_proto(sub_both, sample_scan)
     assert_sub_received_proto(sub_scan, sample_scan)
@@ -397,8 +397,8 @@ def sub_combo(sub_scan_pub, sub_control_state_pub):
 
 def test_combo_subscriber(pub, sub_combo, sample_scan, control_state,
                           topics_scan2d, topics_control_state):
-    pub.send_message(sample_scan)
-    pub.send_message(control_state)
+    pub.send_message(sample_scan, common.create_ts())
+    pub.send_message(control_state, common.create_ts())
 
     messages = sub_combo.poll_and_store()
     assert messages and len(messages) == 2

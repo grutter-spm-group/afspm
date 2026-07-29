@@ -8,6 +8,7 @@ from ...utils import csv
 from typing import Any
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ...io import common
 from ...io.protos.generated import scan_pb2
@@ -80,7 +81,8 @@ class ScanMetadataWriter(afspmc.AfspmComponentBase):
         csv.init_csv_file(self.csv_attribs, self.CSV_FIELDS)
         super().__init__(**kwargs)
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override, save when scans received."""
         if (isinstance(proto, control_pb2.ControlState)):
             self.latest_control_state = proto

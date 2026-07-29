@@ -519,7 +519,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New scans, sending out.")
             _check_and_warn_angle_issue(self.scans)
             for scan in self.scans:
-                self.publisher.send_message(scan)
+                self.publisher.send_message(scan, common.create_ts())
 
     def _update_specs(self):
         old_spec = copy.deepcopy(self.spec)
@@ -549,7 +549,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
 
         if send_spec:
             logger.info("New spec, sending out.")
-            self.publisher.send_message(self.spec)
+            self.publisher.send_message(self.spec, common.create_ts())
 
     def _update_scope_state(self, scope_state: scan_pb2.ScopeState):
         """Send and update scope state if different."""
@@ -559,7 +559,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New scope state %s, sending out.",
                         common.get_enum_str(scan_pb2.ScopeState,
                                             scope_state))
-            self.publisher.send_message(scope_state_msg)
+            self.publisher.send_message(scope_state_msg, common.create_ts())
             self.scope_state = scope_state
 
     def _update_scan_params(self, scan_params: scan_pb2.ScanParameters2d):
@@ -569,7 +569,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New scan_params, sending out.")
             logger.debug(scan_params)
             self.scan_params = scan_params
-            self.publisher.send_message(self.scan_params)
+            self.publisher.send_message(self.scan_params, common.create_ts())
 
     def _update_zctrl_params(self, zctrl_params: feedback_pb2.ZCtrlParameters):
         """Send and update zctrl params if different."""
@@ -578,7 +578,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New zctrl_params, sending out.")
             logger.debug(zctrl_params)
             self.zctrl_params = zctrl_params
-            self.publisher.send_message(self.zctrl_params)
+            self.publisher.send_message(self.zctrl_params, common.create_ts())
 
     def _update_probe_pos(self, probe_pos: spec_pb2.ProbePosition):
         """Send and update probe pos if different."""
@@ -587,7 +587,7 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
             logger.info("New probe position, sending out.")
             logger.debug(probe_pos)
             self.probe_pos = probe_pos
-            self.publisher.send_message(self.probe_pos)
+            self.publisher.send_message(self.probe_pos, common.create_ts())
 
     def _handle_incoming_requests(self):
         """Poll control_server for requests and responds to them."""
@@ -613,7 +613,8 @@ class MicroscopeTranslator(afspmc.AfspmComponentBase, metaclass=ABCMeta):
                                 common.get_enum_str(
                                     scan_pb2.ScopeState,
                                     scope_state_msg.scope_state))
-                    self.publisher.send_message(scope_state_msg)
+                    self.publisher.send_message(scope_state_msg,
+                                                common.create_ts())
                     self.scope_state = scan_pb2.ScopeState.SS_INTERRUPTED
                     self._was_interrupted = True
 

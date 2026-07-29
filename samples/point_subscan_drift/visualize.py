@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.visualizer import Visualizer
@@ -25,7 +26,8 @@ class VisualizerData:
 
 
 def reset_scans(component: Visualizer, envelope: str,
-                proto: Message, viz_data: VisualizerData):
+                proto: Message, ts: Timestamp,
+                viz_data: VisualizerData):
     """Override: we update our scan counter and reset if needed."""
     if isinstance(proto, scan_pb2.Scan2d):
         viz_data.scans_since_reset += 1

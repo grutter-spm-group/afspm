@@ -5,6 +5,7 @@ import logging
 import tkinter as tk
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ..io import common
 from ..io.control import client as ctrl_client
@@ -189,7 +190,8 @@ class AfspmControlUI(AfspmComponentUI):
             logger.warning(msg)
             self.labels[ERROR_LOG_KEY].config(text=msg)
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Check what has changed and update UI accordingly."""
         if isinstance(proto, control_pb2.ControlState):
             last_cs = copy.deepcopy(self.control_state)

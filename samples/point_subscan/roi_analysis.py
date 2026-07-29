@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
@@ -26,7 +27,8 @@ class ROIAnalysisData:
 
 
 def analyze_full_scan(component: AfspmComponent, envelope: str,
-                      proto: Message, analysis_data: ROIAnalysisData):
+                      proto: Message, ts: Timestamp,
+                      analysis_data: ROIAnalysisData):
     """For each 'full scan', output a random set of points of interest."""
     if isinstance(proto, scan_pb2.Scan2d):
         logger.debug("Scan received, analyzing...")
@@ -47,4 +49,4 @@ def analyze_full_scan(component: AfspmComponent, envelope: str,
 
         if component.publisher:
             logger.info(f"Publishing points: {points_list}")
-            component.publisher.send_message(points_list)
+            component.publisher.send_message(points_list, ts)

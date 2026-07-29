@@ -3,6 +3,7 @@
 import logging
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.visualizer import Visualizer
@@ -31,7 +32,8 @@ class ResetScansVisualizer(Visualizer):
 
         super().__init__(**kwargs)
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override: we update our scan counter and reset if needed."""
         if isinstance(proto, scan_pb2.Scan2d):
             self.scans_since_reset += 1
@@ -42,4 +44,4 @@ class ResetScansVisualizer(Visualizer):
                 for key in list(self.subscriber.cache.keys()):
                     if self.scan_id in key:
                         del self.subscriber.cache[key]
-        super().on_message_received(envelope, proto)
+        super().on_message_received(envelope, proto, ts)

@@ -292,9 +292,9 @@ def test_determine_redo_scan(pub_url, psc_url, server_url, router_url, ctx,
     logger.info("Ensure we send out redo scans as needed, and the logic is as "
                 "expected.")
     my_mediator = create_mediator_and_ios(pub_url, psc_url, server_url,
-                                            router_url, rescan_url, ctx,
-                                            csv_attribs,
-                                            channel_id, update_weight)
+                                          router_url, rescan_url, ctx,
+                                          csv_attribs,
+                                          channel_id, update_weight)
     my_mediator.total_corr_info = correction.CorrectionInfo(
         dt1, np.array([0, 0]), np.array([0, 0]))
 
@@ -321,7 +321,7 @@ def test_determine_redo_scan(pub_url, psc_url, server_url, router_url, ctx,
     prior_scan.params.spatial.roi.CopyFrom(roi2)
     my_mediator._determine_redo_scan(uncorrected_scan, prior_scan)
     received = sub.poll_and_store()
-    __, proto = received[0]  # first received of list of messages
+    __, proto, __ = received[0]  # first received of list of messages
     assert proto == requested_scan_params
 
     logger.debug("If the intersection is big enough, no rescan required.")

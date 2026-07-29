@@ -1,5 +1,6 @@
 """Holds abc class and overarching helper methods for cache handling."""
 
+import logging
 from typing import Mapping
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable
@@ -13,6 +14,9 @@ from ...protos.generated import analysis_pb2
 from ...protos.generated import spec_pb2
 
 
+logger = logging.getLogger(__name__)
+
+
 # A default proto-history list for a Last-Value Cache (LVC)
 # Please update with new default messages created.
 DEFAULT_PROTO_WITH_HIST_SEQ = ((scan_pb2.Scan2d(), 1),
@@ -24,6 +28,10 @@ DEFAULT_PROTO_WITH_HIST_SEQ = ((scan_pb2.Scan2d(), 1),
                                (spec_pb2.ProbePosition(), 1),
                                (analysis_pb2.SpatialROIWithScoreList(), 1),
                                (analysis_pb2.SpatialPointWithScoreList(), 1))
+
+
+# Many public methods take as in put a cache_logic. This is its kwargs key.
+CACHE_LOGIC_KEY = 'cache_logic'
 
 
 class CacheLogic(metaclass=ABCMeta):
@@ -111,6 +119,19 @@ def update_cache(proto: Message, ts: Timestamp,
     cache_logic.update_cache(proto, ts, cache)
 
 
+def get_cache_item_ts(cache: dict[str, Iterable[tuple[Message, Timestamp]]],
+                      key: str, idx: int) -> tuple[Message, Timestamp] | None:
+    """Equivalent to get_cache_item, but returns the timestamp as well."""
+    try:
+        return cache[key][idx]
+    except KeyError:
+        logger.trace(f'Key {key} not found in cache, returning None.')
+    except IndexError:
+        logger.trace(f'Index {idx} not found for {key} in cache. '
+                     'Returning None.')
+    return None
+
+
 def get_cache_item(cache: dict[str, Iterable[tuple[Message, Timestamp]]],
                    key: str, idx: int) -> Message:
     """Obtain Message from cache, given key and index.
@@ -128,8 +149,10 @@ def get_cache_item(cache: dict[str, Iterable[tuple[Message, Timestamp]]],
     Returns:
         the proto at that location in the cache.
     """
-    proto, ts = cache[key][idx]
-    return proto
+    item_ts = get_cache_item_ts(cache, key, idx)
+    if item_ts:
+        return item_ts[0]
+    return None
 
 
 def get_cache_items(cache: dict[str, Iterable[tuple[Message, Timestamp]]],
