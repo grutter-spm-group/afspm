@@ -72,7 +72,8 @@ range = [0, 4096]
 
 # ----- Probe / Scan Parameters ----- #
 [scan-speed]
-uuid = 'ScanSpeed'
+getter = 'afspm.components.microscope.translators.asylum.params.get_scan_speed'
+setter = 'afspm.components.microscope.translators.asylum.params.set_scan_speed'
 unit = 'm/s'
 type = 1.0
 range = [0, 5e-4]  # [0 m/s, 500 um / s].  Actual max is 1 m/s!
@@ -116,12 +117,12 @@ type = 1.0
 [x-ratio]
 uuid = 'FastRatio'
 # No units
-type = 1.0
+type = 1
 
 [y-ratio]
 uuid = 'SlowRatio'
 # No units
-type = 1.0
+type = 1
 
 # Miscellaneous
 [img-path]
@@ -135,3 +136,8 @@ type = 1
 [scanning-mode]
 uuid = 'LastScan'
 type = 1
+
+[scan-rate]
+uuid = 'ScanRate'
+unit = '1/s'
+type = 1.0

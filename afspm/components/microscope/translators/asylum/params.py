@@ -185,10 +185,7 @@ class AsylumParam(params.MicroscopeParameterBase):
     IMG_PATH = 'img-path'
     SAVING_MODE = 'saving-mode'  # See SavingMode above.
     SCANNING_MODE = 'scanning-mode'  # See ScanningMode above.
-
-
-# Hardcoded Y ratio (for setting)
-EXPECTED_Y_RATIO = 1.0
+    SCAN_RATE = 'scan-rate'
 
 
 def get_scan_size_x(handler: params.ParameterHandler) -> Any:
@@ -216,26 +213,37 @@ def get_scan_size_y(handler: params.ParameterHandler) -> Any:
 
     This getter will handle that logic.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.Y_RATIO]
+    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.Y_RATIO,
+                     AsylumParam.X_RATIO]
     vals = handler.get_param_list(generic_uuids)
-    return vals[0] * vals[1]  # scan_size * y_ratio
+    return vals[0] * vals[1] / vals[2]  # scan_size * y_ratio / x_ratio
+
+
+def get_scan_speed(handler: AsylumParameterHandler) -> Any:
+    """Get scan speed.
+
+    The Asylum system primarily stores scan speed as a 'Scan Rate', in units
+    of Hz, referring to the rate at which an individual scan line is recorded.
+
+    NOTE:
+    - In fact, there *is* a scan speed parameter, but setting/getting it via
+    the API does not seem to actually change the speed. So we resort to this.
+    - Also, the 'scan speed' shown in Asylum considers not just the scan line
+    but also the 'edge buffers' used during acceleration/deceleration of the
+    tip as it switches direction. Because of this, it is possible our set/get
+    speeds are slightly off from the 'true' get/set speeds.
+    """
+    generic_uuids = [AsylumParam.SCAN_RATE,
+                     params.MicroscopeParameter.SCAN_SIZE_X]
+    vals = handler.get_param_list(generic_uuids)
+    return vals[0] * vals[1]
 
 
 def set_scan_size_x(handler: params.ParameterHandler,
                     val: Any, unit: str):
     """Set scan size (X-dim) for Asylum.
 
-    The scan size is decoupled in two parameters:
-    - ScanSize: 'general' scan size (dimensionless).
-    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
-    to get that dimension's value.
-
-    This setter will handle that logic.
-
-    Note: set_scan_size_y needs to be called *before* a call to
-    set_scan_size_x, as the latter may change the x_ratio according to the
-    *current* scan_size. Since sset_scan_size_y is the one that actually
-    sets scan_size, it *must* be called first.
+    The 'ScanSize' parameter in Asylum corresponds to the X size.
     """
     size_x_uuid = params.MicroscopeParameter.SCAN_SIZE_X
     # Use generic param's info to convert/constrain value.
@@ -246,28 +254,27 @@ def set_scan_size_x(handler: params.ParameterHandler,
     if math.isclose(desired_val, 0.0):
         msg = 'Cannot set scan-size-x due to desired val being 0.'
         raise params.ParameterError(msg)
-
-    # Now, must determine the x ratio for this.
-    scan_size = handler.get_param(AsylumParam.SCAN_SIZE)
-    x_ratio = scan_size / desired_val
-
-    handler.set_param(AsylumParam.X_RATIO, x_ratio, curr_unit=None)
+    handler.set_param(AsylumParam.SCAN_SIZE, desired_val, curr_unit=None)
 
 
 def set_scan_size_y(handler: params.ParameterHandler,
                     val: Any, unit: str):
     """Set scan size (Y-dim) for Asylum.
 
-    The scan size is decoupled in two parameters:
-    - ScanSize: 'general' scan size (dimensionless).
-    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
-    to get that dimension's value.
+    The Y- scan size is decoupled in three(!) parameters:
+    - ScanSize: 'general' scan size (dimensionless), corresponding to the
+    x dimension.
+    - SlowRatio/FastRatio: The ratio to multiply the scan size in order
+    to get y-dimension size.
+
+    So we have:
+    scan_size_y = (y_ratio / x_ratio) * scan_size_x
 
     This setter will handle that logic.
 
     Note: set_scan_size_y needs to be called *before* a call to
     set_scan_size_x, as the latter may change the x_ratio according to the
-    *current* scan_size. Since sset_scan_size_y is the one that actually
+    *current* scan_size. Since set_scan_size_y is the one that actually
     sets scan_size, it *must* be called first.
     """
     size_y_uuid = params.MicroscopeParameter.SCAN_SIZE_Y
@@ -275,20 +282,51 @@ def set_scan_size_y(handler: params.ParameterHandler,
     param_info = handler._get_param_info(size_y_uuid)
     desired_val = params._correct_val_for_sending(val, param_info,
                                                   unit)
+    # Determine ratio parameters
+    scan_size = handler.get_param(AsylumParam.SCAN_SIZE)
 
-    _ensure_y_ratio_is_1(handler)  # Our logic assumes this!
-    handler.set_param(AsylumParam.SCAN_SIZE, desired_val, curr_unit=None)
+    if desired_val > scan_size:
+        x_ratio = round(desired_val / scan_size)
+        y_ratio = 1
+        val_non_one = x_ratio
+    else:
+        y_ratio = round(scan_size / desired_val)
+        x_ratio = 1
+        val_non_one = y_ratio
+
+    if val_non_one % 2 != 0:
+        logger.warning('Trying to set scan-size-y to non-multiple of 2:'
+                       f'{val} (for scan-size-x: {scan_size}). '
+                       f'Updating to {val_non_one * scan_size} instead.')
+        val_non_one -= 1  # Being conservative and going lower.
+
+    handler.set_param(AsylumParam.Y_RATIO, y_ratio, curr_unit=None)
+    handler.set_param(AsylumParam.X_RATIO, x_ratio, curr_unit=None)
 
 
-def _ensure_y_ratio_is_1(handler: params.ParameterHandler):
-    """Ensure the scan size y-ratio is 1. If not, fix it and yell."""
-    y_ratio = handler.get_param(AsylumParam.Y_RATIO)
+def set_scan_speed(handler: params.ParameterHandler,
+                   val: Any, unit: str):
+    """Set scan speed.
 
-    if not isclose(y_ratio, EXPECTED_Y_RATIO):
-        logger.warning(f'Scan size FastRatio is not {EXPECTED_Y_RATIO}!'
-                       'Going to set, but this is unexpected.')
-        handler.set_param(AsylumParam.Y_RATIO, EXPECTED_Y_RATIO,
-                          curr_unit=None)
+    The Asylum system primarily stores scan speed as a 'Scan Rate', in units
+    of Hz, referring to the rate at which an individual scan line is recorded.
+
+    NOTE:
+    - In fact, there *is* a scan speed parameter, but setting/getting it via
+    the API does not seem to actually change the speed. So we resort to this.
+    - Also, the 'scan speed' shown in Asylum considers not just the scan line
+    but also the 'edge buffers' used during acceleration/deceleration of the
+    tip as it switches direction. Because of this, it is possible our set/get
+    speeds are slightly off from the 'true' get/set speeds.
+    """
+    # Convert and ensure our value is in accepted ranges.
+    uuid = params.MicroscopeParameter.SCAN_SPEED
+    param_info = handler._get_param_info(uuid)
+    val = params._correct_val_for_sending(val, param_info, unit, uuid)
+
+    size_x = params.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
+    scan_rate = val / size_x
+    handler.set_param(AsylumParam.SCAN_RATE, scan_rate, curr_unit='1/s')
 
 
 # NOTE: We cannot use GET_VALUE/SET_VALUE with these methods, because they have
