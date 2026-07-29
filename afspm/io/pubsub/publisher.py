@@ -73,7 +73,7 @@ class Publisher:
 
         common.sleep_on_socket_startup()
 
-    def send_msg(self, proto: Message):
+    def send_message(self, proto: Message):
         """Send message via publisher.
 
         It uses get_envelope_for_proto to determine the envelope of our

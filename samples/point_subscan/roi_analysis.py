@@ -47,4 +47,4 @@ def analyze_full_scan(component: AfspmComponent, envelope: str,
 
         if component.publisher:
             logger.info(f"Publishing points: {points_list}")
-            component.publisher.send_msg(points_list)
+            component.publisher.send_message(points_list)

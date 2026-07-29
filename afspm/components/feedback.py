@@ -249,7 +249,7 @@ class FeedbackAnalyzer(AfspmComponent):
                     control_pb2.ExperimentProblem.EP_FEEDBACK_NON_OPTIMAL)
 
             if self.publisher:
-                self.publisher.send_msg(res)
+                self.publisher.send_message(res)
 
 
 # ---------- Feedback Correction ---------- #

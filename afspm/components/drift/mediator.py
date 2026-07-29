@@ -575,7 +575,7 @@ class DriftCompensatedMediator(mediator.MicroscopeMediator):
         if ((isinstance(proto, control_pb2.ControlState) or
                 isinstance(proto, scan_pb2.ScopeStateMsg)) and
                 self.publisher is not None):
-            self.publisher.send_msg(proto)
+            self.publisher.send_message(proto)
 
     def update(self, new_scan: scan_pb2.Scan2d):
         """Update correction infos given a new scan.
@@ -726,7 +726,7 @@ class DriftCompensatedMediator(mediator.MicroscopeMediator):
                 logger.error('Could not send out last scan params for a '
                              'rescan because our stored params are None!')
             else:
-                self.publisher.send_msg(scs_params)
+                self.publisher.send_message(scs_params)
 
     def _handle_shutdown(self):
         """Override to send kill via publisher (if provided)."""
