@@ -225,7 +225,14 @@ def get_scan_speed(handler: AsylumParameterHandler) -> Any:
     The Asylum system primarily stores scan speed as a 'Scan Rate', in units
     of Hz, referring to the rate at which an individual scan line is recorded.
 
+    To get scan speed, we convert from scan rate via the equation:
+    scan_rate = scan_speed / (2 * size_x) = [um/s] / [um] = [1/s]
+    so,
+    scan_speed = scan_rate * 2 * size_x = [1/s] * [um] = [um/s]
+
     NOTE:
+    - We have to use 2x the scan size because each scan performs a
+    forward and backward pass.
     - In fact, there *is* a scan speed parameter, but setting/getting it via
     the API does not seem to actually change the speed. So we resort to this.
     - Also, the 'scan speed' shown in Asylum considers not just the scan line
@@ -236,7 +243,7 @@ def get_scan_speed(handler: AsylumParameterHandler) -> Any:
     generic_uuids = [AsylumParam.SCAN_RATE,
                      params.MicroscopeParameter.SCAN_SIZE_X]
     vals = handler.get_param_list(generic_uuids)
-    return vals[0] * vals[1]
+    return vals[0] * (2 * vals[1])
 
 
 def set_scan_size_x(handler: params.ParameterHandler,
@@ -311,7 +318,12 @@ def set_scan_speed(handler: params.ParameterHandler,
     The Asylum system primarily stores scan speed as a 'Scan Rate', in units
     of Hz, referring to the rate at which an individual scan line is recorded.
 
+    To change scan speed, we change the scan rate via the equation:
+    scan_rate = scan_speed / (2 * size_x) = [um/s] / [um] = [1/s]
+
     NOTE:
+    - We have to use 2x the scan size because each scan performs a
+    forward and backward pass.
     - In fact, there *is* a scan speed parameter, but setting/getting it via
     the API does not seem to actually change the speed. So we resort to this.
     - Also, the 'scan speed' shown in Asylum considers not just the scan line
@@ -324,8 +336,8 @@ def set_scan_speed(handler: params.ParameterHandler,
     param_info = handler._get_param_info(uuid)
     val = params._correct_val_for_sending(val, param_info, unit, uuid)
 
-    size_x = params.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
-    scan_rate = val / size_x
+    size_x = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
+    scan_rate = val / (2*size_x)
     handler.set_param(AsylumParam.SCAN_RATE, scan_rate, curr_unit='1/s')
 
 
