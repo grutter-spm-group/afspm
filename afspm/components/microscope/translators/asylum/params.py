@@ -341,7 +341,7 @@ def set_scan_speed(handler: params.ParameterHandler,
 
     size_x = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
     scan_rate = val / (2*size_x)
-    handler._call_method(SET_SCAN_RATE_METHOD, (scan_rate))
+    handler._call_method(SET_SCAN_RATE_METHOD, (scan_rate,))
 
 
 # NOTE: We cannot use GET_VALUE/SET_VALUE with these methods, because they have
