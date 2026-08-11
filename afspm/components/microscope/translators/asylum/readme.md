@@ -18,6 +18,11 @@ In order to send spectroscopy requests, we needed to implement our own top-level
 %USERPROFILE%/Documents/WaveMetrics/Igor Pro 6 User Files/User Procedures
 ```
 
+### Scan Rate Support Installation
+
+In order to support *setting* scan rate, we need to copy the various validation checks/handling that is done by the user interface. So, we need to copy another
+custom if file: ScanRate.ipf. This needs to be copied to the same location above.
+
 ## Usage
 
 On startup of an experiment, you will need to set up ZeroMQ-XOP, and load the Spectroscopy file.

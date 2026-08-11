@@ -330,6 +330,9 @@ def set_scan_speed(handler: params.ParameterHandler,
     but also the 'edge buffers' used during acceleration/deceleration of the
     tip as it switches direction. Because of this, it is possible our set/get
     speeds are slightly off from the 'true' get/set speeds.
+    - We need to use a custom method to set ScanRate, because the simple
+    approach (PV()) does not do a number of the checks/modifications that are
+    done when user the user interface.
     """
     # Convert and ensure our value is in accepted ranges.
     uuid = params.MicroscopeParameter.SCAN_SPEED
@@ -338,7 +341,7 @@ def set_scan_speed(handler: params.ParameterHandler,
 
     size_x = handler.get_param(params.MicroscopeParameter.SCAN_SIZE_X)
     scan_rate = val / (2*size_x)
-    handler.set_param(AsylumParam.SCAN_RATE, scan_rate, curr_unit='1/s')
+    handler._call_method(SET_SCAN_RATE_METHOD, (scan_rate))
 
 
 # NOTE: We cannot use GET_VALUE/SET_VALUE with these methods, because they have
@@ -354,6 +357,7 @@ GET_POS_X_METHOD = 'GetProbePosX'
 GET_POS_Y_METHOD = 'GetProbePosY'
 SET_POS_X_METHOD = 'SetProbePosX'
 SET_POS_Y_METHOD = 'SetProbePosY'
+SET_SCAN_RATE_METHOD = 'SetScanRate'
 
 
 def get_probe_pos_x(handler: AsylumParameterHandler) -> Any:
