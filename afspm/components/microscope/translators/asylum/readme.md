@@ -43,15 +43,16 @@ zeromq_handler_start() // Prepare to handle incoming messages
 ```
 (Note that the zmq address provided in 'bind' must match that of the AsylumTranslator XOPClient's address, so they can connect).
 
-### Load Spectroscopy File
+### Load Spectroscopy and Scan Rate Files
 
-Next, we must tell Igor to include our methods from Spectroscopy.ipf. To do this, we:
+Next, we must tell Igor to include our methods from Spectroscopy.ipf and from ScanRate.ipf. To do this, we:
 1. Open the Procedure window (either via Ctrl+M or selecting Windows->Procedure Windows->Procedure Window).
 2. In the opened window, place your cursor at the last line of the Procedure file (i.e. after 'StartMeUp()').
 3. Type the following:
 
 ```text
 #include "Spectroscopy"
+#include "ScanRate"
 ```
 
 4. Click on the 'Compile' button on the bottom left toolbar. If it succeeds, the 'Compile' button will disappear.
