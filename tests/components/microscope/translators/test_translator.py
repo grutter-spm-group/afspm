@@ -478,6 +478,65 @@ def test_scan_params(client, default_control_state,
     stop_client(client)
 
 
+def test_scan_params_aspect_ratio(client, default_control_state,
+                                  sub_scan_params, sub_scope_state, exp_problem,
+                                  float_tolerance):
+    logger.info("Validate we can set scan parameters with diff aspect ratios.")
+    startup_grab_control(client, exp_problem)
+
+    logger.info("First, validate we have initial scan params (from the "
+                "cache), and scope state is free.")
+    initial_params = assert_and_return_message(sub_scan_params)
+
+    scope_state_msg = scan_pb2.ScopeStateMsg(
+        scope_state=scan_pb2.ScopeState.SS_FREE)
+    assert_sub_received_proto(sub_scope_state,
+                              scope_state_msg)
+
+    # Two sets of diff scan params: one where you double size_x and
+    # res_y, and one where you double size_y and res_x.
+    diff_scan_params = [copy.deepcopy(initial_params),
+                        copy.deepcopy(initial_params)]
+    diff_scan_params[0].spatial.roi.size.x *= 2
+    diff_scan_params[0].data.shape.y *= 2
+
+    diff_scan_params[1].spatial.roi.size.y *= 2
+    diff_scan_params[1].data.shape.x *= 2
+
+    for modified_params in diff_scan_params:
+        logger.info("Next, set new scan params. We expect a success.")
+        rep = client.set_scan_params(modified_params)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+
+        logger.info("Next, validate that our subscriber receives these new "
+                    "params.")
+        last_params = assert_and_return_message(sub_scan_params)
+
+        logger.info('Requested new position. Expect scope state change.')
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=scan_pb2.ScopeState.SS_MOVING)
+        assert_sub_received_proto(sub_scope_state,
+                                  scope_state_msg)
+
+        logger.info('Next, we should become free (stopped moving).')
+        scope_state_msg = scan_pb2.ScopeStateMsg(
+            scope_state=scan_pb2.ScopeState.SS_FREE)
+        assert_sub_received_proto(sub_scope_state,
+                                  scope_state_msg)
+
+        assert check_equal(last_params, modified_params, float_tolerance)
+
+        logger.info("Now, return to our initial parameters.")
+        rep = client.set_scan_params(initial_params)
+        assert rep == control_pb2.ControlResponse.REP_SUCCESS
+        last_params = assert_and_return_message(sub_scan_params)
+
+        assert check_equal(last_params, initial_params, float_tolerance)
+
+    end_test(client)
+    stop_client(client)
+
+
 def setup_faster_scan(config_dict: dict, client: ControlClient,
                       sub_scan_params: Subscriber,
                       ) -> (list[float], list[scan_pb2.ScanParameters2d]):
