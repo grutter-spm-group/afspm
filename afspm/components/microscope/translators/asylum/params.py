@@ -191,27 +191,24 @@ class AsylumParam(params.MicroscopeParameterBase):
 def get_scan_size_x(handler: params.ParameterHandler) -> Any:
     """Get scan size (X-dim) for Asylum.
 
-    The scan size is decoupled in two parameters:
-    - ScanSize: 'general' scan size (dimensionless).
-    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
-    to get that dimension's value.
-
-    This getter will handle that logic.
+    The 'ScanSize' parameters in Asylum corresponds to the X size.
     """
-    generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.X_RATIO]
-    vals = handler.get_param_list(generic_uuids)
-    return vals[0] * vals[1]  # scan_size * x_ratio
+    generic_uuid = AsylumParam.SCAN_SIZE
+    val = handler.get_param(generic_uuid)
+    return val
 
 
 def get_scan_size_y(handler: params.ParameterHandler) -> Any:
     """Get scan size (Y-dim) for Asylum.
 
-    The scan size is decoupled in two parameters:
-    - ScanSize: 'general' scan size (dimensionless).
-    - FastRatio(X)/SlowRatio(Y): The ratio to multiply the scan size in order
-    to get that dimension's value.
+    The Y- scan size is decoupled in three(!) parameters:
+    - ScanSize: 'general' scan size (dimensionless), corresponding to the
+    x dimension.
+    - SlowRatio/FastRatio: The ratio to multiply the scan size in order
+    to get y-dimension size.
 
-    This getter will handle that logic.
+    So we have:
+    scan_size_y = (y_ratio / x_ratio) * scan_size_x
     """
     generic_uuids = [AsylumParam.SCAN_SIZE, AsylumParam.Y_RATIO,
                      AsylumParam.X_RATIO]
@@ -292,12 +289,12 @@ def set_scan_size_y(handler: params.ParameterHandler,
     # Determine ratio parameters
     scan_size = handler.get_param(AsylumParam.SCAN_SIZE)
 
-    if desired_val > scan_size:
-        x_ratio = round(desired_val / scan_size)
+    if desired_val < scan_size:
+        x_ratio = round(scan_size / desired_val)
         y_ratio = 1
         val_non_one = x_ratio
     else:
-        y_ratio = round(scan_size / desired_val)
+        y_ratio = round(desired_val / scan_size)
         x_ratio = 1
         val_non_one = y_ratio
 
