@@ -642,7 +642,7 @@ def _cap_val_in_range(val: Any, val_range: tuple[Any] | None,
         old_val = val
         val = (val_range[0] if val < val_range[0] else val_range[1]
                if val > val_range[1] else val)
-        logger.info(f'Trying to set {generic_uuid} with value {old_val}, '
+        logger.warn(f'Trying to set {generic_uuid} with value {old_val}, '
                     f'which is outside of range {val_range}. Capping to {val}.')
     return val
 
