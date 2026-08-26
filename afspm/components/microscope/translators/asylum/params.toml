@@ -45,7 +45,7 @@ range = [32, 1536]  # > 2000 may not save
 [scan-resolution-y]  # Unitless
 uuid = 'ScanLines'
 type = 1
-range = [32, 1536]  # > 2000 may not save, real max is 4096.
+range = [16, 1536]  # > 2000 may not save, real max is 4096.
 # Note: the supported values is some strange set. Keep in mind, your
 # chosen resolution will be converted to a supported value.
 
