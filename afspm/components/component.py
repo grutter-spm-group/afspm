@@ -6,6 +6,7 @@ from typing import Callable
 import zmq
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from ..io import common
 from ..io.heartbeat.heartbeat import Heartbeater, get_heartbeat_url
@@ -165,7 +166,8 @@ class AfspmComponentBase:
                 self.stay_alive = False  # Shutdown self
             elif messages:
                 for msg in messages:
-                    self.on_message_received(msg[0], msg[1])
+                    # msg = (envelope, proto, timestamp)
+                    self.on_message_received(msg[0], msg[1], msg[2])
 
     def run_per_loop(self):
         """Run on every iteration of the main loop.
@@ -176,7 +178,8 @@ class AfspmComponentBase:
         """
         pass
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Perform some action on message receipt.
 
         This method will be called whenever a message is received from the
@@ -192,6 +195,7 @@ class AfspmComponentBase:
             envelope: string corresponding to the cache key where this proto
                 is stored in the cache.
             proto: the protobuf.Message instance received.
+            ts: Timestamp associated with this message.
         """
         pass
 
@@ -277,8 +281,9 @@ class AfspmComponent(AfspmComponentBase):
         if self.per_loop_method:
             self.per_loop_method(self, **self.methods_kwargs)
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override to run message_received_method."""
         if self.message_received_method:
-            self.message_received_method(self, envelope, proto,
+            self.message_received_method(self, envelope, proto, ts,
                                          **self.methods_kwargs)

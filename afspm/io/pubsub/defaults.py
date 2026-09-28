@@ -19,8 +19,9 @@ EXTRACT_PROTO = cache_logic.extract_proto
 
 # Simple means each proto has an envelope.
 # Scan means we create channel- and size-specific caches.
-_SIMPLE_CACHE_KWARGS = {'cache_logic': pbc_logic.ProtoBasedCacheLogic()}
-_SCAN_CACHE_KWARGS = {'cache_logic': pbc_logic.PBCScanLogic()}
+_SIMPLE_CACHE_KWARGS = {cache_logic.CACHE_LOGIC_KEY:
+                        pbc_logic.ProtoBasedCacheLogic()}
+_SCAN_CACHE_KWARGS = {cache_logic.CACHE_LOGIC_KEY: pbc_logic.PBCScanLogic()}
 
 # Same as above.
 _SIMPLE_ENVELOPE_FOR_PROTO = cache_logic.CacheLogic.get_envelope_for_proto

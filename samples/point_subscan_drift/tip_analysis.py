@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from afspm.utils.log import LOGGER_ROOT
 from afspm.components.component import AfspmComponent
@@ -25,7 +26,8 @@ class TipStateData:
 
 
 def on_message_received(component: AfspmComponent, envelope: str,
-                        proto: Message, tip_state: TipStateData):
+                        proto: Message, ts: Timestamp,
+                        tip_state: TipStateData):
     """Throw a tip problem every N scans (but wait until resolved)."""
     tip_problem = control_pb2.ExperimentProblem.EP_TIP_SHAPE_CHANGED
     if tip_state.problem_resolved:

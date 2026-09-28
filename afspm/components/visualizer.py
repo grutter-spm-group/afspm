@@ -7,6 +7,7 @@ import numpy as np
 import xarray as xr
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from . import component as afspmc
 from ..io.protos.generated import scan_pb2
@@ -192,9 +193,10 @@ class Visualizer(afspmc.AfspmComponent):
             fig.canvas.draw_idle()
             fig.canvas.flush_events()
 
-    def on_message_received(self, envelope: str, proto: Message):
+    def on_message_received(self, envelope: str, proto: Message,
+                            ts: Timestamp):
         """Override; we update the visualization data on new scans."""
-        super().on_message_received(envelope, proto)
+        super().on_message_received(envelope, proto, ts)
         if isinstance(proto, scan_pb2.Scan2d):
             self._update_visualization_data()
 
